@@ -48,7 +48,15 @@ export interface WelderJob {
   workmanship_warranty_days: number;
 }
 
+export interface SignatureBlockData {
+  clientIdentifier: string;
+  clientName: string;
+  welderIdentifier: string;
+  welderDate: string;
+}
+
 export interface AgreementSection {
   title: string;
   content: string;
+  signatureData?: SignatureBlockData;
 }

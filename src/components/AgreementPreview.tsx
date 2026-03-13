@@ -46,18 +46,59 @@ export function AgreementPreview({ job }: AgreementPreviewProps) {
       {actionButtons}
 
       <div className="agreement-document">
-        {sections.map((section, index) => (
-          <div key={index} className="agreement-section">
-            <h3 className="section-title">{section.title}</h3>
-            <div className="section-content">
-              {section.content.split('\n').map((line, i) => (
-                <p key={i} className="content-line">
-                  {line}
-                </p>
-              ))}
+        {sections.map((section, index) => {
+          const isSignature = section.title === 'CLIENT ACKNOWLEDGMENT';
+          const sig = section.signatureData;
+          return (
+            <div
+              key={index}
+              className={`agreement-section ${isSignature ? 'signature-section' : ''}`}
+            >
+              <h3 className="section-title">{section.title}</h3>
+              <div className="section-content">
+                {section.content.split('\n').map((line, i) => (
+                  <p key={i} className="content-line">
+                    {line}
+                  </p>
+                ))}
+                {sig && (
+                  <div className="signature-blocks">
+                    <div className="signature-block">
+                      <div className="signature-block-identifier">{sig.clientIdentifier}</div>
+                      <div className="signature-field">
+                        <span className="signature-field-label">Name</span>
+                        <div className="signature-field-value">{sig.clientName}</div>
+                      </div>
+                      <div className="signature-field">
+                        <span className="signature-field-label">Signature</span>
+                        <div className="signature-field-value" />
+                      </div>
+                      <div className="signature-field">
+                        <span className="signature-field-label">Date</span>
+                        <div className="signature-field-value" />
+                      </div>
+                    </div>
+                    <div className="signature-block">
+                      <div className="signature-block-identifier">{sig.welderIdentifier}</div>
+                      <div className="signature-field">
+                        <span className="signature-field-label">Name</span>
+                        <div className="signature-field-value" />
+                      </div>
+                      <div className="signature-field">
+                        <span className="signature-field-label">Signature</span>
+                        <div className="signature-field-value" />
+                      </div>
+                      <div className="signature-field">
+                        <span className="signature-field-label">Date</span>
+                        <div className="signature-field-value">{sig.welderDate}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {actionButtons}

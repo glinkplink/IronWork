@@ -361,6 +361,53 @@ body {
   margin-bottom: 0;
 }
 
+.signature-section .content-line {
+  margin-bottom: 0.75rem;
+}
+
+.signature-section .content-line:empty {
+  min-height: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.signature-blocks {
+  margin-top: var(--space-lg);
+}
+
+.signature-block {
+  margin-bottom: var(--space-xl);
+}
+
+.signature-block:last-child {
+  margin-bottom: 0;
+}
+
+.signature-block-identifier {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+  font-size: 0.9375rem;
+}
+
+.signature-field {
+  margin-bottom: var(--space-md);
+}
+
+.signature-field-label {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.signature-field-value {
+  min-height: 1.5em;
+  border-bottom: 1px solid var(--text-primary);
+  padding-bottom: 2px;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+}
+
 /* Footer */
 .app-footer {
   background: var(--gray-800);
