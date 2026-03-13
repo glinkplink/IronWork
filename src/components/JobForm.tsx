@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { WelderJob, JobType, MaterialsProvider, PriceType } from '../types';
 
 interface JobFormProps {
@@ -6,8 +7,39 @@ interface JobFormProps {
 }
 
 export function JobForm({ job, onChange }: JobFormProps) {
+  const [rawPrice, setRawPrice] = useState(() => String(job.price));
+  const [rawWarranty, setRawWarranty] = useState(() =>
+    String(job.workmanship_warranty_days)
+  );
+  const skipSyncRef = useRef(false);
+
+  useEffect(() => {
+    if (skipSyncRef.current) {
+      skipSyncRef.current = false;
+      return;
+    }
+    setRawPrice(job.price === 0 ? '' : String(job.price));
+    setRawWarranty(
+      job.workmanship_warranty_days === 0 ? '' : String(job.workmanship_warranty_days)
+    );
+  }, [job.price, job.workmanship_warranty_days]);
+
   const updateField = <K extends keyof WelderJob>(field: K, value: WelderJob[K]) => {
     onChange({ ...job, [field]: value });
+  };
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setRawPrice(raw);
+    skipSyncRef.current = true;
+    updateField('price', parseFloat(raw) || 0);
+  };
+
+  const handleWarrantyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setRawWarranty(raw);
+    skipSyncRef.current = true;
+    updateField('workmanship_warranty_days', parseInt(raw) || 0);
   };
 
   const addExclusion = () => {
@@ -218,8 +250,8 @@ export function JobForm({ job, onChange }: JobFormProps) {
           <input
             id="price"
             type="number"
-            value={job.price}
-            onChange={(e) => updateField('price', parseFloat(e.target.value) || 0)}
+            value={rawPrice}
+            onChange={handlePriceChange}
             required
             min="0"
             step="0.01"
@@ -343,10 +375,8 @@ export function JobForm({ job, onChange }: JobFormProps) {
           <input
             id="workmanship_warranty_days"
             type="number"
-            value={job.workmanship_warranty_days}
-            onChange={(e) =>
-              updateField('workmanship_warranty_days', parseInt(e.target.value) || 0)
-            }
+            value={rawWarranty}
+            onChange={handleWarrantyChange}
             required
             min="0"
             placeholder="30"
