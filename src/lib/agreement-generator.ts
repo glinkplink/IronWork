@@ -92,10 +92,11 @@ function generateHeader(job: WelderJob): string {
     month: 'long',
     day: 'numeric',
   });
+  const contractorName = job.contractor_name || '[Your Business Name]';
 
   return `Date: ${today}
 
-Contractor: [Your Business Name]
+Contractor: ${contractorName}
 Client: ${job.customer_name}
 Job Location: ${job.job_location}
 Phone: ${job.customer_phone}`;
@@ -210,6 +211,13 @@ This warranty DOES NOT cover:
 }
 
 function generateClientAcknowledgment(job: WelderJob): string {
+  const contractorName = job.contractor_name || '[Your Business Name]';
+  const today = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
   return `By signing below, the Client confirms:
 
 ✓ Agreement to the scope of work outlined above
@@ -222,7 +230,13 @@ Client Name: ${job.customer_name}
 
 Client Signature: _________________________
 
-Date: _________________________`;
+Client Date: _________________________
+
+Contractor Name: ${contractorName}
+
+Contractor Signature: _________________________
+
+Contractor Date: ${today}`;
 }
 
 function capitalizeFirst(str: string): string {

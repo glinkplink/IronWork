@@ -5,6 +5,9 @@ export type PriceType = 'fixed' | 'estimate';
 export type MaterialsProvider = 'welder' | 'customer' | 'mixed';
 
 export interface WelderJob {
+  // Contractor (welder) - optional for backward compatibility
+  contractor_name?: string;
+
   // Customer Information
   customer_name: string;
   customer_phone: string;

@@ -73,6 +73,20 @@ export function JobForm({ job, onChange }: JobFormProps) {
   return (
     <form className="job-form" onSubmit={(e) => e.preventDefault()}>
       <section className="form-section">
+        <h2>Contractor (You)</h2>
+        <div className="form-group">
+          <label htmlFor="contractor_name">Your Business Name</label>
+          <input
+            id="contractor_name"
+            type="text"
+            value={job.contractor_name ?? ''}
+            onChange={(e) => updateField('contractor_name', e.target.value)}
+            placeholder="[Your Business Name]"
+          />
+        </div>
+      </section>
+
+      <section className="form-section">
         <h2>Customer Information</h2>
 
         <div className="form-group">
