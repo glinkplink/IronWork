@@ -19,6 +19,7 @@ A welder opens the app on their phone, answers a few quick questions about a job
 - **Vite**: Fast build tool and dev server
 - **React**: UI framework
 - **TypeScript**: Type safety and better DX
+- **jsPDF**: Client-side PDF generation for the "Download PDF" feature
 
 ### Why This Stack?
 - Zero backend required for MVP
@@ -26,6 +27,13 @@ A welder opens the app on their phone, answers a few quick questions about a job
 - Easy to deploy statically
 - Can be packaged into iOS/Android apps later using Capacitor
 - No complex state management needed for MVP scope
+
+### Known Trade-offs
+- **jsPDF adds ~200KB gzipped** to the main JS bundle (3× increase over the base React build).
+  This was accepted as a deliberate product decision to support named PDF downloads
+  (`CustomerNameM-D-YY.pdf`). The browser's native `window.print()` cannot control the
+  save filename. If bundle size becomes a concern, jsPDF can be lazy-loaded via dynamic
+  `import()` so it only loads when the user clicks "Download PDF".
 
 ## Folder Structure
 

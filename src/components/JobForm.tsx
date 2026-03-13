@@ -11,6 +11,11 @@ export function JobForm({ job, onChange }: JobFormProps) {
   const [rawWarranty, setRawWarranty] = useState(() =>
     String(job.workmanship_warranty_days)
   );
+  // skipSyncRef prevents the useEffect from overwriting raw input strings while the user
+  // is typing. Limitation: if the parent resets the entire job object externally (e.g. a
+  // future "New Job" action) immediately after a keystroke, the reset may be skipped and
+  // inputs will show stale values until the next render cycle. Acceptable for MVP where no
+  // external job reset exists; revisit if a reset/load-job feature is added.
   const skipSyncRef = useRef(false);
 
   useEffect(() => {
