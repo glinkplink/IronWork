@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { WelderJob, JobType, MaterialsProvider, PriceType } from '../types';
 
 interface JobFormProps {
@@ -6,8 +7,44 @@ interface JobFormProps {
 }
 
 export function JobForm({ job, onChange }: JobFormProps) {
+  const [rawPrice, setRawPrice] = useState(() => String(job.price));
+  const [rawWarranty, setRawWarranty] = useState(() =>
+    String(job.workmanship_warranty_days)
+  );
+  // skipSyncRef prevents the useEffect from overwriting raw input strings while the user
+  // is typing. Limitation: if the parent resets the entire job object externally (e.g. a
+  // future "New Job" action) immediately after a keystroke, the reset may be skipped and
+  // inputs will show stale values until the next render cycle. Acceptable for MVP where no
+  // external job reset exists; revisit if a reset/load-job feature is added.
+  const skipSyncRef = useRef(false);
+
+  useEffect(() => {
+    if (skipSyncRef.current) {
+      skipSyncRef.current = false;
+      return;
+    }
+    setRawPrice(job.price === 0 ? '' : String(job.price));
+    setRawWarranty(
+      job.workmanship_warranty_days === 0 ? '' : String(job.workmanship_warranty_days)
+    );
+  }, [job.price, job.workmanship_warranty_days]);
+
   const updateField = <K extends keyof WelderJob>(field: K, value: WelderJob[K]) => {
     onChange({ ...job, [field]: value });
+  };
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setRawPrice(raw);
+    skipSyncRef.current = true;
+    updateField('price', parseFloat(raw) || 0);
+  };
+
+  const handleWarrantyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setRawWarranty(raw);
+    skipSyncRef.current = true;
+    updateField('workmanship_warranty_days', parseInt(raw) || 0);
   };
 
   const addExclusion = () => {
@@ -40,6 +77,20 @@ export function JobForm({ job, onChange }: JobFormProps) {
 
   return (
     <form className="job-form" onSubmit={(e) => e.preventDefault()}>
+      <section className="form-section">
+        <h2>Contractor (You)</h2>
+        <div className="form-group">
+          <label htmlFor="contractor_name">Your Business Name</label>
+          <input
+            id="contractor_name"
+            type="text"
+            value={job.contractor_name ?? ''}
+            onChange={(e) => updateField('contractor_name', e.target.value)}
+            placeholder="[Your Business Name]"
+          />
+        </div>
+      </section>
+
       <section className="form-section">
         <h2>Customer Information</h2>
 
@@ -218,8 +269,8 @@ export function JobForm({ job, onChange }: JobFormProps) {
           <input
             id="price"
             type="number"
-            value={job.price}
-            onChange={(e) => updateField('price', parseFloat(e.target.value) || 0)}
+            value={rawPrice}
+            onChange={handlePriceChange}
             required
             min="0"
             step="0.01"
@@ -267,7 +318,7 @@ export function JobForm({ job, onChange }: JobFormProps) {
         <p className="help-text">List what is NOT included in this job</p>
 
         {job.exclusions.map((exclusion, index) => (
-          <div key={`exclusion-${index}-${exclusion}`} className="list-item">
+          <div key={`exclusion-${index}`} className="list-item">
             <input
               type="text"
               value={exclusion}
@@ -295,7 +346,7 @@ export function JobForm({ job, onChange }: JobFormProps) {
         <p className="help-text">List assumptions about the job conditions</p>
 
         {job.assumptions.map((assumption, index) => (
-          <div key={`assumption-${index}-${assumption}`} className="list-item">
+          <div key={`assumption-${index}`} className="list-item">
             <input
               type="text"
               value={assumption}
@@ -343,10 +394,8 @@ export function JobForm({ job, onChange }: JobFormProps) {
           <input
             id="workmanship_warranty_days"
             type="number"
-            value={job.workmanship_warranty_days}
-            onChange={(e) =>
-              updateField('workmanship_warranty_days', parseInt(e.target.value) || 0)
-            }
+            value={rawWarranty}
+            onChange={handleWarrantyChange}
             required
             min="0"
             placeholder="30"

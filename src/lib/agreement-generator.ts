@@ -1,4 +1,4 @@
-import type { WelderJob, AgreementSection } from '../types';
+import type { WelderJob, AgreementSection, SignatureBlockData } from '../types';
 
 // Section content uses plain text with \n line breaks and • bullets.
 // A future structured content model would separate data from formatting,
@@ -80,10 +80,29 @@ export function generateAgreement(job: WelderJob): AgreementSection[] {
   // 12. Client Acknowledgment
   sections.push({
     title: 'CLIENT ACKNOWLEDGMENT',
-    content: generateClientAcknowledgment(job),
+    content: generateClientAcknowledgment(),
+    signatureData: getSignatureBlockData(job),
   });
 
   return sections;
+}
+
+// Shared helper to get contractor name with fallback
+function getContractorName(job: WelderJob): string {
+  const raw = job.contractor_name?.trim();
+  return raw && raw !== '[Your Business Name]' ? raw : 'Contractor';
+}
+
+function getSignatureBlockData(job: WelderJob): SignatureBlockData {
+  const welderIdentifier = getContractorName(job);
+  const d = new Date();
+  const welderDate = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+
+  return {
+    clientName: job.customer_name,
+    welderIdentifier,
+    welderDate,
+  };
 }
 
 function generateHeader(job: WelderJob): string {
@@ -92,10 +111,11 @@ function generateHeader(job: WelderJob): string {
     month: 'long',
     day: 'numeric',
   });
+  const contractorName = getContractorName(job);
 
   return `Date: ${today}
 
-Contractor: [Your Business Name]
+Contractor: ${contractorName}
 Client: ${job.customer_name}
 Job Location: ${job.job_location}
 Phone: ${job.customer_phone}`;
@@ -209,20 +229,14 @@ This warranty DOES NOT cover:
 • Structural failures unrelated to the weld repair`;
 }
 
-function generateClientAcknowledgment(job: WelderJob): string {
+function generateClientAcknowledgment(): string {
   return `By signing below, the Client confirms:
 
 ✓ Agreement to the scope of work outlined above
 ✓ Understanding of exclusions and limitations
 ✓ Approval of pricing and payment terms
 ✓ Acknowledgment that responsibility transfers upon completion
-✓ Acceptance of workmanship warranty terms
-
-Client Name: ${job.customer_name}
-
-Client Signature: _________________________
-
-Date: _________________________`;
+✓ Acceptance of workmanship warranty terms`;
 }
 
 function capitalizeFirst(str: string): string {
@@ -231,6 +245,13 @@ function capitalizeFirst(str: string): string {
 
 export function formatAgreementAsText(sections: AgreementSection[]): string {
   return sections
-    .map((section) => `${section.title}\n${'='.repeat(section.title.length)}\n\n${section.content}`)
+    .map((section) => {
+      let text = `${section.title}\n${'='.repeat(section.title.length)}\n\n${section.content}`;
+      if (section.signatureData) {
+        const s = section.signatureData;
+        text += `\n\n${s.clientName}\n\nName: ${s.clientName}\nSignature: _________________________\nDate: _________________________\n\n${s.welderIdentifier}\n\nName: _________________________\nSignature: _________________________\nDate: ${s.welderDate}`;
+      }
+      return text;
+    })
     .join('\n\n');
 }

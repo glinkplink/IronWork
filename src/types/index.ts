@@ -5,6 +5,9 @@ export type PriceType = 'fixed' | 'estimate';
 export type MaterialsProvider = 'welder' | 'customer' | 'mixed';
 
 export interface WelderJob {
+  // Contractor (welder) - optional for backward compatibility
+  contractor_name?: string;
+
   // Customer Information
   customer_name: string;
   customer_phone: string;
@@ -45,7 +48,14 @@ export interface WelderJob {
   workmanship_warranty_days: number;
 }
 
+export interface SignatureBlockData {
+  clientName: string;
+  welderIdentifier: string;
+  welderDate: string;
+}
+
 export interface AgreementSection {
   title: string;
   content: string;
+  signatureData?: SignatureBlockData;
 }
