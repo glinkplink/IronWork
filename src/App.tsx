@@ -76,8 +76,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>ScopeLock</h1>
-        <p className="tagline">Simple Agreements for Welders</p>
+        <h1 className="app-title" onClick={() => setView('home')}>ScopeLock</h1>
         <div className="header-actions">
           {showTabs && (
             <button
