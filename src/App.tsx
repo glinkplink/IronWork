@@ -4,6 +4,7 @@ import { JobForm } from './components/JobForm';
 import { AgreementPreview } from './components/AgreementPreview';
 import { AuthPage } from './components/AuthPage';
 import { BusinessProfileForm } from './components/BusinessProfileForm';
+import { HomePage } from './components/HomePage';
 import { useAuth } from './hooks/useAuth';
 import { signOut } from './lib/auth';
 import { getProfile } from './lib/db/profile';
@@ -16,7 +17,7 @@ function App() {
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [editingProfile, setEditingProfile] = useState(false);
-  const [activeTab, setActiveTab] = useState<'form' | 'preview'>('form');
+  const [view, setView] = useState<'home' | 'form' | 'preview'>('home');
   const [job, setJob] = useState<WelderJob>(() => ({
     ...(sampleJob as WelderJob),
     contractor_name: '',
@@ -70,12 +71,23 @@ function App() {
     );
   }
 
+  const showTabs = view === 'form' || view === 'preview';
+
   return (
     <div className="app">
       <header className="app-header">
         <h1>ScopeLock</h1>
         <p className="tagline">Simple Agreements for Welders</p>
         <div className="header-actions">
+          {showTabs && (
+            <button
+              type="button"
+              className="btn-home"
+              onClick={() => setView('home')}
+            >
+              Home
+            </button>
+          )}
           <button
             type="button"
             className="btn-edit-profile"
@@ -93,23 +105,30 @@ function App() {
         </div>
       </header>
 
-      <nav className="tab-nav">
-        <button
-          className={`tab-button ${activeTab === 'form' ? 'active' : ''}`}
-          onClick={() => setActiveTab('form')}
-        >
-          Job Details
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'preview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('preview')}
-        >
-          Agreement Preview
-        </button>
-      </nav>
+      {showTabs && (
+        <nav className="tab-nav">
+          <button
+            className={`tab-button ${view === 'form' ? 'active' : ''}`}
+            onClick={() => setView('form')}
+          >
+            Work Agreement
+          </button>
+          <button
+            className={`tab-button ${view === 'preview' ? 'active' : ''}`}
+            onClick={() => setView('preview')}
+          >
+            Agreement Preview
+          </button>
+        </nav>
+      )}
 
       <main className="app-main">
-        {activeTab === 'form' ? (
+        {view === 'home' ? (
+          <HomePage
+            onCreateAgreement={() => setView('form')}
+            businessName={profile?.business_name}
+          />
+        ) : view === 'form' ? (
           <JobForm job={job} onChange={setJob} />
         ) : (
           <AgreementPreview job={job} />
