@@ -382,6 +382,16 @@ body {
   margin-bottom: 0;
 }
 
+.signature-block + .signature-block {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border);
+}
+
+.signature-typed-autofill {
+  /* TODO: Could use cursive/signature-style font for DocuSign-like look */
+}
+
 .signature-block-identifier {
   font-weight: 600;
   color: var(--text-primary);

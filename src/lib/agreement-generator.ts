@@ -96,7 +96,11 @@ function getContractorName(job: WelderJob): string {
 function getSignatureBlockData(job: WelderJob): SignatureBlockData {
   const welderIdentifier = getContractorName(job);
   const d = new Date();
-  const welderDate = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+  const welderDate = d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
   return {
     clientName: job.customer_name,
@@ -249,7 +253,8 @@ export function formatAgreementAsText(sections: AgreementSection[]): string {
       let text = `${section.title}\n${'='.repeat(section.title.length)}\n\n${section.content}`;
       if (section.signatureData) {
         const s = section.signatureData;
-        text += `\n\n${s.clientName}\n\nName: ${s.clientName}\nSignature: _________________________\nDate: _________________________\n\n${s.welderIdentifier}\n\nName: _________________________\nSignature: _________________________\nDate: ${s.welderDate}`;
+        // TODO: Contractor signature could use cursive/signature-style font for DocuSign-like look
+        text += `\n\nClient\n\nName: ${s.clientName}\nSignature: _________________________\nDate: _________________________\n\n${s.welderIdentifier}\n\nSignature: ${s.welderIdentifier}\nDate: ${s.welderDate}`;
       }
       return text;
     })

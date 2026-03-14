@@ -64,7 +64,7 @@ export function AgreementPreview({ job }: AgreementPreviewProps) {
                 {sig && (
                   <div className="signature-blocks">
                     <div className="signature-block">
-                      <div className="signature-block-identifier">{sig.clientName}</div>
+                      <div className="signature-block-identifier">Client</div>
                       <div className="signature-field">
                         <span className="signature-field-label">Name</span>
                         <div className="signature-field-value">{sig.clientName}</div>
@@ -81,12 +81,10 @@ export function AgreementPreview({ job }: AgreementPreviewProps) {
                     <div className="signature-block">
                       <div className="signature-block-identifier">{sig.welderIdentifier}</div>
                       <div className="signature-field">
-                        <span className="signature-field-label">Name</span>
-                        <div className="signature-field-value" />
-                      </div>
-                      <div className="signature-field">
                         <span className="signature-field-label">Signature</span>
-                        <div className="signature-field-value" />
+                        <div className="signature-field-value signature-typed-autofill">
+                          {sig.welderIdentifier}
+                        </div>
                       </div>
                       <div className="signature-field">
                         <span className="signature-field-label">Date</span>
