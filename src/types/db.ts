@@ -9,6 +9,8 @@ export interface BusinessProfile {
   email: string | null;
   address: string | null;
   google_business_profile_url: string | null;
+  default_exclusions: string[];
+  default_assumptions: string[];
   created_at: string;
   updated_at: string;
 }
