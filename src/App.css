@@ -504,6 +504,38 @@ body {
   font-size: 0.8125rem;
 }
 
+.btn-header-action {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-header-action:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.btn-danger {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  color: white;
+}
+
 /* Edit Profile Page */
 .edit-profile-page {
   max-width: 640px;
@@ -640,9 +672,22 @@ body {
 
 .edit-profile-page .form-actions {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: stretch;
+  margin-top: var(--space-lg);
+}
+
+.edit-profile-page .form-actions-row {
+  display: flex;
   gap: var(--space-md);
   justify-content: center;
-  margin-top: var(--space-lg);
+}
+
+.edit-profile-page .form-actions .btn-danger {
+  width: 100%;
+  padding: var(--space-md);
+  font-size: 1rem;
 }
 
 .edit-profile-page .btn-primary {

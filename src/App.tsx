@@ -7,7 +7,6 @@ import { BusinessProfileForm } from './components/BusinessProfileForm';
 import { HomePage } from './components/HomePage';
 import { EditProfilePage } from './components/EditProfilePage';
 import { useAuth } from './hooks/useAuth';
-import { signOut } from './lib/auth';
 import { getProfile } from './lib/db/profile';
 import type { BusinessProfile } from './types/db';
 import sampleJob from './data/sample-job.json';
@@ -109,28 +108,12 @@ function App() {
       <header className="app-header">
         <h1 className="app-title" onClick={() => setView('home')}>ScopeLock</h1>
         <div className="header-actions">
-          {showTabs && (
-            <button
-              type="button"
-              className="btn-home"
-              onClick={() => setView('home')}
-            >
-              Home
-            </button>
-          )}
           <button
             type="button"
-            className="btn-edit-profile"
+            className="btn-header-action"
             onClick={() => setView('profile')}
           >
             Edit Profile
-          </button>
-          <button
-            type="button"
-            className="btn-sign-out"
-            onClick={() => signOut()}
-          >
-            Sign Out
           </button>
         </div>
       </header>
