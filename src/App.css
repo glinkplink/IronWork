@@ -335,8 +335,8 @@ body {
 }
 
 .agreement-section {
-  margin-bottom: var(--space-lg);
-  padding-bottom: var(--space-lg);
+  margin-bottom: var(--space-xl);
+  padding-bottom: var(--space-xl);
   border-bottom: 1px solid var(--border);
 }
 
@@ -353,6 +353,12 @@ body {
   margin-bottom: var(--space-md);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* Center the main agreement title */
+.agreement-section:first-child .section-title {
+  text-align: center;
+  font-size: 1.25rem;
 }
 
 .section-content {
