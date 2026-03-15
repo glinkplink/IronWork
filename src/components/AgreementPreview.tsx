@@ -25,8 +25,26 @@ export function AgreementPreview({ job }: AgreementPreviewProps) {
 
   const handleDownloadPdf = () => {
     const doc = new jsPDF();
-    const lines = doc.splitTextToSize(plainText, 170);
-    doc.text(lines, 20, 20);
+    const pageHeight = doc.internal.pageSize.height; // ~297mm for A4
+    const pageWidth = doc.internal.pageSize.width;   // ~210mm for A4
+    const margin = 20;
+    const maxWidth = pageWidth - (margin * 2);       // ~170mm
+    const lineHeight = 7;                            // ~7mm per line
+
+    let yPosition = margin;
+    const lines = doc.splitTextToSize(plainText, maxWidth);
+
+    lines.forEach((line: string) => {
+      // Check if adding this line would exceed page height
+      if (yPosition + lineHeight > pageHeight - margin) {
+        doc.addPage();           // Create new page
+        yPosition = margin;       // Reset Y position to top of new page
+      }
+
+      doc.text(line, margin, yPosition);
+      yPosition += lineHeight;
+    });
+
     doc.save(getPdfFilename(job.customer_name));
   };
 
