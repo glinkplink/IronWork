@@ -62,38 +62,25 @@ function App() {
   };
 
   useEffect(() => {
-    if (profile && view !== 'profile') {
-      // Only update contractor_name, not exclusions/assumptions (preserves user edits)
-      setJob((prev) => ({ ...prev, contractor_name: profile.business_name }));
-    }
-  }, [profile?.business_name, view]);
-
-  // Reset auth page state and view when user signs in successfully
-  useEffect(() => {
-    if (user && showAuthPage) {
-      setShowAuthPage(false);
-      setView('home');
-    }
-  }, [user, showAuthPage]);
-
-  useEffect(() => {
     if (user) {
       const loadProfile = async () => {
+        // Also clear auth page flag on sign-in (deferred to avoid sync setState in effect)
+        setShowAuthPage(false);
         setProfileLoading(true);
         const data = await getProfile(user.id);
         setProfile(data);
         setProfileLoading(false);
-        // Reset account creating state when user is authenticated
         setAccountCreating(false);
-        // Reset signup flag once profile is loaded
         if (justCompletedSignup && data) {
           setJustCompletedSignup(false);
         }
       };
       loadProfile();
     } else {
-      setProfile(null);
-      setProfileLoading(false);
+      Promise.resolve().then(() => {
+        setProfile(null);
+        setProfileLoading(false);
+      });
     }
   }, [user, justCompletedSignup]);
 
