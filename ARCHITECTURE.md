@@ -6,51 +6,69 @@ ScopeLock helps independent welders quickly generate short, professional job agr
 
 The generated document is a concise 1–3 page agreement, not a long legal contract.
 
-### Target Users
+### Target Users (For MVP)
 - Independent welders
 - Small welding shops
 - Mobile welders doing repair or fabrication jobs
 
 ### Primary Workflow
-A welder opens the app on their phone, answers a few quick questions about a job, and generates a simple professional agreement they can send to the client before work begins.
+A welder signs up, sets up their business profile (saved to the database), then opens the app to answer a few quick questions about a job and generates a simple professional agreement they can send to the client before work begins.
 
 ## Tech Stack
 
 - **Vite**: Fast build tool and dev server
 - **React**: UI framework
 - **TypeScript**: Type safety and better DX
+- **Supabase**: Authentication (email/password) and Postgres database
 - **jsPDF**: Client-side PDF generation for the "Download PDF" feature
 
 ### Why This Stack?
-- Zero backend required for MVP
-- Fast development and hot reload
-- Easy to deploy statically
+- Supabase provides auth + Postgres with minimal backend code
+- Row-level security enforces per-user data isolation at the DB layer
+- Fast development and hot reload with Vite
+- Easy to deploy statically (frontend only)
 - Can be packaged into iOS/Android apps later using Capacitor
-- No complex state management needed for MVP scope
 
 ### Known Trade-offs
 - **jsPDF adds ~200KB gzipped** to the main JS bundle (3× increase over the base React build).
   This was accepted as a deliberate product decision to support named PDF downloads
-  (`CustomerNameM-D-YY.pdf`). The browser's native `window.print()` cannot control the
-  save filename. If bundle size becomes a concern, jsPDF can be lazy-loaded via dynamic
-  `import()` so it only loads when the user clicks "Download PDF".
+  (`CustomerNameM-D-YY.pdf`). If bundle size becomes a concern, jsPDF can be lazy-loaded
+  via dynamic `import()` so it only loads when the user clicks "Download PDF".
 
 ## Folder Structure
 
 ```
 scope-lock/
 ├── src/
-│   ├── components/       # UI components
-│   │   ├── JobForm.tsx
-│   │   └── AgreementPreview.tsx
-│   ├── data/             # Sample data and constants
-│   │   └── sample-job.json
-│   ├── lib/              # Domain logic (pure functions)
-│   │   └── agreement-generator.ts
-│   ├── types/            # TypeScript type definitions
-│   │   └── index.ts
-│   ├── App.tsx           # Main app component
-│   └── main.tsx          # Entry point
+│   ├── components/
+│   │   ├── AuthPage.tsx              # Sign up / sign in form
+│   │   ├── BusinessProfileForm.tsx   # First-time onboarding form
+│   │   ├── EditProfilePage.tsx       # Edit profile + agreement defaults
+│   │   ├── HomePage.tsx              # Post-login landing page
+│   │   ├── JobForm.tsx               # Work Agreement input form
+│   │   └── AgreementPreview.tsx      # Agreement preview + PDF/Print
+│   ├── data/
+│   │   └── sample-job.json           # Fallback defaults for new agreements
+│   ├── hooks/
+│   │   └── useAuth.ts                # Auth state hook (Supabase session)
+│   ├── lib/
+│   │   ├── supabase.ts               # Supabase client singleton
+│   │   ├── auth.ts                   # signUp / signIn / signOut helpers
+│   │   ├── agreement-generator.ts    # Pure domain logic: agreement text generation
+│   │   └── db/
+│   │       ├── profile.ts            # getProfile / upsertProfile
+│   │       ├── clients.ts            # listClients / upsertClient / deleteClient
+│   │       └── jobs.ts               # listJobs / createJob / updateJob / deleteJob
+│   ├── types/
+│   │   ├── index.ts                  # WelderJob, AgreementSection, SignatureBlockData
+│   │   └── db.ts                     # BusinessProfile, Client, Job, ChangeOrder, CompletionSignoff
+│   ├── App.tsx                       # Root component - view state machine
+│   └── main.tsx                      # Entry point
+├── supabase/
+│   ├── config.toml                   # Supabase CLI config
+│   └── migrations/
+│       ├── 0001_initial_schema.sql   # All 5 tables + indexes + triggers + RLS
+│       └── 0002_add_default_exclusions_assumptions.sql
 ├── public/
 ├── index.html
 ├── package.json
@@ -59,73 +77,85 @@ scope-lock/
 └── ARCHITECTURE.md
 ```
 
+## App Navigation Flow
+
+```
+User visits app
+      ↓
+[Not signed in] → AuthPage (sign up / sign in)
+      ↓
+[Signed in, no profile] → BusinessProfileForm (onboarding)
+      ↓
+[Profile exists] → HomePage ("Create Work Agreement")
+      ↓
+CTA button → JobForm (Work Agreement details)
+      ↓
+Tab nav → AgreementPreview (Print / Download PDF)
+      ↓
+Header "Edit Profile" → EditProfilePage (edit business info + defaults)
+```
+
 ## Domain Logic vs UI Logic
 
-### Domain Logic (`src/lib/`)
+### Domain Logic (`src/lib/agreement-generator.ts`)
 - Pure functions with no side effects
 - Agreement text generation from job data
-- No React dependencies
+- No React or Supabase dependencies
 - Testable in isolation
-- File: `agreement-generator.ts`
 
-### UI Logic (`src/components/`)
+### Auth + DB Layer (`src/lib/`)
+- `supabase.ts`: Supabase client, reads env vars
+- `auth.ts`: Thin wrappers over `supabase.auth`
+- `db/profile.ts`: Profile CRUD
+- `db/clients.ts`: Client CRUD (helpers ready, UI not yet built)
+- `db/jobs.ts`: Job CRUD (helpers ready, jobs still in-memory in UI)
+
+### UI Components (`src/components/`)
 - React components for user interaction
 - Form state management
-- Rendering agreement preview
 - Mobile-first responsive design
-- Files: `JobForm.tsx`, `AgreementPreview.tsx`
 
 ### Type Definitions (`src/types/`)
-- Shared TypeScript interfaces
-- Single source of truth for data shapes
-- File: `index.ts`
+- `index.ts`: WelderJob and agreement types (used by domain logic + UI)
+- `db.ts`: Database row types matching Supabase schema
 
-### Data (`src/data/`)
-- Sample job data for testing
-- Constants and templates
-- File: `sample-job.json`
+## Database Schema
 
-## Separation of Concerns
+Five tables in Supabase Postgres, all with row-level security:
 
-The architecture emphasizes clear separation between:
+| Table | Key Columns |
+|---|---|
+| `business_profiles` | user_id (unique), business_name, owner_name, phone, email, address, google_business_profile_url, default_exclusions[], default_assumptions[] |
+| `clients` | user_id, name, phone, email, address, notes |
+| `jobs` | user_id, client_id, all WelderJob fields, status |
+| `change_orders` | user_id, job_id, description, price_delta, time_delta, approved |
+| `completion_signoffs` | user_id, job_id, client_name, signed_at, notes |
 
-1. **Domain Logic (Agreement Generation)**
-   - Located in `src/lib/agreement-generator.ts`
-   - Pure function: `generateAgreement(job: WelderJob): string`
-   - No UI dependencies
-   - Easy to test and reuse
+All tables use `auth.uid()` RLS policies: users can only read/write their own rows.
 
-2. **UI Components**
-   - Located in `src/components/`
-   - Handle user input and display
-   - Use React state for form management
-   - Import domain logic but not vice versa
+## What Is and Isn't Persisted
 
-3. **Data Schemas**
-   - Located in `src/types/index.ts`
-   - Define `WelderJob` interface
-   - Used by both domain logic and UI
-
-4. **Templates**
-   - Embedded in domain logic as template strings
-   - Structured for easy customization
-   - Separated by document sections
+| Feature | Persisted | Notes |
+|---|---|---|
+| Business profile | Yes | Supabase DB |
+| Default exclusions/assumptions | Yes | Supabase DB, pre-populate new agreements |
+| Auth session | Yes | Supabase session (survives refresh) |
+| Work Agreement (current job) | No | In-memory only; DB helpers exist |
+| Clients | No | DB helpers exist, UI not yet built |
+| Change orders | No | Schema only |
+| Completion signoffs | No | Schema only |
 
 ## Portability Considerations
 
 ### Current (Web MVP)
 - Runs in browser
-- No persistence
-- No backend dependencies
-- Static hosting compatible
+- Auth + profile persistence via Supabase
+- Job agreements are in-memory (no per-job persistence yet)
+- Static hosting compatible (frontend only)
 
 ### Future (Capacitor iOS/Android)
 - Can be wrapped with Capacitor
-- No code changes needed for basic functionality
-- Add native features later:
-  - File system access for saving agreements
-  - Camera for signature capture
-  - Share sheet for sending documents
+- Supabase JS SDK works in Capacitor environments
 - React components are already mobile-first
 
 ### Migration Path to Capacitor
@@ -135,34 +165,35 @@ The architecture emphasizes clear separation between:
 4. Wrap existing React app (no major refactoring)
 5. Add native plugins as needed
 
-## Next Planned Features
+## Roadmap
 
-### MVP (Current)
-- [x] Job input form
+### Completed
+- [x] Job input form (Work Agreement)
 - [x] Agreement text generation
 - [x] Agreement preview
+- [x] PDF download with named file
+- [x] Print support
 - [x] Mobile-first UI
+- [x] Email/password authentication
+- [x] Business profile persistence
+- [x] Default exclusions/assumptions saved to profile
+- [x] Authenticated landing page (Home)
+- [x] Edit Profile page
 
-### Phase 2
-- [ ] PDF export
-- [ ] Signature capture (canvas)
-- [ ] Local storage persistence
-- [ ] Copy to clipboard
-- [ ] Share via SMS/email
+### Near-Term
+- [ ] Research standard welder work agreements/ contracts and edit ours to
+      match
+- [ ] Make PDF output look professional
+- [ ] Client list and client selection UI
+- [ ] Custom branding (logo)
+- [ ] Save/load job history
+- [ ] Add a 'Generate Invoice' function that allows the user to easily create/ send an invoice based on their work agreement. 
 
-### Phase 3
-- [ ] Multiple templates
-- [ ] Custom branding (logo, colors)
-- [ ] Job history
-- [ ] Client database
-- [ ] Cloud sync
-
-### Phase 4 (Capacitor)
-- [ ] iOS app packaging
-- [ ] Android app packaging
-- [ ] Native file sharing
-- [ ] Offline support
-- [ ] Camera integration
+### Later
+- [ ] Multiple agreement templates
+- [ ] Change order flow (schema exists)
+- [ ] Completion signoff (schema exists)
+- [ ] Capacitor iOS/Android packaging
 
 ## Design Principles
 
@@ -177,11 +208,19 @@ The architecture emphasizes clear separation between:
 - Use TypeScript for all new code
 - Keep components small and focused
 - Prefer pure functions for business logic
-- No external state management libraries (React state is enough)
+- No external state management libraries (React state is sufficient)
 - Mobile-first CSS (start with mobile, add desktop styles)
-- No backend for MVP
-- No authentication for MVP
-- No database for MVP
+- All new tables must include RLS policies
+- DB helpers go in `src/lib/db/`
+
+## Environment Variables
+
+```
+VITE_SUPABASE_URL=     # Supabase project URL
+VITE_SUPABASE_ANON_KEY= # Supabase anon (public) key
+```
+
+Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboard (Project Settings → API).
 
 ## Running the Application
 
@@ -199,9 +238,18 @@ npm run build
 npm run preview
 ```
 
+## Applying Migrations
+
+```bash
+# Apply via Supabase CLI
+npx supabase db push
+
+# Or paste migration SQL directly in Supabase Dashboard → SQL Editor
+```
+
 ## Deployment
 
-The app can be deployed to any static hosting:
+The frontend can be deployed to any static hosting:
 - Vercel
 - Netlify
 - GitHub Pages
