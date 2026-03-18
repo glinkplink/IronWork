@@ -1,8 +1,6 @@
 # ScopeLock
 
-**Simple Agreements for Welders**
-
-ScopeLock helps independent welders quickly generate short, professional job agreements for small jobs. The goal is to prevent disputes, clarify scope, and protect the welder from being blamed for issues outside their work.
+Work agreement generator for contractors (initially welders). Contractors fill out a job form and get a professional PDF agreement to send to clients.
 
 ## Quick Start
 
@@ -10,139 +8,104 @@ ScopeLock helps independent welders quickly generate short, professional job agr
 # Install dependencies
 npm install
 
+# Copy env vars and fill in from Supabase dashboard (Project Settings → API)
+cp .env.example .env.local
+
 # Start development server
 npm run dev
 
 # Build for production
 npm run build
-
-# Preview production build
-npm run preview
 ```
 
 ## Features
 
-- ✅ Mobile-first responsive design
-- ✅ Welder Job Agreement Generator
-- ✅ Real-time agreement preview
-- ✅ Copy to clipboard functionality
-- ✅ Print/PDF export support
-- ✅ No backend required
-- ✅ No authentication needed
-- ✅ No database required
+- Mobile-first responsive design
+- Email/password authentication (Supabase)
+- Business profile stored in database
+- Reusable default exclusions and assumptions saved to profile
+- Work Agreement generator (12 sections)
+- Agreement preview
+- PDF download with named file (`CustomerName M-D-YY.pdf`)
+- Print support
 
 ## Tech Stack
 
-- **Vite** - Fast build tool and dev server
-- **React** - UI framework
-- **TypeScript** - Type safety
+- **Vite** + **React** + **TypeScript**
+- **Supabase** (auth + Postgres + row-level security)
+- **jsPDF** (PDF generation)
+- Plain CSS — no Tailwind
+
+## Environment Variables
+
+```
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
 
 ## Project Structure
 
 ```
-scope-lock/
-├── src/
-│   ├── components/
-│   │   ├── JobForm.tsx              # Main job input form
-│   │   └── AgreementPreview.tsx     # Agreement preview component
-│   ├── data/
-│   │   └── sample-job.json          # Sample job data for testing
-│   ├── lib/
-│   │   └── agreement-generator.ts   # Domain logic for agreement generation
-│   ├── types/
-│   │   └── index.ts                 # TypeScript type definitions
-│   ├── App.tsx                      # Main app component
-│   ├── App.css                      # Mobile-first styles
-│   └── main.tsx                     # Entry point
-├── ARCHITECTURE.md                  # Architecture documentation
-├── package.json
-└── README.md
+src/
+  App.tsx                    # Root — auth routing + onboarding state machine
+  components/
+    AuthPage.tsx             # Sign-in page (returning users)
+    BusinessProfileForm.tsx  # Landing page / new user onboarding step 1
+    PasswordCreationPage.tsx # New user onboarding step 2
+    HomePage.tsx             # Dashboard after login
+    JobForm.tsx              # Work agreement form
+    AgreementPreview.tsx     # Agreement preview + PDF export
+    EditProfilePage.tsx      # Edit business profile + agreement defaults
+  lib/
+    supabase.ts              # Supabase client
+    auth.ts                  # signUp, signIn, signOut
+    agreement-generator.ts   # Agreement text generation
+    db/
+      profile.ts             # getProfile, upsertProfile
+      clients.ts             # listClients, upsertClient, deleteClient
+      jobs.ts                # listJobs, createJob, updateJob, deleteJob
+  hooks/
+    useAuth.ts               # Supabase auth state listener
+  types/
+    index.ts                 # WelderJob and agreement types
+    db.ts                    # BusinessProfile, Client, Job etc.
+  data/
+    sample-job.json          # Default/placeholder values for new agreements
+supabase/
+  migrations/               # Apply via Supabase CLI or dashboard SQL editor
+    0001_initial_schema.sql
+    0002_add_default_exclusions_assumptions.sql
 ```
 
-## How to Use
+## Auth + Onboarding Flow
 
-1. Open the app on your phone or desktop
-2. Fill in the job details form:
-   - Customer information
-   - Job type and description
-   - Materials and services included
-   - Pricing and payment terms
-   - Exclusions and assumptions
-   - Warranty period
-3. Switch to "Agreement Preview" tab to see the generated agreement
-4. Copy the text or print/PDF the document
-5. Send to your client before starting work
+**New user:**
+1. Lands on `BusinessProfileForm` (sign-up + profile in one)
+2. Fills in business details → Continue
+3. `PasswordCreationPage` → creates Supabase account + saves profile
+4. Redirects to `HomePage`
 
-## Agreement Sections Generated
+**Returning user:**
+1. Lands on `BusinessProfileForm` → clicks "Sign In"
+2. `AuthPage` (email + password)
+3. Redirects to `HomePage`
 
-1. Agreement Header (date, parties, location)
-2. Project Overview
-3. Scope of Work
-4. Materials
-5. Exclusions
-6. Hidden Damage Clause (if applicable)
-7. Third-Party Work Clause
-8. Change Orders (if enabled)
-9. Pricing and Payment Terms
-10. Completion and Responsibility Transfer
-11. Workmanship Warranty
-12. Client Acknowledgment
+## Database
 
-## Deployment
+Five tables: `business_profiles`, `clients`, `jobs`, `change_orders`, `completion_signoffs`
 
-The app can be deployed to any static hosting platform:
+All tables use RLS — users can only access their own rows.
 
-- **Vercel**: `vercel deploy`
-- **Netlify**: Connect GitHub repo or drag-and-drop `dist/` folder
-- **GitHub Pages**: Push to `gh-pages` branch
-- **Cloudflare Pages**: Connect GitHub repo
-- **AWS S3 + CloudFront**: Upload `dist/` contents to S3 bucket
-
-Build command: `npm run build`
-Output directory: `dist/`
-
-## Future Roadmap
-
-### Phase 2 (Next)
-- [ ] PDF export
-- [ ] Signature capture (canvas)
-- [ ] Local storage persistence
-- [ ] Share via SMS/email
-
-### Phase 3
-- [ ] Multiple templates
-- [ ] Custom branding (logo, colors)
-- [ ] Job history
-- [ ] Client database
-
-### Phase 4 (Capacitor)
-- [ ] iOS app packaging
-- [ ] Android app packaging
-- [ ] Native file sharing
-- [ ] Camera integration
+Apply migrations via Supabase CLI:
+```bash
+npx supabase db push
+```
+Or paste each migration file into Supabase Dashboard → SQL Editor.
 
 ## Architecture
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed documentation on:
-- Product purpose
-- Stack choices
-- Folder structure
-- Domain logic vs UI logic
-- Portability considerations
-- Capacitor packaging path
-
-## Development Guidelines
-
-- Mobile-first CSS (start with mobile, add desktop styles)
-- Pure functions for business logic
-- No external state management (React state only)
-- TypeScript for all code
-- Keep components small and focused
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for stack rationale, data flow, and roadmap.
 
 ## License
 
 MIT
-
-## Support
-
-For questions or issues, please open an issue on GitHub.

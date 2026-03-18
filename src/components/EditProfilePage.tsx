@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { upsertProfile } from '../lib/db/profile';
+import { signOut } from '../lib/auth';
 import type { BusinessProfile } from '../types/db';
 
 interface EditProfilePageProps {
@@ -92,11 +93,6 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
         <h1 className="app-title" onClick={onCancel}>
           ScopeLock
         </h1>
-        <div className="header-actions">
-          <button type="button" className="btn-sign-out" onClick={onCancel}>
-            Home
-          </button>
-        </div>
       </header>
 
       <main className="app-main">
@@ -234,11 +230,16 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
             {error && <div className="error-banner">{error}</div>}
 
             <div className="form-actions">
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Saving...' : 'Save Changes'}
-              </button>
-              <button type="button" className="btn-secondary" onClick={onCancel}>
-                Home
+              <div className="form-actions-row">
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={onCancel}>
+                  Home
+                </button>
+              </div>
+              <button type="button" className="btn-danger" onClick={() => signOut()}>
+                Sign Out
               </button>
             </div>
           </form>

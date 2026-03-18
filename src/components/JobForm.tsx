@@ -23,10 +23,13 @@ export function JobForm({ job, onChange }: JobFormProps) {
       skipSyncRef.current = false;
       return;
     }
-    setRawPrice(job.price === 0 ? '' : String(job.price));
-    setRawWarranty(
-      job.workmanship_warranty_days === 0 ? '' : String(job.workmanship_warranty_days)
-    );
+    // Sync display values when the parent resets the job object externally (e.g. new agreement)
+    const nextPrice = job.price === 0 ? '' : String(job.price);
+    const nextWarranty = job.workmanship_warranty_days === 0 ? '' : String(job.workmanship_warranty_days);
+    Promise.resolve().then(() => {
+      setRawPrice(nextPrice);
+      setRawWarranty(nextWarranty);
+    });
   }, [job.price, job.workmanship_warranty_days]);
 
   const updateField = <K extends keyof WelderJob>(field: K, value: WelderJob[K]) => {
