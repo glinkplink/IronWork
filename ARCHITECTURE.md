@@ -35,9 +35,10 @@ A welder signs up, sets up their business profile (saved to the database), then 
   render the file with much closer parity to the on-screen preview.
 
 ### PDF vs preview (`server/app-server.mjs` + `AgreementPreview.tsx`)
-- **Header and footer** (Work Order #, Confidential, Service Provider line, page numbers) use
-  Puppeteer `displayHeaderFooter` with `headerTemplate` / `footerTemplate` — they are **not**
-  duplicated in the document body HTML.
+- **Header and footer** (Work Order #, Confidential, footer `Service Provider - [business name]`,
+  phone when present, page numbers) use Puppeteer `displayHeaderFooter` with `headerTemplate` /
+  `footerTemplate` — they are **not** duplicated in the document body HTML. Footer uses
+  `business_profiles.business_name` (not owner/welder name).
 - **Body** includes the centered **Work Order** title, numbered sections, tables, and signatures
   only. Section 1 **Service Provider / SP Phone / SP Email** rows come from `business_profiles`,
   not from per–work-order contractor fields on the edit form.

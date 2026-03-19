@@ -89,8 +89,8 @@ function buildHeaderTemplate(workOrderNumber) {
   const safeWorkOrderNumber = escapeHtml(workOrderNumber || 'Work Order');
 
   return `
-    <div style="width:100%; padding:0 40px; box-sizing:border-box; font-family: Arial, sans-serif; color:#aaaaaa; font-size:8px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #bdd7ee; padding:0 0 4px; width:100%;">
+    <div style="width:100%; padding:0 40px; box-sizing:border-box; font-family: Arial, sans-serif; color:#aaaaaa; font-size:9px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #cccccc; padding:0 0 4px; width:100%;">
         <span style="flex:1; text-align:left; white-space:nowrap;">${safeWorkOrderNumber}</span>
         <span style="flex:1; text-align:center; white-space:nowrap; text-transform:uppercase;">Confidential</span>
         <span style="flex:1; text-align:right; white-space:nowrap; opacity:0;">placeholder</span>
@@ -100,17 +100,25 @@ function buildHeaderTemplate(workOrderNumber) {
   `;
 }
 
+/** providerName = business name (not individual welder name). */
 function buildFooterTemplate(providerName, providerPhone) {
-  const safeProviderName = escapeHtml(providerName || 'Service Provider');
+  const safeBusinessName = escapeHtml((providerName || '').trim());
   const safeProviderPhone = escapeHtml(providerPhone || '');
-  const providerText = safeProviderPhone
-    ? `Service Provider: ${safeProviderName} | ${safeProviderPhone}`
-    : `Service Provider: ${safeProviderName}`;
+  let providerText;
+  if (safeBusinessName && safeProviderPhone) {
+    providerText = `Service Provider - ${safeBusinessName} | ${safeProviderPhone}`;
+  } else if (safeBusinessName) {
+    providerText = `Service Provider - ${safeBusinessName}`;
+  } else if (safeProviderPhone) {
+    providerText = `Service Provider | ${safeProviderPhone}`;
+  } else {
+    providerText = 'Service Provider';
+  }
 
   return `
-    <div style="width:100%; padding:0 40px; box-sizing:border-box; font-family: Arial, sans-serif; color:#aaaaaa; font-size:8px;">
+    <div style="width:100%; padding:0 40px; box-sizing:border-box; font-family: Arial, sans-serif; color:#aaaaaa; font-size:9px;">
       <div style="height:10px;"></div>
-      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #bdd7ee; padding:4px 0 0; width:100%;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #cccccc; padding:4px 0 0; width:100%;">
         <span style="white-space:nowrap;">${providerText}</span>
         <span style="white-space:nowrap;">Page <span class="pageNumber"></span></span>
       </div>
@@ -142,14 +150,14 @@ async function handlePdfRequest(req, res) {
     const pdf = await page.pdf({
       format: 'Letter',
       printBackground: true,
-      preferCSSPageSize: true,
+      preferCSSPageSize: false,
       displayHeaderFooter: true,
       headerTemplate: buildHeaderTemplate(workOrderNumber),
       footerTemplate: buildFooterTemplate(providerName, providerPhone),
       margin: {
-        top: '80px',
+        top: '70px',
         right: '60px',
-        bottom: '80px',
+        bottom: '70px',
         left: '60px',
       },
     });

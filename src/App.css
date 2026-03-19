@@ -17,6 +17,11 @@
   --text-secondary: #5A5650;
   --text-muted: #8A8680;
 
+  /* Agreement / PDF — match v2 template (blue headings, label column) */
+  --agreement-section-blue: var(--primary);
+  --agreement-label-column-bg: #bdd7ee;
+  --agreement-margin-line: #cccccc;
+
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
   --space-md: 1rem;
@@ -394,8 +399,9 @@ body {
 
 .agreement-document-header {
   margin-bottom: var(--space-xl);
-  padding-bottom: var(--space-lg);
-  border-bottom: 2px solid var(--border);
+  padding-top: var(--space-lg);
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .agreement-document-title {
@@ -410,7 +416,7 @@ body {
 .agreement-section {
   margin-bottom: var(--space-lg);
   padding-bottom: var(--space-lg);
-  border-bottom: 1px solid var(--divider);
+  border-bottom: none;
   break-inside: avoid;
   page-break-inside: avoid;
 }
@@ -425,10 +431,10 @@ body {
   font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--text-primary);
+  color: var(--agreement-section-blue);
   margin: 0 0 var(--space-md);
   padding-bottom: var(--space-sm);
-  border-bottom: 1px solid #bdd7ee;
+  border-bottom: 2px solid var(--agreement-section-blue);
 }
 
 .section-content {
@@ -465,6 +471,7 @@ body {
 
 .content-bullets li {
   display: list-item;
+  background: transparent;
 }
 
 .content-bullets li + li {
@@ -474,19 +481,19 @@ body {
 .content-table {
   width: 100%;
   border-collapse: collapse;
-  border: 1px solid #cccccc;
+  border: 1px solid var(--agreement-margin-line);
   margin-bottom: var(--space-md);
   table-layout: fixed;
 }
 
-.content-table tr:nth-child(odd) {
-  background: #f7f7f5;
+.content-table tr {
+  background: transparent;
 }
 
 .content-table td {
   padding: 0.7rem 0.8rem;
   vertical-align: top;
-  border: 1px solid #cccccc;
+  border: 1px solid var(--agreement-margin-line);
 }
 
 .table-label {
@@ -495,12 +502,14 @@ body {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  background: var(--agreement-label-column-bg);
+  color: var(--agreement-section-blue);
 }
 
 .table-value {
   font-size: 0.95rem;
   line-height: 1.55;
+  background: #fff;
   color: var(--text-primary);
   white-space: pre-wrap;
 }
@@ -508,7 +517,7 @@ body {
 .signature-blocks {
   margin-top: 2.5rem;
   padding-top: 1.5rem;
-  border-top: 2px solid var(--text-primary);
+  border-top: none;
 }
 
 .signature-block {
@@ -522,7 +531,7 @@ body {
 .signature-block + .signature-block {
   margin-top: var(--space-xl);
   padding-top: var(--space-lg);
-  border-top: 1px solid var(--border);
+  border-top: none;
 }
 
 .signature-block-identifier {
@@ -1464,6 +1473,11 @@ body {
   .section-title {
     page-break-after: avoid;
     break-after: avoid;
+  }
+
+  .table-label {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .signature-section {

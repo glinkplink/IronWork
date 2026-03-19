@@ -17,11 +17,17 @@ function getPdfFilename(woNumber: number, customerName: string): string {
   return `WO-${String(woNumber).padStart(4, '0')}_${sanitized}.pdf`;
 }
 
-function getProviderDisplay(profile: BusinessProfile | null, job: WelderJob) {
-  return {
-    name: profile?.owner_name || profile?.business_name || job.contractor_name || 'Service Provider',
-    phone: profile?.phone || job.contractor_phone || '',
-  };
+/** Business name for PDF footer (not owner/welder personal name). */
+function getPdfFooterBusinessName(profile: BusinessProfile | null, job: WelderJob): string {
+  return (
+    profile?.business_name?.trim() ||
+    job.contractor_name?.trim() ||
+    ''
+  );
+}
+
+function getPdfFooterPhone(profile: BusinessProfile | null, job: WelderJob): string {
+  return profile?.phone || job.contractor_phone || '';
 }
 
 function buildPdfHtml(previewMarkup: string): string {
@@ -37,10 +43,7 @@ function buildPdfHtml(previewMarkup: string): string {
         color-scheme: light;
       }
 
-      @page {
-        size: Letter;
-        margin: 0.35in;
-      }
+      /* No @page rule: page.pdf({ margin }) is the only source of content insets (see app-server). */
 
       html,
       body {
@@ -75,23 +78,25 @@ function buildPdfHtml(previewMarkup: string): string {
         padding: 0;
       }
 
-      /* Match on-screen tables: borders + row shading for PDF */
+      /* Key-value tables: label column tint + borders (parity with preview) */
       .content-table {
         border: 1px solid #cccccc;
         border-collapse: collapse;
       }
 
       .content-table td {
-        border-bottom: 1px solid #cccccc;
+        border: 1px solid #cccccc;
         padding: 0.7rem 0.8rem;
       }
 
-      .content-table tr:nth-child(odd) {
-        background: #f7f7f5;
+      .table-label {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
 
-      .content-table tr:last-child td {
-        border-bottom: none;
+      /* Extra space below Puppeteer header margin so "Work Order" clears the header rule */
+      .pdf-render-root .agreement-document-header {
+        padding-top: 2rem;
       }
 
       .content-bullets {
@@ -119,8 +124,6 @@ function buildPdfHtml(previewMarkup: string): string {
 }
 
 async function buildPdf(job: WelderJob, profile: BusinessProfile | null, previewElement: HTMLElement) {
-  const provider = getProviderDisplay(profile, job);
-
   const response = await fetch('/api/pdf', {
     method: 'POST',
     headers: {
@@ -130,8 +133,8 @@ async function buildPdf(job: WelderJob, profile: BusinessProfile | null, preview
       filename: getPdfFilename(job.wo_number, job.customer_name),
       html: buildPdfHtml(previewElement.outerHTML),
       workOrderNumber: `Work Order #${String(job.wo_number).padStart(4, '0')}`,
-      providerName: provider.name,
-      providerPhone: provider.phone,
+      providerName: getPdfFooterBusinessName(profile, job),
+      providerPhone: getPdfFooterPhone(profile, job),
     }),
   });
 
