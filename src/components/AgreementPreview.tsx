@@ -155,8 +155,13 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
     onSaveSuccess(data.id, isNewSave);
   };
 
-  const downloadButton = (
-    <button onClick={handleDownloadAndSave} className="btn-action btn-primary" disabled={saving}>
+  const renderDownloadButton = () => (
+    <button
+      type="button"
+      onClick={handleDownloadAndSave}
+      className="btn-action btn-primary"
+      disabled={saving}
+    >
       {saving ? 'Saving...' : 'Download & Save'}
     </button>
   );
@@ -168,7 +173,7 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
           <div className="success-banner">{confirmationMessage}</div>
         )}
         {saveError && <div className="error-banner">{saveError}</div>}
-        {downloadButton}
+        {renderDownloadButton()}
       </div>
 
       <div ref={documentRef} className="agreement-document">
@@ -267,7 +272,7 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
       </div>
 
       <div className="preview-actions preview-actions-bottom">
-        {downloadButton}
+        {renderDownloadButton()}
       </div>
     </div>
   );
