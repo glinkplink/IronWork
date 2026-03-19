@@ -1,310 +1,365 @@
+import { useState } from 'react';
 import { jsPDF } from 'jspdf';
-import type { WelderJob } from '../types';
+import type { WelderJob, AgreementSection } from '../types';
 import type { BusinessProfile } from '../types/db';
-import { generateAgreement, formatAgreementAsText } from '../lib/agreement-generator';
+import { generateAgreement } from '../lib/agreement-generator';
+import { saveWorkOrder } from '../lib/db/jobs';
 
 interface AgreementPreviewProps {
   job: WelderJob;
   profile: BusinessProfile | null;
+  existingJobId?: string;
+  onSaveSuccess: (savedJobId: string, isNewSave: boolean) => void;
 }
 
-function getPdfFilename(customerName: string): string {
-  const sanitized = customerName.replace(/\s+/g, '');
-  const d = new Date();
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  const yy = String(d.getFullYear()).slice(-2);
-  return `${sanitized}${m}-${day}-${yy}.pdf`;
+function getPdfFilename(woNumber: number, customerName: string): string {
+  const sanitized = (customerName || 'customer').replace(/\s+/g, '_');
+  return `WO-${String(woNumber).padStart(4, '0')}_${sanitized}.pdf`;
 }
 
-// Labels that should have bold formatting
-const BOLD_LABELS = [
-  'Date:',
-  'Service Provider:',
-  'Customer:',
-  'Job Location:',
-  'Phone:',
-  'Item/Structure:',
-  'Work Requested:',
-  'Job Type:',
-  'Total Price:',
-  'Price Type:',
-  'Deposit Required:',
-  'Payment Terms:',
-  'Target Completion:',
-  'Name:',
-  'Signature:',
-];
+function drawHeader(doc: jsPDF, woNumber: number, pageWidth: number, sideMargin: number) {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(170, 170, 170);
+  doc.text(`Work Order #${String(woNumber).padStart(4, '0')}`, sideMargin, 10);
+  doc.text('Confidential', pageWidth / 2, 10, { align: 'center' });
+  doc.setDrawColor(189, 215, 238);
+  doc.setLineWidth(0.5);
+  doc.line(sideMargin, 13, pageWidth - sideMargin, 13);
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(0, 0, 0);
+}
 
-// Parse a line and return label/value parts if it matches a known label
-function parseLabeledLine(line: string): { label: string; value: string } | null {
-  for (const label of BOLD_LABELS) {
-    if (line.startsWith(label)) {
-      return { label, value: line.slice(label.length).trim() };
+function drawFooter(
+  doc: jsPDF,
+  pageNum: number,
+  pageWidth: number,
+  pageHeight: number,
+  sideMargin: number,
+  profileName: string,
+  profilePhone: string
+) {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(170, 170, 170);
+  doc.setDrawColor(189, 215, 238);
+  doc.setLineWidth(0.5);
+  doc.line(sideMargin, pageHeight - 14, pageWidth - sideMargin, pageHeight - 14);
+  const providerText = profilePhone
+    ? `Service Provider: ${profileName} | ${profilePhone}`
+    : `Service Provider: ${profileName}`;
+  doc.text(providerText, sideMargin, pageHeight - 10);
+  doc.text(`Page ${pageNum}`, pageWidth - sideMargin, pageHeight - 10, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(0, 0, 0);
+}
+
+function buildPdf(job: WelderJob, profile: BusinessProfile | null, sections: AgreementSection[]) {
+  const doc = new jsPDF();
+  const topMargin = 25;
+  const sideMargin = 20;
+  const bottomMargin = 22;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = pageWidth - sideMargin * 2;
+
+  const profileName = profile?.business_name || job.contractor_name || 'Service Provider';
+  const profilePhone = profile?.phone || job.contractor_phone || '';
+
+  let y = topMargin;
+
+  drawHeader(doc, job.wo_number, pageWidth, sideMargin);
+
+  const checkPageBreak = (needed: number) => {
+    if (y + needed > pageHeight - bottomMargin) {
+      doc.addPage();
+      drawHeader(doc, job.wo_number, pageWidth, sideMargin);
+      y = topMargin;
     }
-  }
-  return null;
-}
-
-// Render a line with bold label for HTML preview
-function renderLineWithBoldLabel(line: string, key: number) {
-  const parsed = parseLabeledLine(line);
-  if (parsed) {
-    return (
-      <p key={key} className="content-line">
-        <strong>{parsed.label}</strong> {parsed.value}
-      </p>
-    );
-  }
-  return (
-    <p key={key} className="content-line">
-      {line}
-    </p>
-  );
-}
-
-export function AgreementPreview({ job, profile }: AgreementPreviewProps) {
-  const sections = generateAgreement(job, profile);
-  const plainText = formatAgreementAsText(sections);
-
-  const handlePrint = () => {
-    window.print();
   };
 
-  const handleDownloadPdf = () => {
-    const doc = new jsPDF();
-    const pageHeight = doc.internal.pageSize.height; // ~297mm for A4
-    const pageWidth = doc.internal.pageSize.width;   // ~210mm for A4
-    const margin = 20;
-    const maxWidth = pageWidth - (margin * 2);       // ~170mm
-    const baseLineHeight = 6;                        // Base line height
-    const usableHeight = pageHeight - (margin * 2);  // Usable page height
+  // Title
+  checkPageBreak(12);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('WORK ORDER AGREEMENT', pageWidth / 2, y, { align: 'center' });
+  y += 12;
 
-    let yPosition = margin;
-    const lines = doc.splitTextToSize(plainText, maxWidth);
+  for (const section of sections) {
+    const sectionLabel =
+      section.number > 0 ? `${section.number}. ${section.title}` : section.title;
 
-    // Section headers to detect for special formatting
-    const sectionHeaders = [
-      'WELDING SERVICES AGREEMENT',
-      'Project Overview',
-      'Scope of Work',
-      'Materials',
-      'Exclusions',
-      'Assumptions',
-      'Hidden Damage Clause',
-      'Third-Party Work',
-      'Change Orders',
-      'Pricing and Payment',
-      'Completion and Responsibility',
-      'Workmanship Warranty',
-      'Agreement and Acknowledgment',
-    ];
+    checkPageBreak(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(sectionLabel, sideMargin, y);
+    y += 7;
 
-    // Signature block party labels
-    const signaturePartyLabels = ['Customer', 'Service Provider'];
-
-    // Pre-calculate section boundaries for smart page breaks
-    const sectionStartIndices: number[] = [];
-    lines.forEach((line: string, index: number) => {
-      if (sectionHeaders.includes(line.trim())) {
-        sectionStartIndices.push(index);
-      }
-    });
-
-    // Calculate height needed for content from startIdx to next section (or end)
-    const getContentHeightUntilNextSection = (startIdx: number): number => {
-      const nextSectionIdx = sectionStartIndices.find(i => i > startIdx) ?? lines.length;
-      let height = 0;
-      for (let i = startIdx; i < nextSectionIdx; i++) {
-        const trimmed = lines[i].trim();
-        if (trimmed === '') {
-          height += 3;
-        } else if (sectionHeaders.includes(trimmed)) {
-          height += baseLineHeight + 2 + 4; // header height + spacing
-        } else {
-          height += baseLineHeight;
-        }
-      }
-      return height;
-    };
-
-    lines.forEach((line: string, index: number) => {
-      const trimmedLine = line.trim();
-      const isMainTitle = trimmedLine === 'WELDING SERVICES AGREEMENT';
-      const isSectionHeader = sectionHeaders.includes(trimmedLine);
-      const isSignaturePartyLabel = signaturePartyLabels.includes(trimmedLine);
-      const isEmptyLine = trimmedLine === '';
-
-      // Track if we're in Service Provider section
-      const previousLines = lines.slice(0, index).map((l: string) => l.trim());
-      const isAfterServiceProvider = previousLines.includes('Service Provider');
-      const isBeforeCustomer = !previousLines.includes('Customer') ||
-                               previousLines.lastIndexOf('Service Provider') > previousLines.lastIndexOf('Customer');
-
-      // Check if this is the Service Provider's signature line
-      const isProviderSignatureLine =
-        isAfterServiceProvider &&
-        isBeforeCustomer &&
-        trimmedLine.startsWith('Signature:');
-
-      // Determine line height and spacing
-      let lineHeight = baseLineHeight;
-      if (isEmptyLine) {
-        lineHeight = 3;
-      } else if (isSectionHeader) {
-        lineHeight = baseLineHeight + 2;
-      }
-
-      // Add extra space before "Customer" signature label
-      if (trimmedLine === 'Customer') {
-        yPosition += 15;
-      }
-
-      // Smart page break: when hitting a section header, check if section fits
-      if (isSectionHeader && !isMainTitle) {
-        const sectionHeight = getContentHeightUntilNextSection(index);
-        const spaceRemaining = usableHeight - (yPosition - margin);
-
-        // If less than 40% of section fits, start new page
-        if (sectionHeight > spaceRemaining && spaceRemaining < sectionHeight * 0.6) {
-          doc.addPage();
-          yPosition = margin;
-        }
-      }
-
-      // Basic overflow check
-      if (yPosition + lineHeight > pageHeight - margin) {
-        doc.addPage();
-        yPosition = margin;
-      }
-
-      // Add spacing before section headers (except main title and if not at page top)
-      if (isSectionHeader && !isMainTitle && yPosition > margin + 5) {
-        yPosition += 4;
-      }
-
-      // Render the line
-      if (!isEmptyLine) {
-        if (isMainTitle) {
-          doc.setFontSize(16);
-          doc.setFont('helvetica', 'bold');
-          doc.text(line, pageWidth / 2, yPosition, { align: 'center' });
-        } else if (isSectionHeader) {
-          doc.setFontSize(12);
-          doc.setFont('helvetica', 'bold');
-          doc.text(line, margin, yPosition);
-        } else if (isSignaturePartyLabel) {
-          doc.setFontSize(11);
-          doc.setFont('helvetica', 'bold');
-          doc.text(line, margin, yPosition);
-        } else if (isProviderSignatureLine) {
-          // Render Service Provider signature with label in bold, value in italic
+    for (const block of section.blocks) {
+      if (block.type === 'paragraph') {
+        const lines = doc.splitTextToSize(block.text, contentWidth);
+        const needed = lines.length * 5 + 4;
+        checkPageBreak(needed);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(lines, sideMargin, y);
+        y += lines.length * 5 + 4;
+      } else if (block.type === 'bullets') {
+        for (const item of block.items) {
+          const bulletText = `\u2022  ${item}`;
+          const lines = doc.splitTextToSize(bulletText, contentWidth - 5);
+          const needed = lines.length * 5 + 2;
+          checkPageBreak(needed);
+          doc.setFont('helvetica', 'normal');
           doc.setFontSize(10);
-          const parsed = parseLabeledLine(trimmedLine);
-          if (parsed) {
-            doc.setFont('helvetica', 'bold');
-            doc.text(parsed.label, margin, yPosition);
-            const labelWidth = doc.getTextWidth(parsed.label + ' ');
+          doc.text(lines, sideMargin + 5, y);
+          y += lines.length * 5 + 2;
+        }
+        y += 2;
+      } else if (block.type === 'table') {
+        const labelColWidth = 55;
+        const valueColWidth = contentWidth - labelColWidth;
+        const cellPadX = 3;
+        const cellPadY = 4;
+
+        for (let ri = 0; ri < block.rows.length; ri++) {
+          const [label, value] = block.rows[ri];
+          const valueLines = doc.splitTextToSize(value || '', valueColWidth - cellPadX * 2);
+          const rowHeight = Math.max(8, valueLines.length * 5 + cellPadY * 2);
+
+          checkPageBreak(rowHeight);
+
+          if (ri % 2 === 0) {
+            doc.setFillColor(247, 247, 245);
+            doc.rect(sideMargin, y, contentWidth, rowHeight, 'F');
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.text(label, sideMargin + cellPadX, y + cellPadY + 1.5);
+
+          doc.setFont('helvetica', 'normal');
+          doc.text(valueLines, sideMargin + labelColWidth + cellPadX, y + cellPadY + 1.5);
+
+          y += rowHeight;
+        }
+        y += 3;
+      } else if (block.type === 'signature') {
+        const sig = section.signatureData;
+        if (!sig) continue;
+
+        checkPageBreak(50);
+
+        const sigColWidth = (contentWidth - 10) / 2;
+        const cols = [
+          { x: sideMargin, label: 'Customer', name: sig.customerName, autofillSig: '', date: '' },
+          {
+            x: sideMargin + sigColWidth + 10,
+            label: 'Service Provider',
+            name: sig.ownerName,
+            autofillSig: sig.ownerName,
+            date: sig.ownerDate,
+          },
+        ];
+
+        const startY = y;
+        for (const col of cols) {
+          let cy = startY;
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.text(col.label, col.x, cy);
+          cy += 7;
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.text(`Name: ${col.name}`, col.x, cy);
+          cy += 8;
+
+          doc.text('Signature:', col.x, cy);
+          if (col.autofillSig) {
             doc.setFont('helvetica', 'italic');
-            doc.setFontSize(14);
-            doc.text(parsed.value, margin + labelWidth, yPosition);
-            doc.setFontSize(10); // Reset font size
-          } else {
+            doc.setFontSize(13);
+            doc.text(col.autofillSig, col.x + 25, cy);
             doc.setFont('helvetica', 'normal');
-            doc.text(line, margin, yPosition);
+            doc.setFontSize(9);
+          } else {
+            doc.setDrawColor(150, 150, 150);
+            doc.line(col.x + 25, cy + 1, col.x + sigColWidth - 5, cy + 1);
+            doc.setDrawColor(0, 0, 0);
           }
-        } else {
-          doc.setFontSize(10);
-          const parsed = parseLabeledLine(trimmedLine);
-          if (parsed) {
-            doc.setFont('helvetica', 'bold');
-            doc.text(parsed.label, margin, yPosition);
-            const labelWidth = doc.getTextWidth(parsed.label + ' ');
-            doc.setFont('helvetica', 'normal');
-            doc.text(parsed.value, margin + labelWidth, yPosition);
+          cy += 8;
+
+          doc.text('Date:', col.x, cy);
+          if (col.date) {
+            doc.text(col.date, col.x + 15, cy);
           } else {
-            doc.setFont('helvetica', 'normal');
-            doc.text(line, margin, yPosition);
+            doc.setDrawColor(150, 150, 150);
+            doc.line(col.x + 15, cy + 1, col.x + sigColWidth - 5, cy + 1);
+            doc.setDrawColor(0, 0, 0);
           }
         }
+
+        y = startY + 32;
       }
+    }
 
-      yPosition += lineHeight;
-    });
+    y += 5;
+  }
 
-    doc.save(getPdfFilename(job.customer_name));
+  // Stamp footers on all pages
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    drawFooter(doc, i, pageWidth, pageHeight, sideMargin, profileName, profilePhone);
+  }
+
+  doc.save(getPdfFilename(job.wo_number, job.customer_name));
+}
+
+export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }: AgreementPreviewProps) {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [confirmationMessage, setConfirmationMessage] = useState('');
+
+  const sections = generateAgreement(job, profile);
+
+  const handleDownloadAndSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    setConfirmationMessage('');
+
+    buildPdf(job, profile, sections);
+
+    if (!profile) {
+      setSaving(false);
+      setSaveError('No profile found — cannot save work order.');
+      return;
+    }
+
+    const { data, error } = await saveWorkOrder(profile.user_id, job, existingJobId);
+
+    setSaving(false);
+
+    if (error || !data) {
+      setSaveError(error?.message || 'Failed to save work order.');
+      return;
+    }
+
+    const isNewSave = !existingJobId;
+    setConfirmationMessage(
+      `WO #${String(job.wo_number).padStart(4, '0')} saved. PDF downloaded.`
+    );
+    onSaveSuccess(data.id, isNewSave);
   };
 
-  const actionButtons = (
-    <div className="preview-actions">
-      <button onClick={handlePrint} className="btn-action">
-        Print
-      </button>
-      <button onClick={handleDownloadPdf} className="btn-action">
-        📥 Download PDF
-      </button>
-    </div>
+  const downloadButton = (
+    <button onClick={handleDownloadAndSave} className="btn-action btn-primary" disabled={saving}>
+      {saving ? 'Saving...' : 'Download & Save'}
+    </button>
   );
 
   return (
     <div className="agreement-preview">
-      {actionButtons}
-
-      <div className="agreement-document">
-        {sections.map((section, index) => {
-          const isSignature = !!section.signatureData;
-          const sig = section.signatureData;
-          return (
-            <div
-              key={index}
-              className={`agreement-section ${isSignature ? 'signature-section' : ''}`}
-            >
-              <h3 className="section-title">{section.title}</h3>
-              <div className="section-content">
-                {section.content.split('\n').map((line, i) => renderLineWithBoldLabel(line, i))}
-                {sig && (
-                  <div className="signature-blocks">
-                    <div className="signature-block">
-                      <div className="signature-block-identifier">Customer</div>
-                      <div className="signature-field">
-                        <span className="signature-field-label">Name</span>
-                        <div className="signature-field-value">{sig.customerName}</div>
-                      </div>
-                      <div className="signature-field">
-                        <span className="signature-field-label">Signature</span>
-                        <div className="signature-field-value" />
-                      </div>
-                      <div className="signature-field">
-                        <span className="signature-field-label">Date</span>
-                        <div className="signature-field-value" />
-                      </div>
-                    </div>
-                    <div className="signature-block">
-                      <div className="signature-block-identifier">Service Provider</div>
-                      <div className="signature-field">
-                        <span className="signature-field-label">Name</span>
-                        <div className="signature-field-value">{sig.ownerName}</div>
-                      </div>
-                      <div className="signature-field">
-                        <span className="signature-field-label">Signature</span>
-                        <div className="signature-field-value">
-                          <div className="signature-autofill-name">{sig.ownerName}</div>
-                        </div>
-                      </div>
-                      <div className="signature-field">
-                        <span className="signature-field-label">Date</span>
-                        <div className="signature-field-value">{sig.ownerDate}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div className="preview-actions">
+        {confirmationMessage && (
+          <div className="success-banner">{confirmationMessage}</div>
+        )}
+        {saveError && <div className="error-banner">{saveError}</div>}
+        {downloadButton}
       </div>
 
-      {actionButtons}
+      <div className="agreement-document">
+        {sections.map((section, si) => (
+          <div
+            key={si}
+            className={`agreement-section ${section.signatureData ? 'signature-section' : ''}`}
+          >
+            <h3 className="section-title">
+              {section.number > 0 ? `${section.number}. ${section.title}` : section.title}
+            </h3>
+            <div className="section-content">
+              {section.blocks.map((block, bi) => {
+                if (block.type === 'paragraph') {
+                  return (
+                    <p key={bi} className="content-paragraph">
+                      {block.text}
+                    </p>
+                  );
+                }
+                if (block.type === 'bullets') {
+                  return (
+                    <ul key={bi} className="content-bullets">
+                      {block.items.map((item, ii) => (
+                        <li key={ii}>{item}</li>
+                      ))}
+                    </ul>
+                  );
+                }
+                if (block.type === 'table') {
+                  return (
+                    <table key={bi} className="content-table">
+                      <tbody>
+                        {block.rows.map(([label, value], ri) => (
+                          <tr key={ri}>
+                            <td className="table-label">{label}</td>
+                            <td className="table-value">{value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                }
+                if (block.type === 'signature') {
+                  const sig = section.signatureData;
+                  if (!sig) return null;
+                  return (
+                    <div key={bi} className="signature-blocks">
+                      <div className="signature-block">
+                        <div className="signature-block-identifier">Customer</div>
+                        <div className="signature-field">
+                          <span className="signature-field-label">Name</span>
+                          <div className="signature-field-value">{sig.customerName}</div>
+                        </div>
+                        <div className="signature-field">
+                          <span className="signature-field-label">Signature</span>
+                          <div className="signature-field-value" />
+                        </div>
+                        <div className="signature-field">
+                          <span className="signature-field-label">Date</span>
+                          <div className="signature-field-value" />
+                        </div>
+                      </div>
+                      <div className="signature-block">
+                        <div className="signature-block-identifier">Service Provider</div>
+                        <div className="signature-field">
+                          <span className="signature-field-label">Name</span>
+                          <div className="signature-field-value">{sig.ownerName}</div>
+                        </div>
+                        <div className="signature-field">
+                          <span className="signature-field-label">Signature</span>
+                          <div className="signature-field-value">
+                            <div className="signature-autofill-name">{sig.ownerName}</div>
+                          </div>
+                        </div>
+                        <div className="signature-field">
+                          <span className="signature-field-label">Date</span>
+                          <div className="signature-field-value">{sig.ownerDate}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="preview-actions">
+        {downloadButton}
+      </div>
     </div>
   );
 }

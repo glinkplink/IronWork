@@ -184,9 +184,8 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 - [ ] Research standard welder work agreements/ contracts and edit ours to
       match
 - [ ] Make PDF output look professional
-- [ ] Client list and client selection UI
+- [ ] Client list and client selection UI - user's clients are saved in DB so their details can we auto-filled later in future work orders.
 - [ ] Custom branding (logo)
-- [ ] Save/load job history
 - [ ] Add a 'Generate Invoice' function that allows the user to easily create/ send an invoice based on their work agreement. 
 
 ### Later

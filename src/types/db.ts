@@ -11,6 +11,12 @@ export interface BusinessProfile {
   google_business_profile_url: string | null;
   default_exclusions: string[];
   default_assumptions: string[];
+  next_wo_number: number;
+  default_warranty_period: number;
+  default_negotiation_period: number;
+  default_payment_methods: string[];
+  default_late_payment_terms: string;
+  default_card_fee_note: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -34,7 +40,7 @@ export interface Job {
   customer_name: string;
   customer_phone: string;
   job_location: string;
-  job_type: 'repair' | 'fabrication' | 'mobile repair';
+  job_type?: string;
   asset_or_item_description: string;
   requested_work: string;
   materials_provided_by: 'welder' | 'customer' | 'mixed';
@@ -43,7 +49,7 @@ export interface Job {
   paint_or_coating_included: boolean;
   removal_or_disassembly_included: boolean;
   hidden_damage_possible: boolean;
-  price_type: 'fixed' | 'estimate';
+  price_type: 'fixed' | 'estimate' | 'time_and_materials';
   price: number;
   deposit_required: boolean;
   payment_terms: string | null;
@@ -53,6 +59,21 @@ export interface Job {
   change_order_required: boolean;
   workmanship_warranty_days: number | null;
   status: string;
+  // New WO columns
+  wo_number: number | null;
+  agreement_date: string | null;
+  contractor_phone: string | null;
+  contractor_email: string | null;
+  customer_email: string | null;
+  governing_state: string | null;
+  job_classification: string | null;
+  target_start: string | null;
+  deposit_amount: number | null;
+  payment_methods: string[];
+  late_payment_terms: string | null;
+  card_fee_note: boolean;
+  negotiation_period: number | null;
+  customer_obligations: string[];
   created_at: string;
   updated_at: string;
 }

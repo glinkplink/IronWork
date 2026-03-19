@@ -1,36 +1,52 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WelderJob, JobType, MaterialsProvider, PriceType } from '../types';
+import type { WelderJob, JobClassification, MaterialsProvider, PriceType } from '../types';
 
 interface JobFormProps {
   job: WelderJob;
   onChange: (job: WelderJob) => void;
 }
 
+const PAYMENT_METHOD_OPTIONS = ['Cash', 'Check', 'Zelle', 'Venmo', 'Card'];
+
 export function JobForm({ job, onChange }: JobFormProps) {
-  const [rawPrice, setRawPrice] = useState(() => String(job.price));
+  const [rawPrice, setRawPrice] = useState(() => (job.price === 0 ? '' : String(job.price)));
+  const [rawDeposit, setRawDeposit] = useState(() => (job.deposit_amount === 0 ? '' : String(job.deposit_amount)));
   const [rawWarranty, setRawWarranty] = useState(() =>
-    String(job.workmanship_warranty_days)
+    job.workmanship_warranty_days === 0 ? '' : String(job.workmanship_warranty_days)
   );
-  // skipSyncRef prevents the useEffect from overwriting raw input strings while the user
-  // is typing. Limitation: if the parent resets the entire job object externally (e.g. a
-  // future "New Job" action) immediately after a keystroke, the reset may be skipped and
-  // inputs will show stale values until the next render cycle. Acceptable for MVP where no
-  // external job reset exists; revisit if a reset/load-job feature is added.
+  const [rawNegotiation, setRawNegotiation] = useState(() =>
+    job.negotiation_period === 0 ? '' : String(job.negotiation_period)
+  );
+
   const skipSyncRef = useRef(false);
+  const wasStateAutoDetectedRef = useRef(true);
 
   useEffect(() => {
     if (skipSyncRef.current) {
       skipSyncRef.current = false;
       return;
     }
-    // Sync display values when the parent resets the job object externally (e.g. new agreement)
     const nextPrice = job.price === 0 ? '' : String(job.price);
+    const nextDeposit = job.deposit_amount === 0 ? '' : String(job.deposit_amount);
     const nextWarranty = job.workmanship_warranty_days === 0 ? '' : String(job.workmanship_warranty_days);
+    const nextNegotiation = job.negotiation_period === 0 ? '' : String(job.negotiation_period);
     Promise.resolve().then(() => {
       setRawPrice(nextPrice);
+      setRawDeposit(nextDeposit);
       setRawWarranty(nextWarranty);
+      setRawNegotiation(nextNegotiation);
     });
-  }, [job.price, job.workmanship_warranty_days]);
+  }, [job.price, job.deposit_amount, job.workmanship_warranty_days, job.negotiation_period]);
+
+  // Auto-detect governing state from job_location
+  useEffect(() => {
+    if (!wasStateAutoDetectedRef.current) return;
+    const match = job.job_location.match(/,\s*([A-Z]{2})\s*\d{5}|,\s*([A-Z]{2})\s*$/);
+    const detected = match ? (match[1] || match[2]) : null;
+    if (detected && detected !== job.governing_state) {
+      onChange({ ...job, governing_state: detected });
+    }
+  }, [job.job_location]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateField = <K extends keyof WelderJob>(field: K, value: WelderJob[K]) => {
     onChange({ ...job, [field]: value });
@@ -43,6 +59,13 @@ export function JobForm({ job, onChange }: JobFormProps) {
     updateField('price', parseFloat(raw) || 0);
   };
 
+  const handleDepositChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setRawDeposit(raw);
+    skipSyncRef.current = true;
+    updateField('deposit_amount', parseFloat(raw) || 0);
+  };
+
   const handleWarrantyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     setRawWarranty(raw);
@@ -50,53 +73,110 @@ export function JobForm({ job, onChange }: JobFormProps) {
     updateField('workmanship_warranty_days', parseInt(raw) || 0);
   };
 
-  const addExclusion = () => {
-    updateField('exclusions', [...job.exclusions, '']);
+  const handleNegotiationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setRawNegotiation(raw);
+    skipSyncRef.current = true;
+    updateField('negotiation_period', parseInt(raw) || 0);
   };
 
+  const handleGoverningStateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    wasStateAutoDetectedRef.current = false;
+    updateField('governing_state', e.target.value.toUpperCase().slice(0, 2));
+  };
+
+  const togglePaymentMethod = (method: string) => {
+    const methods = job.payment_methods.includes(method)
+      ? job.payment_methods.filter((m) => m !== method)
+      : [...job.payment_methods, method];
+    updateField('payment_methods', methods);
+  };
+
+  const addExclusion = () => updateField('exclusions', [...job.exclusions, '']);
   const updateExclusion = (index: number, value: string) => {
-    const newExclusions = [...job.exclusions];
-    newExclusions[index] = value;
-    updateField('exclusions', newExclusions);
+    const next = [...job.exclusions];
+    next[index] = value;
+    updateField('exclusions', next);
   };
-
-  const removeExclusion = (index: number) => {
+  const removeExclusion = (index: number) =>
     updateField('exclusions', job.exclusions.filter((_, i) => i !== index));
-  };
 
-  const addAssumption = () => {
-    updateField('assumptions', [...job.assumptions, '']);
+  const addObligation = () => updateField('customer_obligations', [...job.customer_obligations, '']);
+  const updateObligation = (index: number, value: string) => {
+    const next = [...job.customer_obligations];
+    next[index] = value;
+    updateField('customer_obligations', next);
   };
-
-  const updateAssumption = (index: number, value: string) => {
-    const newAssumptions = [...job.assumptions];
-    newAssumptions[index] = value;
-    updateField('assumptions', newAssumptions);
-  };
-
-  const removeAssumption = (index: number) => {
-    updateField('assumptions', job.assumptions.filter((_, i) => i !== index));
-  };
+  const removeObligation = (index: number) =>
+    updateField('customer_obligations', job.customer_obligations.filter((_, i) => i !== index));
 
   return (
     <form className="job-form" onSubmit={(e) => e.preventDefault()}>
+      {/* WO Info */}
+      <section className="form-section">
+        <h2>Work Order</h2>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="wo_number">WO #</label>
+            <input
+              id="wo_number"
+              type="text"
+              value={`WO-${String(job.wo_number).padStart(4, '0')}`}
+              readOnly
+              className="input-readonly"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="agreement_date">Agreement Date *</label>
+            <input
+              id="agreement_date"
+              type="date"
+              value={job.agreement_date}
+              onChange={(e) => updateField('agreement_date', e.target.value)}
+              required
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Contractor */}
       <section className="form-section">
         <h2>Contractor (You)</h2>
         <div className="form-group">
-          <label htmlFor="contractor_name">Your Business Name</label>
+          <label htmlFor="contractor_name">Business Name</label>
           <input
             id="contractor_name"
             type="text"
             value={job.contractor_name ?? ''}
             onChange={(e) => updateField('contractor_name', e.target.value)}
-            placeholder="[Your Business Name]"
+            placeholder="ABC Welding"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="contractor_phone">Phone</label>
+          <input
+            id="contractor_phone"
+            type="tel"
+            value={job.contractor_phone ?? ''}
+            onChange={(e) => updateField('contractor_phone', e.target.value)}
+            placeholder="(555) 000-0000"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="contractor_email">Email</label>
+          <input
+            id="contractor_email"
+            type="email"
+            value={job.contractor_email ?? ''}
+            onChange={(e) => updateField('contractor_email', e.target.value)}
+            placeholder="you@example.com"
           />
         </div>
       </section>
 
+      {/* Customer */}
       <section className="form-section">
         <h2>Customer Information</h2>
-
         <div className="form-group">
           <label htmlFor="customer_name">Customer Name *</label>
           <input
@@ -108,7 +188,6 @@ export function JobForm({ job, onChange }: JobFormProps) {
             placeholder="John Smith"
           />
         </div>
-
         <div className="form-group">
           <label htmlFor="customer_phone">Customer Phone *</label>
           <input
@@ -120,9 +199,18 @@ export function JobForm({ job, onChange }: JobFormProps) {
             placeholder="(555) 123-4567"
           />
         </div>
-
         <div className="form-group">
-          <label htmlFor="job_location">Job Location *</label>
+          <label htmlFor="customer_email">Customer Email</label>
+          <input
+            id="customer_email"
+            type="email"
+            value={job.customer_email}
+            onChange={(e) => updateField('customer_email', e.target.value)}
+            placeholder="customer@example.com"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="job_location">Job Site / Address *</label>
           <textarea
             id="job_location"
             value={job.job_location}
@@ -132,27 +220,43 @@ export function JobForm({ job, onChange }: JobFormProps) {
             rows={2}
           />
         </div>
+        <div className="form-group">
+          <label htmlFor="governing_state">
+            Governing State
+            <span className="help-text-inline"> (auto-detected from address)</span>
+          </label>
+          <input
+            id="governing_state"
+            type="text"
+            value={job.governing_state}
+            onChange={handleGoverningStateChange}
+            placeholder="TX"
+            maxLength={2}
+            style={{ textTransform: 'uppercase', maxWidth: '80px' }}
+          />
+        </div>
       </section>
 
+      {/* Job Details */}
       <section className="form-section">
         <h2>Job Details</h2>
-
         <div className="form-group">
-          <label htmlFor="job_type">Job Type *</label>
+          <label htmlFor="job_classification">Job Classification *</label>
           <select
-            id="job_type"
-            value={job.job_type}
-            onChange={(e) => updateField('job_type', e.target.value as JobType)}
+            id="job_classification"
+            value={job.job_classification}
+            onChange={(e) => updateField('job_classification', e.target.value as JobClassification)}
             required
           >
             <option value="repair">Repair</option>
             <option value="fabrication">Fabrication</option>
-            <option value="mobile repair">Mobile Repair</option>
+            <option value="installation">Installation</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="other">Other</option>
           </select>
         </div>
-
         <div className="form-group">
-          <label htmlFor="asset_or_item_description">Item/Asset Description *</label>
+          <label htmlFor="asset_or_item_description">Item / Asset Description *</label>
           <textarea
             id="asset_or_item_description"
             value={job.asset_or_item_description}
@@ -162,7 +266,6 @@ export function JobForm({ job, onChange }: JobFormProps) {
             rows={2}
           />
         </div>
-
         <div className="form-group">
           <label htmlFor="requested_work">Requested Work *</label>
           <textarea
@@ -174,27 +277,49 @@ export function JobForm({ job, onChange }: JobFormProps) {
             rows={3}
           />
         </div>
-
         <div className="form-group">
           <label htmlFor="materials_provided_by">Materials Provided By *</label>
           <select
             id="materials_provided_by"
             value={job.materials_provided_by}
-            onChange={(e) =>
-              updateField('materials_provided_by', e.target.value as MaterialsProvider)
-            }
+            onChange={(e) => updateField('materials_provided_by', e.target.value as MaterialsProvider)}
             required
           >
-            <option value="welder">Welder (You)</option>
+            <option value="welder">Service Provider (You)</option>
             <option value="customer">Customer</option>
             <option value="mixed">Mixed</option>
           </select>
         </div>
       </section>
 
+      {/* Scheduling */}
+      <section className="form-section">
+        <h2>Scheduling</h2>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="target_start">Target Start Date</label>
+            <input
+              id="target_start"
+              type="date"
+              value={job.target_start}
+              onChange={(e) => updateField('target_start', e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="target_completion_date">Target Completion Date</label>
+            <input
+              id="target_completion_date"
+              type="date"
+              value={job.target_completion_date}
+              onChange={(e) => updateField('target_completion_date', e.target.value)}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Included Services */}
       <section className="form-section">
         <h2>Included Services</h2>
-
         <div className="checkbox-group">
           <label className="checkbox-label">
             <input
@@ -204,7 +329,6 @@ export function JobForm({ job, onChange }: JobFormProps) {
             />
             <span>Installation Included</span>
           </label>
-
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -213,32 +337,28 @@ export function JobForm({ job, onChange }: JobFormProps) {
             />
             <span>Grinding Included</span>
           </label>
-
           <label className="checkbox-label">
             <input
               type="checkbox"
               checked={job.paint_or_coating_included}
               onChange={(e) => updateField('paint_or_coating_included', e.target.checked)}
             />
-            <span>Paint/Coating Included</span>
+            <span>Paint / Coating Included</span>
           </label>
-
           <label className="checkbox-label">
             <input
               type="checkbox"
               checked={job.removal_or_disassembly_included}
-              onChange={(e) =>
-                updateField('removal_or_disassembly_included', e.target.checked)
-              }
+              onChange={(e) => updateField('removal_or_disassembly_included', e.target.checked)}
             />
-            <span>Removal/Disassembly Included</span>
+            <span>Removal / Disassembly Included</span>
           </label>
         </div>
       </section>
 
+      {/* Risk */}
       <section className="form-section">
         <h2>Risk Assessment</h2>
-
         <div className="checkbox-group">
           <label className="checkbox-label">
             <input
@@ -251,9 +371,9 @@ export function JobForm({ job, onChange }: JobFormProps) {
         </div>
       </section>
 
+      {/* Pricing & Payment */}
       <section className="form-section">
-        <h2>Pricing</h2>
-
+        <h2>Pricing &amp; Payment</h2>
         <div className="form-group">
           <label htmlFor="price_type">Price Type *</label>
           <select
@@ -264,62 +384,77 @@ export function JobForm({ job, onChange }: JobFormProps) {
           >
             <option value="fixed">Fixed Price</option>
             <option value="estimate">Estimate</option>
+            <option value="time_and_materials">Time &amp; Materials</option>
           </select>
         </div>
-
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="price">Total Price ($) *</label>
+            <input
+              id="price"
+              type="number"
+              value={rawPrice}
+              onChange={handlePriceChange}
+              required
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="deposit_amount">Deposit Amount ($)</label>
+            <input
+              id="deposit_amount"
+              type="number"
+              value={rawDeposit}
+              onChange={handleDepositChange}
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+            />
+          </div>
+        </div>
         <div className="form-group">
-          <label htmlFor="price">Price ($) *</label>
-          <input
-            id="price"
-            type="number"
-            value={rawPrice}
-            onChange={handlePriceChange}
-            required
-            min="0"
-            step="0.01"
-            placeholder="450"
+          <label>Accepted Payment Methods</label>
+          <div className="checkbox-group">
+            {PAYMENT_METHOD_OPTIONS.map((method) => (
+              <label key={method} className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={job.payment_methods.includes(method)}
+                  onChange={() => togglePaymentMethod(method)}
+                />
+                <span>{method}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="form-group">
+          <label htmlFor="late_payment_terms">Late Payment Terms</label>
+          <textarea
+            id="late_payment_terms"
+            value={job.late_payment_terms}
+            onChange={(e) => updateField('late_payment_terms', e.target.value)}
+            rows={2}
+            placeholder="Balances unpaid 7 days after completion accrue 1.5% per month"
           />
         </div>
-
         <div className="checkbox-group">
           <label className="checkbox-label">
             <input
               type="checkbox"
-              checked={job.deposit_required}
-              onChange={(e) => updateField('deposit_required', e.target.checked)}
+              checked={job.card_fee_note}
+              onChange={(e) => updateField('card_fee_note', e.target.checked)}
             />
-            <span>Deposit Required</span>
+            <span>Add card processing fee note (up to 3.5%)</span>
           </label>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="payment_terms">Payment Terms *</label>
-          <textarea
-            id="payment_terms"
-            value={job.payment_terms}
-            onChange={(e) => updateField('payment_terms', e.target.value)}
-            required
-            placeholder="50% deposit required, balance due upon completion"
-            rows={2}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="target_completion_date">Target Completion Date *</label>
-          <input
-            id="target_completion_date"
-            type="date"
-            value={job.target_completion_date}
-            onChange={(e) => updateField('target_completion_date', e.target.value)}
-            required
-          />
         </div>
       </section>
 
+      {/* Exclusions */}
       <section className="form-section">
         <h2>Exclusions</h2>
         <p className="help-text">List what is NOT included in this job</p>
-
         {job.exclusions.map((exclusion, index) => (
           <div key={`exclusion-${index}`} className="list-item">
             <input
@@ -338,43 +473,41 @@ export function JobForm({ job, onChange }: JobFormProps) {
             </button>
           </div>
         ))}
-
         <button type="button" className="btn-add" onClick={addExclusion}>
           + Add Exclusion
         </button>
       </section>
 
+      {/* Customer Obligations */}
       <section className="form-section">
-        <h2>Assumptions</h2>
-        <p className="help-text">List assumptions about the job conditions</p>
-
-        {job.assumptions.map((assumption, index) => (
-          <div key={`assumption-${index}`} className="list-item">
+        <h2>Customer Obligations &amp; Site Conditions</h2>
+        <p className="help-text">What the customer must provide or ensure before work begins</p>
+        {job.customer_obligations.map((obligation, index) => (
+          <div key={`obligation-${index}`} className="list-item">
             <input
               type="text"
-              value={assumption}
-              onChange={(e) => updateAssumption(index, e.target.value)}
+              value={obligation}
+              onChange={(e) => updateObligation(index, e.target.value)}
               placeholder="e.g., Customer will provide clear access to work area"
             />
             <button
               type="button"
               className="btn-remove"
-              onClick={() => removeAssumption(index)}
-              aria-label="Remove assumption"
+              onClick={() => removeObligation(index)}
+              aria-label="Remove obligation"
             >
               ×
             </button>
           </div>
         ))}
-
-        <button type="button" className="btn-add" onClick={addAssumption}>
-          + Add Assumption
+        <button type="button" className="btn-add" onClick={addObligation}>
+          + Add Obligation
         </button>
       </section>
 
+      {/* Scope Control */}
       <section className="form-section">
         <h2>Scope Control</h2>
-
         <div className="checkbox-group">
           <label className="checkbox-label">
             <input
@@ -387,22 +520,37 @@ export function JobForm({ job, onChange }: JobFormProps) {
         </div>
       </section>
 
+      {/* Warranty & Dispute */}
       <section className="form-section">
-        <h2>Warranty</h2>
-
-        <div className="form-group">
-          <label htmlFor="workmanship_warranty_days">
-            Workmanship Warranty (Days) *
-          </label>
-          <input
-            id="workmanship_warranty_days"
-            type="number"
-            value={rawWarranty}
-            onChange={handleWarrantyChange}
-            required
-            min="0"
-            placeholder="30"
-          />
+        <h2>Warranty &amp; Dispute Resolution</h2>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="workmanship_warranty_days">
+              Workmanship Warranty (Days)
+            </label>
+            <input
+              id="workmanship_warranty_days"
+              type="number"
+              value={rawWarranty}
+              onChange={handleWarrantyChange}
+              min="0"
+              placeholder="30"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="negotiation_period">
+              Negotiation Period (Days)
+            </label>
+            <input
+              id="negotiation_period"
+              type="number"
+              value={rawNegotiation}
+              onChange={handleNegotiationChange}
+              min="1"
+              placeholder="10"
+            />
+            <p className="help-text">Good-faith negotiation window before formal dispute process</p>
+          </div>
         </div>
       </section>
     </form>

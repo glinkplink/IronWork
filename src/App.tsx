@@ -36,35 +36,71 @@ function App() {
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [accountCreating, setAccountCreating] = useState(false);
   const [justCompletedSignup, setJustCompletedSignup] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [woIsOpen, setWoIsOpen] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [job, setJob] = useState<WelderJob>(() => ({
     ...(sampleJob as WelderJob),
     contractor_name: '',
   }));
 
-  // Populate job with profile defaults when creating a new Work Agreement
-  const createNewAgreement = () => {
-    const defaults = profile
+  const doCreateNewAgreement = (currentProfile: BusinessProfile | null) => {
+    const today = new Date().toISOString().split('T')[0];
+    const p = currentProfile;
+    const defaults: Partial<WelderJob> = p
       ? {
-          contractor_name: profile.business_name,
-          exclusions: profile.default_exclusions?.length ? profile.default_exclusions : sampleJob.exclusions,
-          assumptions: profile.default_assumptions?.length ? profile.default_assumptions : sampleJob.assumptions,
+          contractor_name: p.business_name,
+          contractor_phone: p.phone ?? '',
+          contractor_email: p.email ?? '',
+          wo_number: p.next_wo_number ?? 1,
+          agreement_date: today,
+          exclusions: p.default_exclusions?.length ? [...p.default_exclusions] : [],
+          customer_obligations: p.default_assumptions?.length ? [...p.default_assumptions] : [],
+          payment_methods: p.default_payment_methods?.length
+            ? [...p.default_payment_methods]
+            : ['Cash', 'Check'],
+          late_payment_terms:
+            p.default_late_payment_terms ||
+            'Balances unpaid 7 days after completion accrue 1.5% per month',
+          card_fee_note: p.default_card_fee_note ?? false,
+          workmanship_warranty_days: p.default_warranty_period ?? 30,
+          negotiation_period: p.default_negotiation_period ?? 10,
         }
-      : {};
+      : { agreement_date: today };
 
     setJob({
       ...(sampleJob as WelderJob),
       contractor_name: '',
       exclusions: [],
-      assumptions: [],
+      customer_obligations: [],
       ...defaults,
     });
+    setCurrentJobId(null);
+    setWoIsOpen(true);
     setView('form');
+  };
+
+  const createNewAgreement = () => {
+    if (woIsOpen && currentJobId === null) {
+      setShowUnsavedModal(true);
+      return;
+    }
+    doCreateNewAgreement(profile);
+  };
+
+  const handleSaveSuccess = (savedJobId: string, isNewSave: boolean) => {
+    setCurrentJobId(savedJobId);
+    if (isNewSave && profile) {
+      const newCount = (profile.next_wo_number ?? 1) + 1;
+      const updatedProfile = { ...profile, next_wo_number: newCount };
+      setProfile(updatedProfile);
+      upsertProfile({ user_id: profile.user_id, next_wo_number: newCount });
+    }
   };
 
   useEffect(() => {
     if (user) {
       const loadProfile = async () => {
-        // Also clear auth page flag on sign-in (deferred to avoid sync setState in effect)
         setShowAuthPage(false);
         setProfileLoading(true);
         const data = await getProfile(user.id);
@@ -104,7 +140,6 @@ function App() {
 
     setAccountCreating(true);
 
-    // Create account
     const { data, error } = await signUp(onboardingData.email, password);
 
     if (error || !data.user) {
@@ -112,7 +147,6 @@ function App() {
       throw new Error(error?.message || 'Failed to create account');
     }
 
-    // Save profile
     const { error: profileError } = await upsertProfile({
       user_id: data.user.id,
       business_name: onboardingData.businessName,
@@ -130,13 +164,11 @@ function App() {
       throw new Error(profileError.message);
     }
 
-    // Set flags for successful signup
     setShowSuccessBanner(true);
     setJustCompletedSignup(true);
     setOnboardingStep(null);
     setOnboardingData(null);
-    setView('home'); // Ensure we land on home page
-    // Keep accountCreating true - will be reset when auth state updates
+    setView('home');
   };
 
   if (authLoading || profileLoading || accountCreating) {
@@ -147,7 +179,6 @@ function App() {
     );
   }
 
-  // New user onboarding flow
   if (!user && !showAuthPage) {
     if (onboardingStep === 'password' && onboardingData) {
       return (
@@ -168,13 +199,10 @@ function App() {
     );
   }
 
-  // Returning user sign in
   if (!user && showAuthPage) {
     return <AuthPage onSignUpClick={() => setShowAuthPage(false)} />;
   }
 
-  // Authenticated user without profile
-  // Skip this if user just completed signup (profile is still loading)
   if (user && !profile && !justCompletedSignup) {
     return (
       <BusinessProfileForm
@@ -185,8 +213,6 @@ function App() {
     );
   }
 
-  // User is authenticated and has profile
-  // If user just completed signup and profile is still loading, show loading state
   if (!profile) {
     if (justCompletedSignup) {
       return <div className="app-loading">Setting up your account...</div>;
@@ -194,7 +220,6 @@ function App() {
     return null;
   }
 
-  // Show EditProfilePage when view === 'profile'
   if (view === 'profile') {
     return (
       <EditProfilePage
@@ -250,13 +275,44 @@ function App() {
         ) : view === 'form' ? (
           <JobForm job={job} onChange={setJob} />
         ) : (
-          <AgreementPreview job={job} profile={profile} />
+          <AgreementPreview
+            job={job}
+            profile={profile}
+            existingJobId={currentJobId ?? undefined}
+            onSaveSuccess={handleSaveSuccess}
+          />
         )}
       </main>
 
       <footer className="app-footer">
         <p>ScopeLock - Protect Your Work</p>
       </footer>
+
+      {showUnsavedModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Unsaved Work Order</h3>
+            <p>You have an unsaved Work Order. Continue editing or discard it?</p>
+            <div className="modal-actions">
+              <button
+                className="btn-secondary"
+                onClick={() => setShowUnsavedModal(false)}
+              >
+                Continue Editing
+              </button>
+              <button
+                className="btn-danger"
+                onClick={() => {
+                  setShowUnsavedModal(false);
+                  doCreateNewAgreement(profile);
+                }}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
