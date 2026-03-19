@@ -77,9 +77,7 @@ export const saveWorkOrder = async (
     contractor_phone: job.contractor_phone || null,
     contractor_email: job.contractor_email || null,
     deposit_amount: job.deposit_amount,
-    payment_methods: job.payment_methods,
     late_payment_terms: job.late_payment_terms,
-    card_fee_note: job.card_fee_note,
     negotiation_period: job.negotiation_period,
     customer_obligations: job.customer_obligations,
   };

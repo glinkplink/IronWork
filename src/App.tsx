@@ -56,13 +56,9 @@ function App() {
           agreement_date: today,
           exclusions: p.default_exclusions?.length ? [...p.default_exclusions] : [],
           customer_obligations: p.default_assumptions?.length ? [...p.default_assumptions] : [],
-          payment_methods: p.default_payment_methods?.length
-            ? [...p.default_payment_methods]
-            : ['Cash', 'Check'],
           late_payment_terms:
             p.default_late_payment_terms ||
             'Balances unpaid 7 days after completion accrue 1.5% per month',
-          card_fee_note: p.default_card_fee_note ?? false,
           workmanship_warranty_days: p.default_warranty_period ?? 30,
           negotiation_period: p.default_negotiation_period ?? 10,
         }

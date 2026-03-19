@@ -378,16 +378,6 @@ export function JobForm({ job, onChange }: JobFormProps) {
             placeholder="Balances unpaid 7 days after completion accrue 1.5% per month"
           />
         </div>
-        <div className="checkbox-group">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={job.card_fee_note}
-              onChange={(e) => updateField('card_fee_note', e.target.checked)}
-            />
-            <span>Add card processing fee note (up to 3.5%)</span>
-          </label>
-        </div>
       </section>
 
       {/* Exclusions */}

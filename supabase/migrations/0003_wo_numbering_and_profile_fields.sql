@@ -19,9 +19,7 @@ ALTER TABLE jobs
   ADD COLUMN IF NOT EXISTS job_classification text,
   ADD COLUMN IF NOT EXISTS target_start date,
   ADD COLUMN IF NOT EXISTS deposit_amount numeric(10,2),
-  ADD COLUMN IF NOT EXISTS payment_methods text[] NOT NULL DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS late_payment_terms text,
-  ADD COLUMN IF NOT EXISTS card_fee_note boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS negotiation_period integer,
   ADD COLUMN IF NOT EXISTS customer_obligations text[] NOT NULL DEFAULT '{}';
 

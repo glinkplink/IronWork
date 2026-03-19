@@ -144,7 +144,7 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     { type: 'table', rows: pricingRows },
     { type: 'paragraph', text: job.late_payment_terms },
   ];
-  if (job.card_fee_note) {
+  if (profile?.default_card_fee_note) {
     pricingBlocks.push({
       type: 'paragraph',
       text: 'Payments made by credit or debit card are subject to a processing fee of up to 3.5%.',

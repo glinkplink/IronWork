@@ -69,9 +69,7 @@ export interface Job {
   job_classification: string | null;
   target_start: string | null;
   deposit_amount: number | null;
-  payment_methods: string[];
   late_payment_terms: string | null;
-  card_fee_note: boolean;
   negotiation_period: number | null;
   customer_obligations: string[];
   created_at: string;
