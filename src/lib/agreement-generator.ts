@@ -38,8 +38,31 @@ function getSignatureBlockData(job: WelderJob, profile: BusinessProfile | null):
   };
 }
 
+/** Built without numbers; `assignSequentialSectionNumbers` fills 1…n (signature block stays 0). */
+interface AgreementSectionDraft {
+  title: string;
+  blocks: SectionContentBlock[];
+  signatureData?: SignatureBlockData;
+  isSignature?: boolean;
+}
+
+function assignSequentialSectionNumbers(drafts: AgreementSectionDraft[]): AgreementSection[] {
+  let num = 1;
+  return drafts.map((d) => {
+    if (d.isSignature) {
+      return {
+        title: d.title,
+        number: 0,
+        blocks: d.blocks,
+        signatureData: d.signatureData,
+      };
+    }
+    return { title: d.title, number: num++, blocks: d.blocks };
+  });
+}
+
 export function generateAgreement(job: WelderJob, profile: BusinessProfile | null): AgreementSection[] {
-  const sections: AgreementSection[] = [];
+  const drafts: AgreementSectionDraft[] = [];
 
   const priceTypeLabel =
     job.price_type === 'fixed' ? 'Fixed Price' :
@@ -59,9 +82,8 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     ['Customer Email', job.customer_email || ''],
     ['Job Site Address', job.job_location],
   ];
-  sections.push({
+  drafts.push({
     title: 'Parties & Project Information',
-    number: 1,
     blocks: [{ type: 'table', rows: partiesRows }],
   });
 
@@ -76,9 +98,8 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     ['Target Start', formatDate(job.target_start)],
     ['Target Completion', formatDate(job.target_completion_date)],
   ];
-  sections.push({
+  drafts.push({
     title: 'Project Overview',
-    number: 2,
     blocks: [{ type: 'table', rows: overviewRows }],
   });
 
@@ -102,16 +123,15 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     scopeBlocks.push({ type: 'bullets', items: scopeItems });
   }
   scopeBlocks.push({ type: 'paragraph', text: materialsText });
-  sections.push({ title: 'Scope of Work', number: 3, blocks: scopeBlocks });
+  drafts.push({ title: 'Scope of Work', blocks: scopeBlocks });
 
-  // 4. Exclusions — omit entire section if no non-empty items (stable section numbers: still "4." when present)
+  // Exclusions — omit entire section if no non-empty items
   const rawExclusions =
     job.exclusions.length > 0 ? job.exclusions : (profile?.default_exclusions ?? []);
   const effectiveExclusions = normalizeBulletList(rawExclusions);
   if (effectiveExclusions.length > 0) {
-    sections.push({
+    drafts.push({
       title: 'Exclusions',
-      number: 4,
       blocks: [{ type: 'bullets', items: effectiveExclusions }],
     });
   }
@@ -123,9 +143,8 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
       : (profile?.default_assumptions ?? []);
   const effectiveObligations = normalizeBulletList(rawObligations);
   if (effectiveObligations.length > 0) {
-    sections.push({
+    drafts.push({
       title: 'Customer Obligations & Site Conditions',
-      number: 5,
       blocks: [
         { type: 'bullets', items: effectiveObligations },
         {
@@ -151,44 +170,40 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
   if (lateTerms) {
     pricingBlocks.push({ type: 'note', text: lateTerms });
   }
-  sections.push({ title: 'Pricing & Payment Terms', number: 6, blocks: pricingBlocks });
+  drafts.push({ title: 'Pricing & Payment Terms', blocks: pricingBlocks });
 
-  // 7. Change Orders
-  sections.push({
+  // Change Orders
+  drafts.push({
     title: 'Change Orders',
-    number: 7,
     blocks: [{
       type: 'paragraph',
       text: `Any work outside the agreed scope requires written or verbal approval from ${CUSTOMER} before proceeding. Change orders may result in additional charges and timeline adjustments. ${SERVICE_PROVIDER_CAP} will provide an estimate for any additional work before proceeding.`,
     }],
   });
 
-  // 8. Hidden Damage
-  sections.push({
+  // Hidden Damage
+  drafts.push({
     title: 'Hidden Damage',
-    number: 8,
     blocks: [{
       type: 'paragraph',
       text: `If hidden damage is discovered during repair work that was not visible during initial inspection, ${SERVICE_PROVIDER} will notify ${CUSTOMER} before proceeding. Additional work required to address hidden damage may result in additional charges and will require ${CUSTOMER} approval.`,
     }],
   });
 
-  // 9. Completion & Acceptance
+  // Completion & Acceptance
   const completionText =
     job.workmanship_warranty_days > 0
       ? `Upon completion of the work and ${CUSTOMER} approval, responsibility for the repaired/fabricated item transfers back to ${CUSTOMER}. ${SERVICE_PROVIDER_CAP} is only responsible for workmanship defects as outlined in the Workmanship Warranty section.`
       : `Upon completion of the work and ${CUSTOMER} approval, responsibility for the repaired/fabricated item transfers back to ${CUSTOMER}.`;
-  sections.push({
+  drafts.push({
     title: 'Completion & Acceptance',
-    number: 9,
     blocks: [{ type: 'paragraph', text: completionText }],
   });
 
-  // 10. Workmanship Warranty (omitted if warranty days is 0)
+  // Workmanship Warranty (omitted if warranty days is 0)
   if (job.workmanship_warranty_days > 0) {
-    sections.push({
+    drafts.push({
       title: 'Workmanship Warranty',
-      number: 10,
       blocks: [
         {
           type: 'paragraph',
@@ -211,42 +226,38 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     });
   }
 
-  // 11. Liability & Indemnification
+  // Liability & Indemnification
   const priceText = job.price > 0 ? formatPrice(job.price) : 'the Total Contract Price';
-  sections.push({
+  drafts.push({
     title: 'Liability & Indemnification',
-    number: 11,
     blocks: [{
       type: 'paragraph',
       text: `${SERVICE_PROVIDER_CAP}'s total liability under this agreement shall not exceed ${priceText}. ${SERVICE_PROVIDER_CAP} shall not be liable for indirect, incidental, or consequential damages. ${CUSTOMER.charAt(0).toUpperCase() + CUSTOMER.slice(1)} agrees to indemnify and hold ${SERVICE_PROVIDER} harmless from claims arising from ${CUSTOMER}'s misuse or modification of the work after completion.`,
     }],
   });
 
-  // 12. Third-Party Work
-  sections.push({
+  // Third-Party Work
+  drafts.push({
     title: 'Third-Party Work',
-    number: 12,
     blocks: [{
       type: 'paragraph',
       text: `${SERVICE_PROVIDER_CAP} is not responsible for work performed by other contractors, modifications made after completion of this agreement, issues arising from prior repairs or work by others, or damage caused by misuse after work completion.`,
     }],
   });
 
-  // 13. Cancellation & Rescheduling
-  sections.push({
+  // Cancellation & Rescheduling
+  drafts.push({
     title: 'Cancellation & Rescheduling',
-    number: 13,
     blocks: [{
       type: 'paragraph',
       text: `Either party may cancel this Agreement before work commences with 24 hours written notice. If ${CUSTOMER} cancels after work has commenced, ${CUSTOMER} shall pay for work completed to date plus any materials purchased. The deposit is non-refundable if the Service Provider has mobilized to the job site.`,
     }],
   });
 
-  // 14. Dispute Resolution (omitted if negotiation period is 0)
+  // Dispute Resolution (omitted if negotiation period is 0)
   if (job.negotiation_period > 0) {
-    sections.push({
+    drafts.push({
       title: 'Dispute Resolution',
-      number: 14,
       blocks: [{
         type: 'paragraph',
         text: `The parties agree to attempt to resolve any dispute arising under this Agreement through good-faith negotiation first. If negotiation fails within ${job.negotiation_period} days, the parties agree to non-binding mediation before pursuing litigation. This Agreement shall be governed by and construed under the laws of the applicable state.`,
@@ -254,25 +265,24 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     });
   }
 
-  // 15. Entire Agreement
-  sections.push({
+  // Entire Agreement
+  drafts.push({
     title: 'Entire Agreement',
-    number: 15,
     blocks: [{
       type: 'paragraph',
       text: `This document constitutes the entire agreement between the parties and supersedes all prior discussions, representations, or agreements. Any modifications to this agreement must be made in writing and signed by both parties.`,
     }],
   });
 
-  // Signature page
-  sections.push({
+  // Signature page (unnumbered in preview; `number` 0)
+  drafts.push({
     title: 'Signatures & Acceptance',
-    number: 0,
     blocks: [{ type: 'signature' }],
     signatureData: getSignatureBlockData(job, profile),
+    isSignature: true,
   });
 
-  return sections;
+  return assignSequentialSectionNumbers(drafts);
 }
 
 export function formatAgreementAsText(sections: AgreementSection[]): string {

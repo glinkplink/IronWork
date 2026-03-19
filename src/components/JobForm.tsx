@@ -10,10 +10,10 @@ export function JobForm({ job, onChange }: JobFormProps) {
   const [rawPrice, setRawPrice] = useState(() => (job.price === 0 ? '' : String(job.price)));
   const [rawDeposit, setRawDeposit] = useState(() => (job.deposit_amount === 0 ? '' : String(job.deposit_amount)));
   const [rawWarranty, setRawWarranty] = useState(() =>
-    job.workmanship_warranty_days === 0 ? '' : String(job.workmanship_warranty_days)
+    String(job.workmanship_warranty_days ?? 0)
   );
   const [rawNegotiation, setRawNegotiation] = useState(() =>
-    job.negotiation_period === 0 ? '' : String(job.negotiation_period)
+    String(job.negotiation_period ?? 0)
   );
 
   const skipSyncRef = useRef(false);
@@ -25,8 +25,8 @@ export function JobForm({ job, onChange }: JobFormProps) {
     }
     const nextPrice = job.price === 0 ? '' : String(job.price);
     const nextDeposit = job.deposit_amount === 0 ? '' : String(job.deposit_amount);
-    const nextWarranty = job.workmanship_warranty_days === 0 ? '' : String(job.workmanship_warranty_days);
-    const nextNegotiation = job.negotiation_period === 0 ? '' : String(job.negotiation_period);
+    const nextWarranty = String(job.workmanship_warranty_days ?? 0);
+    const nextNegotiation = String(job.negotiation_period ?? 0);
     Promise.resolve().then(() => {
       setRawPrice(nextPrice);
       setRawDeposit(nextDeposit);
@@ -410,9 +410,8 @@ export function JobForm({ job, onChange }: JobFormProps) {
         </div>
       </section>
 
-      {/* 10 / 14 */}
       <section className="form-section">
-        <h2>10. Workmanship Warranty / 14. Dispute Resolution</h2>
+        <h2>Workmanship Warranty &amp; Dispute Resolution</h2>
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="workmanship_warranty_days">
@@ -426,6 +425,9 @@ export function JobForm({ job, onChange }: JobFormProps) {
               min="0"
               placeholder="30"
             />
+            <p className="help-text help-text-italic">
+              If no warranty, enter 0 and the section will be omitted.
+            </p>
           </div>
           <div className="form-group">
             <label htmlFor="negotiation_period">
@@ -440,11 +442,11 @@ export function JobForm({ job, onChange }: JobFormProps) {
               placeholder="10"
             />
             <p className="help-text">Good-faith negotiation window before formal dispute process</p>
+            <p className="help-text help-text-italic">
+              If no negotiations, enter 0 and the section will be omitted.
+            </p>
           </div>
         </div>
-        <p className="help-text help-text-italic">
-          If either of these fields are 0, the relevant sections will be removed from the work order.
-        </p>
       </section>
     </form>
   );

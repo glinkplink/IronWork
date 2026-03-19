@@ -42,9 +42,9 @@ A welder signs up, sets up their business profile (saved to the database), then 
 - **Body** includes the centered **Work Order** title, numbered sections, tables, and signatures
   only. Section 1 **Service Provider / SP Phone / SP Email** rows come from `business_profiles`,
   not from per–work-order contractor fields on the edit form.
-- **Optional sections**: Exclusions (4) and Customer Obligations (5) are omitted entirely when
-  there are no non-empty bullet items; section numbers for remaining sections stay fixed (e.g.
-  Pricing remains section 6).
+- **Optional sections**: Exclusions, Customer Obligations, Workmanship Warranty (when days is 0),
+  and Dispute Resolution (when negotiation days is 0) are omitted when empty or zero. **Section
+  numbers are assigned at render time** (1…n with no gaps); the signature block stays unnumbered.
 - **Governing state** is not collected on the work order form; dispute copy uses generic
   “applicable state” language.
 
