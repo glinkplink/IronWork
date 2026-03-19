@@ -10,6 +10,7 @@ import { EditProfilePage } from './components/EditProfilePage';
 import { useAuth } from './hooks/useAuth';
 import { getProfile, upsertProfile } from './lib/db/profile';
 import { signUp } from './lib/auth';
+import { getDefaultCustomerObligations, getDefaultExclusions } from './lib/defaults';
 import type { BusinessProfile } from './types/db';
 import sampleJob from './data/sample-job.json';
 import './App.css';
@@ -35,8 +36,8 @@ function buildNewAgreementDraft(currentProfile: BusinessProfile | null): WelderJ
         contractor_email: p.email ?? '',
         wo_number: p.next_wo_number ?? 1,
         agreement_date: today,
-        exclusions: p.default_exclusions?.length ? [...p.default_exclusions] : [],
-        customer_obligations: p.default_assumptions?.length ? [...p.default_assumptions] : [],
+        exclusions: getDefaultExclusions(p.default_exclusions),
+        customer_obligations: getDefaultCustomerObligations(p.default_assumptions),
         late_payment_terms:
           p.default_late_payment_terms ||
           'Balances unpaid 7 days after completion accrue 1.5% per month',
@@ -48,8 +49,8 @@ function buildNewAgreementDraft(currentProfile: BusinessProfile | null): WelderJ
   return {
     ...(sampleJob as WelderJob),
     contractor_name: '',
-    exclusions: [],
-    customer_obligations: [],
+    exclusions: getDefaultExclusions(),
+    customer_obligations: getDefaultCustomerObligations(),
     ...defaults,
   };
 }
@@ -173,8 +174,8 @@ function App() {
       email: onboardingData.email || null,
       address: onboardingData.address || null,
       google_business_profile_url: onboardingData.googleUrl || null,
-      default_exclusions: [],
-      default_assumptions: [],
+      default_exclusions: getDefaultExclusions(),
+      default_assumptions: getDefaultCustomerObligations(),
     });
 
     if (profileError) {

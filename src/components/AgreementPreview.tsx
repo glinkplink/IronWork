@@ -17,6 +17,13 @@ function getPdfFilename(woNumber: number, customerName: string): string {
   return `WO-${String(woNumber).padStart(4, '0')}_${sanitized}.pdf`;
 }
 
+function getProviderDisplay(profile: BusinessProfile | null, job: WelderJob) {
+  return {
+    name: profile?.owner_name || profile?.business_name || job.contractor_name || 'Service Provider',
+    phone: profile?.phone || job.contractor_phone || '',
+  };
+}
+
 function buildPdfHtml(previewMarkup: string): string {
   return `<!doctype html>
 <html lang="en">
@@ -65,6 +72,10 @@ function buildPdfHtml(previewMarkup: string): string {
         box-shadow: none;
       }
 
+      .agreement-document-header {
+        display: none;
+      }
+
       @media print {
         body {
           -webkit-font-smoothing: antialiased;
@@ -78,7 +89,9 @@ function buildPdfHtml(previewMarkup: string): string {
 </html>`;
 }
 
-async function buildPdf(job: WelderJob, previewElement: HTMLElement) {
+async function buildPdf(job: WelderJob, profile: BusinessProfile | null, previewElement: HTMLElement) {
+  const provider = getProviderDisplay(profile, job);
+
   const response = await fetch('/api/pdf', {
     method: 'POST',
     headers: {
@@ -87,6 +100,9 @@ async function buildPdf(job: WelderJob, previewElement: HTMLElement) {
     body: JSON.stringify({
       filename: getPdfFilename(job.wo_number, job.customer_name),
       html: buildPdfHtml(previewElement.outerHTML),
+      workOrderNumber: `Work Order #${String(job.wo_number).padStart(4, '0')}`,
+      providerName: provider.name,
+      providerPhone: provider.phone,
     }),
   });
 
@@ -126,7 +142,7 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
     }
 
     try {
-      await buildPdf(job, documentRef.current);
+      await buildPdf(job, profile, documentRef.current);
     } catch (error) {
       setSaving(false);
       setSaveError(error instanceof Error ? error.message : 'Failed to generate PDF.');

@@ -76,11 +76,59 @@ function getMimeType(filePath) {
   }
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function buildHeaderTemplate(workOrderNumber) {
+  const safeWorkOrderNumber = escapeHtml(workOrderNumber || 'Work Order');
+
+  return `
+    <div style="width:100%; padding:0 18px; box-sizing:border-box; font-family: Barlow, 'DIN 2014', Bahnschrift, 'D-DIN', Arial, sans-serif; color:#9ca3af; font-size:8px;">
+      <div style="border-bottom:1px solid #bfd7ee; padding:6px 0 5px;">
+        <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+          <tr>
+            <td style="width:40%; text-align:left; white-space:nowrap; letter-spacing:0.04em;">${safeWorkOrderNumber}</td>
+            <td style="width:20%; text-align:center; white-space:nowrap; letter-spacing:0.12em; text-transform:uppercase;">Confidential</td>
+            <td style="width:40%; text-align:right;">&nbsp;</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildFooterTemplate(providerName, providerPhone) {
+  const safeProviderName = escapeHtml(providerName || 'Service Provider');
+  const safeProviderPhone = escapeHtml(providerPhone || '');
+  const providerText = safeProviderPhone
+    ? `Service Provider: ${safeProviderName} | ${safeProviderPhone}`
+    : `Service Provider: ${safeProviderName}`;
+
+  return `
+    <div style="width:100%; padding:0 18px; box-sizing:border-box; font-family: Barlow, 'DIN 2014', Bahnschrift, 'D-DIN', Arial, sans-serif; color:#9ca3af; font-size:8px;">
+      <div style="border-top:1px solid #bfd7ee; padding:5px 0 6px;">
+        <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+          <tr>
+            <td style="text-align:left; white-space:nowrap;">${providerText}</td>
+            <td style="text-align:right; white-space:nowrap;">Page <span class="pageNumber"></span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 async function handlePdfRequest(req, res) {
   let page;
 
   try {
-    const { html, filename } = await readJsonBody(req);
+    const { html, filename, workOrderNumber, providerName, providerPhone } = await readJsonBody(req);
 
     if (typeof html !== 'string' || !html.trim()) {
       sendText(res, 400, 'Missing HTML payload.');
@@ -101,11 +149,14 @@ async function handlePdfRequest(req, res) {
       format: 'Letter',
       printBackground: true,
       preferCSSPageSize: true,
+      displayHeaderFooter: true,
+      headerTemplate: buildHeaderTemplate(workOrderNumber),
+      footerTemplate: buildFooterTemplate(providerName, providerPhone),
       margin: {
-        top: '0',
-        right: '0',
-        bottom: '0',
-        left: '0',
+        top: '56px',
+        right: '18px',
+        bottom: '56px',
+        left: '18px',
       },
     });
 

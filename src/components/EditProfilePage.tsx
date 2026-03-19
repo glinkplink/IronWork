@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { upsertProfile } from '../lib/db/profile';
 import { signOut } from '../lib/auth';
+import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defaults';
 import type { BusinessProfile } from '../types/db';
 
 const PAYMENT_METHOD_OPTIONS = ['Cash', 'Check', 'Zelle', 'Venmo', 'Card'];
@@ -19,10 +20,10 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
   const [address, setAddress] = useState(profile.address ?? '');
   const [googleUrl, setGoogleUrl] = useState(profile.google_business_profile_url ?? '');
   const [defaultExclusions, setDefaultExclusions] = useState<string[]>(
-    profile.default_exclusions ?? []
+    getDefaultExclusions(profile.default_exclusions)
   );
   const [defaultCustomerObligations, setDefaultCustomerObligations] = useState<string[]>(
-    profile.default_assumptions ?? []
+    getDefaultCustomerObligations(profile.default_assumptions)
   );
   const [defaultWarrantyPeriod, setDefaultWarrantyPeriod] = useState(
     profile.default_warranty_period ?? 30
