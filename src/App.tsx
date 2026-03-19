@@ -25,6 +25,35 @@ interface OnboardingData {
   googleUrl: string;
 }
 
+function buildNewAgreementDraft(currentProfile: BusinessProfile | null): WelderJob {
+  const today = new Date().toISOString().split('T')[0];
+  const p = currentProfile;
+  const defaults: Partial<WelderJob> = p
+    ? {
+        contractor_name: p.business_name,
+        contractor_phone: p.phone ?? '',
+        contractor_email: p.email ?? '',
+        wo_number: p.next_wo_number ?? 1,
+        agreement_date: today,
+        exclusions: p.default_exclusions?.length ? [...p.default_exclusions] : [],
+        customer_obligations: p.default_assumptions?.length ? [...p.default_assumptions] : [],
+        late_payment_terms:
+          p.default_late_payment_terms ||
+          'Balances unpaid 7 days after completion accrue 1.5% per month',
+        workmanship_warranty_days: p.default_warranty_period ?? 30,
+        negotiation_period: p.default_negotiation_period ?? 10,
+      }
+    : { agreement_date: today };
+
+  return {
+    ...(sampleJob as WelderJob),
+    contractor_name: '',
+    exclusions: [],
+    customer_obligations: [],
+    ...defaults,
+  };
+}
+
 function App() {
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
@@ -43,41 +72,25 @@ function App() {
     ...(sampleJob as WelderJob),
     contractor_name: '',
   }));
+  const [draftBaseline, setDraftBaseline] = useState<WelderJob | null>(null);
 
   const doCreateNewAgreement = (currentProfile: BusinessProfile | null) => {
-    const today = new Date().toISOString().split('T')[0];
-    const p = currentProfile;
-    const defaults: Partial<WelderJob> = p
-      ? {
-          contractor_name: p.business_name,
-          contractor_phone: p.phone ?? '',
-          contractor_email: p.email ?? '',
-          wo_number: p.next_wo_number ?? 1,
-          agreement_date: today,
-          exclusions: p.default_exclusions?.length ? [...p.default_exclusions] : [],
-          customer_obligations: p.default_assumptions?.length ? [...p.default_assumptions] : [],
-          late_payment_terms:
-            p.default_late_payment_terms ||
-            'Balances unpaid 7 days after completion accrue 1.5% per month',
-          workmanship_warranty_days: p.default_warranty_period ?? 30,
-          negotiation_period: p.default_negotiation_period ?? 10,
-        }
-      : { agreement_date: today };
-
-    setJob({
-      ...(sampleJob as WelderJob),
-      contractor_name: '',
-      exclusions: [],
-      customer_obligations: [],
-      ...defaults,
-    });
+    const nextDraft = buildNewAgreementDraft(currentProfile);
+    setJob(nextDraft);
+    setDraftBaseline(nextDraft);
     setCurrentJobId(null);
     setWoIsOpen(true);
     setView('form');
   };
 
   const createNewAgreement = () => {
-    if (woIsOpen && currentJobId === null) {
+    const hasUnsavedChanges =
+      woIsOpen &&
+      currentJobId === null &&
+      draftBaseline !== null &&
+      JSON.stringify(job) !== JSON.stringify(draftBaseline);
+
+    if (hasUnsavedChanges) {
       setShowUnsavedModal(true);
       return;
     }
