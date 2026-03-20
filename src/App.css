@@ -416,30 +416,26 @@ body {
   border-color: var(--border-strong);
 }
 
-/* Preview: native 816px sheet; optional JS upscale on desktop (see AgreementPreview). Page scrolls in app-main. */
-.agreement-preview-measure {
+/* Preview: scale Letter-width sheet on screen; spacer tracks transformed size. */
+.agreement-preview-scale-viewport {
+  position: relative;
   width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   overflow-y: visible;
 }
 
-.agreement-preview-stage {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  max-width: 816px;
+.agreement-preview-scale-spacer {
+  position: relative;
   margin: 0 auto;
-  box-sizing: border-box;
 }
 
-.agreement-preview-upscale {
-  flex-shrink: 0;
+.agreement-preview-scale-sheet {
+  position: absolute;
+  top: 0;
+  left: 0;
   box-sizing: border-box;
-  transform-origin: top center;
-}
-
-.agreement-preview-native-sheet {
-  box-sizing: border-box;
+  will-change: transform;
 }
 
 /* ─── Agreement Document ────────────────────────────── */
@@ -1596,24 +1592,20 @@ body {
     padding: 0;
   }
 
-  .agreement-preview-measure {
+  .agreement-preview-scale-viewport {
     overflow: visible;
   }
 
-  .agreement-preview-stage {
-    min-height: 0 !important;
-    max-width: none !important;
-  }
-
-  .agreement-preview-upscale {
+  .agreement-preview-scale-sheet {
+    position: static;
     transform: none !important;
     width: 100% !important;
+    will-change: auto;
   }
 
-  .agreement-preview-native-sheet {
+  .agreement-preview-scale-spacer {
     width: 100% !important;
-    max-width: 816px;
-    margin: 0 auto;
+    height: auto !important;
   }
 
   .agreement-document {

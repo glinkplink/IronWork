@@ -178,7 +178,7 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
   const [saveError, setSaveError] = useState('');
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const documentRef = useRef<HTMLDivElement | null>(null);
-  const previewMeasureRef = useRef<HTMLDivElement | null>(null);
+  const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const previewSheetRef = useRef<HTMLDivElement | null>(null);
   const [previewContentHeight, setPreviewContentHeight] = useState(0);
   /**
@@ -190,11 +190,11 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
   const sections = generateAgreement(job, profile);
 
   useLayoutEffect(() => {
-    const measure = previewMeasureRef.current;
-    if (!measure) return;
+    const viewport = previewViewportRef.current;
+    if (!viewport) return;
 
     const computeScale = () => {
-      const w = measure.getBoundingClientRect().width;
+      const w = viewport.getBoundingClientRect().width;
       if (w <= 0) return 1;
 
       const maxScale = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ).matches ? 1.5 : 1;
@@ -207,7 +207,7 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
 
     updateScale();
     const ro = new ResizeObserver(updateScale);
-    ro.observe(measure);
+    ro.observe(viewport);
     const mq = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ);
     mq.addEventListener('change', updateScale);
     window.addEventListener('resize', updateScale);
@@ -295,30 +295,23 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
         {renderDownloadButton()}
       </div>
 
-      <div ref={previewMeasureRef} className="agreement-preview-measure">
+      <div ref={previewViewportRef} className="agreement-preview-scale-viewport">
         <div
-          className="agreement-preview-stage"
+          className="agreement-preview-scale-spacer"
           style={{
-            minHeight:
-              previewContentHeight > 0
-                ? previewContentHeight * previewScale
-                : undefined,
-            maxWidth: previewScale > 1 ? 'none' : PREVIEW_LETTER_WIDTH_PX,
+            width: PREVIEW_LETTER_WIDTH_PX * previewScale,
+            height: previewContentHeight * previewScale,
           }}
         >
           <div
-            className="agreement-preview-upscale"
+            ref={previewSheetRef}
+            className="agreement-preview-scale-sheet"
             style={{
               width: PREVIEW_LETTER_WIDTH_PX,
               transform: previewScale !== 1 ? `scale(${previewScale})` : undefined,
-              transformOrigin: 'top center',
+              transformOrigin: 'top left',
             }}
           >
-            <div
-              ref={previewSheetRef}
-              className="agreement-preview-native-sheet"
-              style={{ width: PREVIEW_LETTER_WIDTH_PX }}
-            >
                 <div ref={documentRef} className="agreement-document">
               <div className="agreement-document-header">
                 <h2 className="agreement-document-title">Work Order</h2>
@@ -468,11 +461,10 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
                   </div>
                 </div>
               ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>
+      </div>
 
       <div className="preview-actions preview-actions-bottom">
         {renderDownloadButton()}
