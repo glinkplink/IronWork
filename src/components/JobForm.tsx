@@ -408,9 +408,9 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
         </div>
       </section>
 
-      {/* 7. Change Orders */}
+      {/* 7. Change Orders & Hidden Damage — matches consolidated agreement section */}
       <section className="form-section">
-        <h2>7. Change Orders</h2>
+        <h2>7. Change Orders &amp; Hidden Damage</h2>
         <div className="checkbox-group">
           <label className="checkbox-label checkbox-label-nowrap">
             <input
@@ -420,13 +420,6 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
             />
             <span>Require Change Order for Extra Work</span>
           </label>
-        </div>
-      </section>
-
-      {/* 8. Hidden Damage */}
-      <section className="form-section">
-        <h2>8. Hidden Damage</h2>
-        <div className="checkbox-group">
           <label className="checkbox-label">
             <input
               type="checkbox"

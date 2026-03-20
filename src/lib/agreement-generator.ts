@@ -179,39 +179,34 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
   }
   drafts.push({ title: 'Pricing & Payment Terms', blocks: pricingBlocks });
 
-  // Change Orders
-  drafts.push({
-    title: 'Change Orders',
-    blocks: [{
+  const completionOpeningWithWarranty =
+    `Upon completion of the work and ${CUSTOMER} approval, responsibility for the repaired/fabricated item transfers back to ${CUSTOMER}. ${SERVICE_PROVIDER_CAP} is only responsible for workmanship defects as outlined in the Workmanship Warranty section.`;
+  const completionOpeningNoWarranty =
+    `Upon completion of the work and ${CUSTOMER} approval, responsibility for the repaired/fabricated item transfers back to ${CUSTOMER}.`;
+
+  const changeOrdersHiddenDamageBlocks: SectionContentBlock[] = [
+    {
       type: 'paragraph',
-      text: `Any work outside the agreed scope requires written or verbal approval from ${CUSTOMER} before proceeding. Change orders may result in additional charges and timeline adjustments. ${SERVICE_PROVIDER_CAP} will provide an estimate for any additional work before proceeding.`,
-    }],
-  });
-
-  // Hidden Damage
-  drafts.push({
-    title: 'Hidden Damage',
-    blocks: [{
+      text: `Any work outside the agreed scope requires approval from ${CUSTOMER} before ${SERVICE_PROVIDER} proceeds. Extra work may cost more and take longer; ${SERVICE_PROVIDER_CAP} will give an estimate before starting that work. If hidden damage appears during the job that could not reasonably be seen during the initial inspection, ${SERVICE_PROVIDER} will notify ${CUSTOMER} before doing more work to address it. Any added work for hidden damage may cost more and requires ${CUSTOMER}'s approval.`,
+    },
+  ];
+  if (job.workmanship_warranty_days <= 0) {
+    changeOrdersHiddenDamageBlocks.push({
       type: 'paragraph',
-      text: `If hidden damage is discovered during repair work that was not visible during initial inspection, ${SERVICE_PROVIDER} will notify ${CUSTOMER} before proceeding. Additional work required to address hidden damage may result in additional charges and will require ${CUSTOMER} approval.`,
-    }],
-  });
-
-  // Completion & Acceptance
-  const completionText =
-    job.workmanship_warranty_days > 0
-      ? `Upon completion of the work and ${CUSTOMER} approval, responsibility for the repaired/fabricated item transfers back to ${CUSTOMER}. ${SERVICE_PROVIDER_CAP} is only responsible for workmanship defects as outlined in the Workmanship Warranty section.`
-      : `Upon completion of the work and ${CUSTOMER} approval, responsibility for the repaired/fabricated item transfers back to ${CUSTOMER}.`;
+      text: completionOpeningNoWarranty,
+    });
+  }
   drafts.push({
-    title: 'Completion & Acceptance',
-    blocks: [{ type: 'paragraph', text: completionText }],
+    title: 'Change Orders & Hidden Damage',
+    blocks: changeOrdersHiddenDamageBlocks,
   });
 
-  // Workmanship Warranty (omitted if warranty days is 0)
+  // Workmanship Warranty (omitted if warranty days is 0; completion opening folded in when present)
   if (job.workmanship_warranty_days > 0) {
     drafts.push({
       title: 'Workmanship Warranty',
       blocks: [
+        { type: 'paragraph', text: completionOpeningWithWarranty },
         {
           type: 'paragraph',
           text: `${SERVICE_PROVIDER_CAP} guarantees the welding workmanship for ${job.workmanship_warranty_days} days from the completion date.`,
@@ -240,22 +235,14 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     });
   }
 
-  // Liability & Indemnification
+  // Liability & Indemnification (includes former Third-Party Work)
   const priceText = job.price > 0 ? formatPrice(job.price) : 'the Total Contract Price';
+  const customerCap = CUSTOMER.charAt(0).toUpperCase() + CUSTOMER.slice(1);
   drafts.push({
     title: 'Liability & Indemnification',
     blocks: [{
       type: 'paragraph',
-      text: `${SERVICE_PROVIDER_CAP}'s total liability under this agreement shall not exceed ${priceText}. ${SERVICE_PROVIDER_CAP} shall not be liable for indirect, incidental, or consequential damages. ${CUSTOMER.charAt(0).toUpperCase() + CUSTOMER.slice(1)} agrees to indemnify and hold ${SERVICE_PROVIDER} harmless from claims arising from ${CUSTOMER}'s misuse or modification of the work after completion.`,
-    }],
-  });
-
-  // Third-Party Work
-  drafts.push({
-    title: 'Third-Party Work',
-    blocks: [{
-      type: 'paragraph',
-      text: `${SERVICE_PROVIDER_CAP} is not responsible for work performed by other contractors, modifications made after completion of this agreement, issues arising from prior repairs or work by others, or damage caused by misuse after work completion.`,
+      text: `${SERVICE_PROVIDER_CAP}'s total liability under this agreement shall not exceed ${priceText}. ${SERVICE_PROVIDER_CAP} shall not be liable for indirect, incidental, or consequential damages. ${customerCap} agrees to indemnify and hold ${SERVICE_PROVIDER} harmless from claims arising from ${CUSTOMER}'s misuse or modification of the work after completion. Additionally, ${SERVICE_PROVIDER_CAP} is not responsible for work performed by other contractors, modifications made after completion of this agreement, issues arising from prior repairs or work by others, or damage caused by misuse after work completion.`,
     }],
   });
 
@@ -279,19 +266,16 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     });
   }
 
-  // Entire Agreement
-  drafts.push({
-    title: 'Entire Agreement',
-    blocks: [{
-      type: 'paragraph',
-      text: `This document constitutes the entire agreement between the parties and supersedes all prior discussions, representations, or agreements. Any modifications to this agreement must be made in writing and signed by both parties.`,
-    }],
-  });
-
-  // Signature page (unnumbered in preview; `number` 0)
+  // Signature page (unnumbered in preview; `number` 0); entire-agreement line above signature lines
   drafts.push({
     title: 'Signatures & Acceptance',
-    blocks: [{ type: 'signature' }],
+    blocks: [
+      {
+        type: 'paragraph',
+        text: 'This document constitutes the entire agreement and supersedes all prior discussions. Modifications must be in writing and signed by both parties.',
+      },
+      { type: 'signature' },
+    ],
     signatureData: getSignatureBlockData(job, profile),
     isSignature: true,
   });
