@@ -92,9 +92,9 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
 
   return (
     <form className="job-form" onSubmit={(e) => e.preventDefault()}>
-      {/* 1. Parties & Project Information */}
+      {/* Parties & Project Information */}
       <section className="form-section">
-        <h2>1. Parties &amp; Project Information</h2>
+        <h2>Parties &amp; Project Information</h2>
         <div className="form-group">
           <label htmlFor="agreement_date">Agreement Date *</label>
           <input
@@ -173,9 +173,9 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
         </div>
       </section>
 
-      {/* 2. Project Overview */}
+      {/* Project Overview */}
       <section className="form-section">
-        <h2>2. Project Overview</h2>
+        <h2>Project Overview</h2>
         <div className="form-group">
           <label htmlFor="job_classification">Job Classification *</label>
           <select
@@ -247,9 +247,9 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
         </div>
       </section>
 
-      {/* 3. Scope of Work */}
+      {/* Scope of Work */}
       <section className="form-section">
-        <h2>3. Scope of Work</h2>
+        <h2>Scope of Work</h2>
         <div className="form-group">
           <label htmlFor="materials_provided_by">Materials Provided By *</label>
           <select
@@ -299,9 +299,9 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
         </div>
       </section>
 
-      {/* 4. Exclusions */}
+      {/* Exclusions */}
       <section className="form-section">
-        <h2>4. Exclusions</h2>
+        <h2>Exclusions</h2>
         <p className="help-text">List what is NOT included in this job</p>
         {job.exclusions.map((exclusion, index) => (
           <div key={`exclusion-${index}`} className="list-item">
@@ -326,9 +326,9 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
         </button>
       </section>
 
-      {/* 5. Customer Obligations & Site Conditions */}
+      {/* Customer Obligations & Site Conditions */}
       <section className="form-section">
-        <h2>5. Customer Obligations &amp; Site Conditions</h2>
+        <h2>Customer Obligations &amp; Site Conditions</h2>
         <p className="help-text">What the customer must provide or ensure before work begins</p>
         {job.customer_obligations.map((obligation, index) => (
           <div key={`obligation-${index}`} className="list-item">
@@ -353,9 +353,9 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
         </button>
       </section>
 
-      {/* 6. Pricing & Payment Terms */}
+      {/* Pricing & Payment Terms */}
       <section className="form-section">
-        <h2>6. Pricing &amp; Payment Terms</h2>
+        <h2>Pricing &amp; Payment Terms</h2>
         <div className="form-group">
           <label htmlFor="price_type">Price Type *</label>
           <select
@@ -408,9 +408,9 @@ export function JobForm({ job, onChange, businessName, jobPersisted = false }: J
         </div>
       </section>
 
-      {/* 7. Change Orders & Hidden Damage — matches consolidated agreement section */}
+      {/* Change Orders & Hidden Damage — matches consolidated agreement section */}
       <section className="form-section">
-        <h2>7. Change Orders &amp; Hidden Damage</h2>
+        <h2>Change Orders &amp; Hidden Damage</h2>
         <div className="checkbox-group">
           <label className="checkbox-label checkbox-label-nowrap">
             <input

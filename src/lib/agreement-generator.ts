@@ -132,10 +132,9 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
   scopeBlocks.push({ type: 'paragraph', text: materialsText });
   drafts.push({ title: 'Scope of Work', blocks: scopeBlocks });
 
-  // Exclusions — omit entire section if no non-empty items
-  const rawExclusions =
-    job.exclusions.length > 0 ? job.exclusions : (profile?.default_exclusions ?? []);
-  const effectiveExclusions = normalizeBulletList(rawExclusions);
+  // Exclusions — omit entire section if no non-empty items (job list only; profile defaults
+  // are copied into new drafts in App, not substituted here — cleared lines stay omitted)
+  const effectiveExclusions = normalizeBulletList(job.exclusions);
   if (effectiveExclusions.length > 0) {
     drafts.push({
       title: 'Exclusions',
@@ -143,12 +142,8 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     });
   }
 
-  // 5. Customer Obligations — omit entire section (including mobilization note) if no bullets
-  const rawObligations =
-    job.customer_obligations.length > 0
-      ? job.customer_obligations
-      : (profile?.default_assumptions ?? []);
-  const effectiveObligations = normalizeBulletList(rawObligations);
+  // Customer Obligations — omit entire section (including mobilization note) if no bullets
+  const effectiveObligations = normalizeBulletList(job.customer_obligations);
   if (effectiveObligations.length > 0) {
     drafts.push({
       title: 'Customer Obligations & Site Conditions',

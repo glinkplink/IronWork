@@ -57,9 +57,11 @@ A welder signs up, sets up their business profile (saved to the database), then 
   no table box), then a **3-column party table** (row labels | Service Provider | Customer): header
   row is all light-blue cells; **Name**, **Phone**, and **Email** label cells match other agreement
   tables; values are white. Profile fills the SP column; the form fills the customer column.
-- **Optional sections**: Exclusions, Customer Obligations, Workmanship Warranty (when days is 0),
-  and Dispute Resolution (when negotiation days is 0) are omitted when empty or zero. **Section
-  numbers are assigned at render time** (1…n with no gaps); the signature block stays unnumbered.
+- **Optional sections**: Exclusions and Customer Obligations omit when the **job** lists have no
+  non-empty lines (profile defaults are copied into **new** drafts only; clearing the form removes
+  the section from preview/PDF). Workmanship Warranty (days is 0) and Dispute Resolution
+  (negotiation days is 0) omit similarly. **Section numbers are assigned at render time** (1…n with
+  no gaps); the signature block stays unnumbered.
 - **Governing state** is not collected on the work order form; dispute copy uses generic
   “applicable state” language.
 
