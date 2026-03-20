@@ -1840,24 +1840,20 @@ body {
 
 .work-orders-row {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
   padding: var(--space-md) 0;
   border-bottom: 1px solid var(--border);
-}
-
-@media (min-width: 640px) {
-  .work-orders-row {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
 }
 
 .work-orders-row-main {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .work-orders-wo {
@@ -1871,6 +1867,7 @@ body {
 .work-orders-customer {
   font-weight: 600;
   color: var(--text-primary);
+  font-size: calc(1rem + 3pt);
 }
 
 .work-orders-meta {
