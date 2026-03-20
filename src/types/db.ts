@@ -88,13 +88,3 @@ export interface ChangeOrder {
   updated_at: string;
 }
 
-export interface CompletionSignoff {
-  id: string;
-  user_id: string;
-  job_id: string;
-  client_name: string;
-  signed_at: string;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}

@@ -60,7 +60,7 @@ src/
   hooks/
     useAuth.ts               # Supabase auth state listener
   types/
-    db.ts                    # BusinessProfile, Client, Job, ChangeOrder, CompletionSignoff
+    db.ts                    # BusinessProfile, Client, Job, ChangeOrder
     index.ts                 # WelderJob, AgreementSection, SignatureBlockData
   data/
     sample-job.json          # Default/placeholder values for new agreements
@@ -102,7 +102,7 @@ server/
 
 ## Database schema
 
-Tables: `business_profiles`, `clients`, `jobs`, `change_orders`, `completion_signoffs`
+Tables: `business_profiles`, `clients`, `jobs`, `change_orders`
 
 All tables have RLS — users can only read/write their own rows (`user_id = auth.uid()`).
 
@@ -124,7 +124,7 @@ Migrations are in `supabase/migrations/` — apply via Supabase CLI (`npx supaba
 | Current Work Agreement (job form state) | No — in-memory only |
 | Clients | No — helpers exist, no UI yet |
 | Jobs | No — helpers exist, no UI yet |
-| Change orders / completion signoffs | No — schema only |
+| Change orders | No — schema only |
 
 ---
 

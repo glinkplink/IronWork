@@ -94,7 +94,7 @@ supabase/
 
 ## Database
 
-Five tables: `business_profiles`, `clients`, `jobs`, `change_orders`, `completion_signoffs`
+Four tables: `business_profiles`, `clients`, `jobs`, `change_orders`
 
 All tables use RLS — users can only access their own rows.
 

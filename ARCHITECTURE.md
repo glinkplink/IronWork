@@ -107,7 +107,7 @@ scope-lock/
 │   │       └── jobs.ts               # listJobs / createJob / updateJob / deleteJob
 │   ├── types/
 │   │   ├── index.ts                  # WelderJob, AgreementSection, SignatureBlockData
-│   │   └── db.ts                     # BusinessProfile, Client, Job, ChangeOrder, CompletionSignoff
+│   │   └── db.ts                     # BusinessProfile, Client, Job, ChangeOrder
 │   ├── App.tsx                       # Root component - view state machine
 │   └── main.tsx                      # Entry point
 ├── server/
@@ -115,7 +115,7 @@ scope-lock/
 ├── supabase/
 │   ├── config.toml                   # Supabase CLI config
 │   └── migrations/
-│       ├── 0001_initial_schema.sql   # All 5 tables + indexes + triggers + RLS
+│       ├── 0001_initial_schema.sql   # Initial tables + indexes + triggers + RLS
 │       └── 0002_add_default_exclusions_assumptions.sql
 ├── public/
 ├── index.html
@@ -169,7 +169,7 @@ Header "Edit Profile" → EditProfilePage (edit business info + defaults)
 
 ## Database Schema
 
-Five tables in Supabase Postgres, all with row-level security:
+Four tables in Supabase Postgres, all with row-level security:
 
 | Table | Key Columns |
 |---|---|
@@ -177,7 +177,6 @@ Five tables in Supabase Postgres, all with row-level security:
 | `clients` | user_id, name, **name_normalized** (dedup key), phone, email, address, notes |
 | `jobs` | user_id, client_id, all WelderJob fields, status |
 | `change_orders` | user_id, job_id, description, price_delta, time_delta, approved |
-| `completion_signoffs` | user_id, job_id, client_name, signed_at, notes |
 
 All tables use `auth.uid()` RLS policies: users can only read/write their own rows.
 
