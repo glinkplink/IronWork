@@ -27,21 +27,26 @@ export function HomePage({
 
   return (
     <div className="home-page">
+      <div className="home-work-orders-bar">
+        <a
+          href="#"
+          className="home-work-orders-link"
+          onClick={(e) => {
+            e.preventDefault();
+            onWorkOrders();
+          }}
+        >
+          Work Orders
+        </a>
+      </div>
       <div className="home-content">
-        <div className="home-content-top">
-          <div className="home-content-top-left">
-            {showSuccessBanner ? (
-              <div className="success-banner home-success-banner">
-                Business profile created successfully
-              </div>
-            ) : (
-              ownerName && <p className="home-greeting">Welcome back, {ownerName}</p>
-            )}
+        {showSuccessBanner ? (
+          <div className="success-banner home-success-banner">
+            Business profile created successfully
           </div>
-          <button type="button" className="btn-large btn-home-work-orders" onClick={onWorkOrders}>
-            Work Orders
-          </button>
-        </div>
+        ) : (
+          ownerName && <p className="home-greeting">Welcome back, {ownerName}</p>
+        )}
         <h1>Create clear job agreements and protect your work</h1>
         <p className="home-description">
           Generate a Work Agreement, track changes, and keep a clear record of what was approved.

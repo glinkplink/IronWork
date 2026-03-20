@@ -763,10 +763,10 @@ body {
 
 .home-page {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
   min-height: 60vh;
-  padding: var(--space-xl);
+  padding: 0 0 var(--space-xl);
 }
 
 .home-content {
@@ -1758,27 +1758,46 @@ body {
   }
 }
 
-/* ─── Home: Work Orders entry ───────────────────────── */
+/* ─── Home: Work Orders entry (viewport-right, below header gear) ─ */
 
-.home-content-top {
+.home-work-orders-bar {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  padding: var(--space-sm) var(--space-md) 0;
+  box-sizing: border-box;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-md);
-  width: 100%;
-  margin-bottom: var(--space-lg);
-  text-align: left;
+  justify-content: flex-end;
 }
 
-.home-content-top-left {
-  flex: 1;
-  min-width: 0;
+.home-work-orders-link {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.btn-home-work-orders {
-  flex-shrink: 0;
-  padding: 10px var(--space-md);
-  font-size: 0.8125rem;
+.home-work-orders-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+.home-work-orders-link:focus {
+  outline: none;
+}
+
+.home-work-orders-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ─── Work Orders list ─────────────────────────────── */
