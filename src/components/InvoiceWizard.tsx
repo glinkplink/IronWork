@@ -2,7 +2,13 @@ import { useMemo, useState } from 'react';
 import type { Job, BusinessProfile, Invoice, InvoiceLineItem } from '../types/db';
 import { createInvoice, updateInvoice } from '../lib/db/invoices';
 
-const PAYMENT_METHOD_OPTIONS = ['Cash', 'Check', 'Zelle', 'Venmo', 'Card'] as const;
+/** Left / right columns in step 3 UI */
+const PAYMENT_METHOD_COLUMN_LEFT = ['Card', 'Cash', 'Check'] as const;
+const PAYMENT_METHOD_COLUMN_RIGHT = ['Venmo', 'CashApp', 'Zelle'] as const;
+const PAYMENT_METHOD_OPTIONS = [
+  ...PAYMENT_METHOD_COLUMN_LEFT,
+  ...PAYMENT_METHOD_COLUMN_RIGHT,
+] as const;
 
 const TAX_RATE = 0.06;
 
@@ -604,16 +610,30 @@ export function InvoiceWizard({
           </button>
           <p className="invoice-wizard-hint">Choose methods to show on this invoice.</p>
           <div className="invoice-payment-checkboxes">
-            {PAYMENT_METHOD_OPTIONS.map((method) => (
-              <label key={method} className="invoice-wizard-check">
-                <input
-                  type="checkbox"
-                  checked={selectedPaymentMethods.includes(method)}
-                  onChange={() => togglePayment(method)}
-                />
-                {method}
-              </label>
-            ))}
+            <div className="invoice-payment-column">
+              {PAYMENT_METHOD_COLUMN_LEFT.map((method) => (
+                <label key={method} className="invoice-wizard-check">
+                  <input
+                    type="checkbox"
+                    checked={selectedPaymentMethods.includes(method)}
+                    onChange={() => togglePayment(method)}
+                  />
+                  {method}
+                </label>
+              ))}
+            </div>
+            <div className="invoice-payment-column">
+              {PAYMENT_METHOD_COLUMN_RIGHT.map((method) => (
+                <label key={method} className="invoice-wizard-check">
+                  <input
+                    type="checkbox"
+                    checked={selectedPaymentMethods.includes(method)}
+                    onChange={() => togglePayment(method)}
+                  />
+                  {method}
+                </label>
+              ))}
+            </div>
           </div>
           <div className="invoice-wizard-step-actions">
             <button

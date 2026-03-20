@@ -4,7 +4,7 @@ import { signOut } from '../lib/auth';
 import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defaults';
 import type { BusinessProfile } from '../types/db';
 
-const PAYMENT_METHOD_OPTIONS = ['Cash', 'Check', 'Zelle', 'Venmo', 'Card'];
+const PAYMENT_METHOD_OPTIONS = ['Card', 'Cash', 'Check', 'Venmo', 'CashApp', 'Zelle'];
 
 interface EditProfilePageProps {
   profile: BusinessProfile;

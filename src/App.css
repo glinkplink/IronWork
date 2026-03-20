@@ -2239,17 +2239,17 @@ body {
 }
 
 .invoice-payment-checkboxes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px var(--space-lg);
+  margin-bottom: 0;
+  align-items: start;
+}
+
+.invoice-payment-column {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 0;
-}
-
-@media (min-width: 640px) {
-  .invoice-payment-checkboxes {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 .invoice-wizard-check {
