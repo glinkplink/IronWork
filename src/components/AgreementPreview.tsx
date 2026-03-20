@@ -115,7 +115,7 @@ function buildPdfHtml(previewMarkup: string): string {
 
       /* Extra space below Puppeteer header margin so "Work Order" clears the header rule */
       .pdf-render-root .agreement-document-header {
-        padding-top: 2rem;
+        padding-top: 1rem;
       }
 
       .content-bullets {

@@ -465,8 +465,8 @@ body {
 }
 
 .agreement-section {
-  margin-bottom: var(--space-lg);
-  padding-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
   border-bottom: none;
   break-inside: avoid;
   page-break-inside: avoid;
@@ -495,7 +495,7 @@ body {
 .content-paragraph {
   margin: 0 0 var(--space-md);
   font-size: 0.9375rem;
-  line-height: 1.7;
+  line-height: 1.45;
   text-align: left;
   color: var(--text-primary);
 }
@@ -631,13 +631,13 @@ body {
 }
 
 .signature-blocks {
-  margin-top: 2.5rem;
-  padding-top: 1.5rem;
+  margin-top: 1.75rem;
+  padding-top: 1rem;
   border-top: none;
 }
 
 .signature-block {
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-lg);
 }
 
 .signature-block:last-child {
@@ -645,8 +645,8 @@ body {
 }
 
 .signature-block + .signature-block {
-  margin-top: var(--space-xl);
-  padding-top: var(--space-lg);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
   border-top: none;
 }
 
@@ -1631,7 +1631,7 @@ body {
   }
 
   .signature-section {
-    margin-top: 2rem;
+    margin-top: 1.25rem;
   }
 }
 
