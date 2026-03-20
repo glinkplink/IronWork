@@ -137,11 +137,6 @@ function buildPdfHtml(previewMarkup: string): string {
         print-color-adjust: exact;
       }
 
-      /* Preview-only chrome (e.g. “Work Order” title); PDF uses Puppeteer margin header for WO# */
-      .agreement-preview-only {
-        display: none !important;
-      }
-
       .content-bullets {
         list-style-type: disc;
         list-style-position: outside;
@@ -356,10 +351,6 @@ export function AgreementPreview({ job, profile, existingJobId, onSaveSuccess }:
             }}
           >
                 <div ref={documentRef} className="agreement-document">
-              {/* Preview only — not in PDF body; WO# stays in Puppeteer margin header */}
-              <div className="agreement-preview-only agreement-document-header">
-                <h2 className="agreement-document-title">Work Order</h2>
-              </div>
               {sections.map((section, si) => (
                 <div
                   key={si}

@@ -78,9 +78,8 @@ A welder signs up, sets up their business profile (saved to the database), then 
   is set to that client’s id. Requires migration **`0004_clients_name_normalized.sql`**.
 - **WO number:** **`wo_number`** is included only on **insert**; **updates** omit it so the stored
   WO# cannot be overwritten from the client. New drafts get it from **`next_wo_number`**. It is
-  **not** on the edit form. **Preview** shows a centered **“Work Order”** title only (no number);
-  PDF body omits that block (`agreement-preview-only`). Puppeteer **`headerTemplate`** prints **WO#**
-  in the PDF margin header.
+  **not** on the edit form. **Preview** has no document title; Puppeteer **`headerTemplate`** prints
+  **WO#** in the PDF margin header.
 
 ## Folder Structure
 

@@ -85,7 +85,7 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-/** Puppeteer margin header: WO# top-left (preview shows plain “Work Order” title only). */
+/** Puppeteer margin header: WO# top-left (no “Work Order” title in preview/PDF body). */
 function buildHeaderTemplate(workOrderNumber) {
   const left =
     workOrderNumber != null && String(workOrderNumber).trim() !== ''
@@ -95,7 +95,7 @@ function buildHeaderTemplate(workOrderNumber) {
   return `
     <div style="width:100%; padding:0 40px; box-sizing:border-box; font-family: Arial, sans-serif; color:#aaaaaa; font-size:9px;">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #cccccc; padding:0 0 4px; width:100%;">
-        <span style="flex:1; text-align:left; white-space:nowrap;">${left}</span>
+        <span style="flex:1; text-align:left; white-space:nowrap;"><span style="font-size:calc(9px + 1pt);font-weight:700;">${left}</span></span>
         <span style="flex:1; text-align:center; white-space:nowrap; text-transform:uppercase;">Confidential</span>
         <span style="flex:1; text-align:right; white-space:nowrap; opacity:0;">placeholder</span>
       </div>

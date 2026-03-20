@@ -449,22 +449,6 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.agreement-document-header {
-  margin-bottom: var(--space-xl);
-  padding-top: var(--space-lg);
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.agreement-document-title {
-  margin: 0;
-  text-align: center;
-  font-size: 1.9rem;
-  line-height: 1.1;
-  letter-spacing: 0.02em;
-  color: var(--text-primary);
-}
-
 .agreement-section {
   margin-bottom: var(--space-md);
   padding-bottom: var(--space-md);
