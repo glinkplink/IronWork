@@ -146,11 +146,12 @@ function App() {
   };
 
   useEffect(() => {
-    if (user) {
-      const loadProfile = async () => {
+    const uid = user?.id;
+    if (uid) {
+      const run = async () => {
         setShowAuthPage(false);
         setProfileLoading(true);
-        const data = await getProfile(user.id);
+        const data = await getProfile(uid);
         setProfile(data);
         setProfileLoading(false);
         setAccountCreating(false);
@@ -158,21 +159,22 @@ function App() {
           setJustCompletedSignup(false);
         }
       };
-      loadProfile();
+      void run();
     } else {
       Promise.resolve().then(() => {
         setProfile(null);
         setProfileLoading(false);
       });
     }
-  }, [user, justCompletedSignup]);
+  }, [user?.id, justCompletedSignup]);
 
-  const loadProfile = async () => {
+  const loadProfile = async (options?: { silent?: boolean }) => {
     if (!user) return;
-    setProfileLoading(true);
+    const silent = options?.silent === true;
+    if (!silent) setProfileLoading(true);
     const data = await getProfile(user.id);
     setProfile(data);
-    setProfileLoading(false);
+    if (!silent) setProfileLoading(false);
   };
 
   const openWorkOrders = () => {
@@ -203,10 +205,10 @@ function App() {
   };
 
   const handleInvoiceWizardSuccess = (invoice: Invoice) => {
-    void loadProfile();
     setActiveInvoice(invoice);
     setWizardExistingInvoice(null);
     setView('invoice-final');
+    void loadProfile({ silent: true });
   };
 
   const handleInvoiceWizardCancel = () => {
@@ -243,7 +245,7 @@ function App() {
     setView('work-orders');
     setInvoiceFlowJob(null);
     setActiveInvoice(null);
-    void loadProfile();
+    void loadProfile({ silent: true });
   };
 
   const handleInvoiceUpdated = (inv: Invoice) => {

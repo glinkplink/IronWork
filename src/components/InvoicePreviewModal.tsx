@@ -11,7 +11,7 @@ export function InvoicePreviewModal({ open, onClose, htmlMarkup }: InvoicePrevie
   return (
     <div className="invoice-preview-modal-overlay" role="dialog" aria-modal="true" aria-label="Invoice preview">
       <div className="invoice-preview-modal-toolbar">
-        <button type="button" className="btn-secondary" onClick={onClose}>
+        <button type="button" className="home-work-orders-link" onClick={onClose}>
           Close
         </button>
       </div>

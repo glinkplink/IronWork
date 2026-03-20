@@ -197,6 +197,7 @@ export function InvoiceFinalPage({
   const [previewScale, setPreviewScale] = useState(1);
 
   const previewHtml = generateInvoiceHtml(invoice, job, profile);
+  const isReadOnly = invoice.status === 'downloaded';
 
   useLayoutEffect(() => {
     setInvoice(invoiceProp);
@@ -295,16 +296,17 @@ export function InvoiceFinalPage({
   return (
     <div className="invoice-final-page">
       <div className="invoice-final-nav">
-        <button type="button" className="btn-secondary" onClick={onGoHome}>
+        <button type="button" className="invoice-final-nav-plain" onClick={onGoHome}>
           Go Home
         </button>
-        <button type="button" className="btn-secondary" onClick={onWorkOrders}>
+        <button type="button" className="home-work-orders-link" onClick={onWorkOrders}>
           Work Orders
         </button>
       </div>
 
       <h1 className="invoice-final-heading">
-        Invoice #{String(invoice.invoice_number).padStart(4, '0')} Ready
+        Invoice #{String(invoice.invoice_number).padStart(4, '0')}
+        {isReadOnly ? '' : ' Ready'}
       </h1>
 
       {downloadError ? (
@@ -351,50 +353,56 @@ export function InvoiceFinalPage({
       <div className="invoice-final-actions">
         <button
           type="button"
-          className="btn-action btn-primary"
+          className="btn-primary btn-large invoice-final-download-btn"
           disabled={downloading}
           onClick={() => void handleDownload()}
         >
           {downloading
             ? 'Downloading…'
-            : hasPersistedDownloadOnce
-              ? 'Download PDF'
-              : 'Download Invoice'}
+            : isReadOnly
+              ? 'Download Invoice'
+              : hasPersistedDownloadOnce
+                ? 'Download PDF'
+                : 'Download Invoice'}
         </button>
-        <button type="button" className="btn-secondary invoice-final-edit-btn" onClick={onEditInvoice}>
-          Edit Invoice
-        </button>
+        {!isReadOnly ? (
+          <button type="button" className="btn-text invoice-final-edit-btn" onClick={onEditInvoice}>
+            Edit Invoice
+          </button>
+        ) : null}
       </div>
 
-      <div className="invoice-final-notes">
-        {!notesOpen ? (
-          <button type="button" className="btn-text invoice-final-notes-toggle" onClick={() => setNotesOpen(true)}>
-            Add Notes
-          </button>
-        ) : (
-          <div className="invoice-final-notes-panel">
-            <label className="field-label" htmlFor="invoice-notes">
-              Notes
-            </label>
-            <textarea
-              id="invoice-notes"
-              className="field-input invoice-notes-textarea"
-              rows={4}
-              value={notesDraft}
-              onChange={(e) => setNotesDraft(e.target.value)}
-            />
-            {notesError ? <p className="invoice-notes-error">{notesError}</p> : null}
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={savingNotes}
-              onClick={() => void handleSaveNotes()}
-            >
-              {savingNotes ? 'Saving…' : 'Save Notes'}
+      {!isReadOnly ? (
+        <div className="invoice-final-notes">
+          {!notesOpen ? (
+            <button type="button" className="btn-text invoice-final-notes-toggle" onClick={() => setNotesOpen(true)}>
+              Add Notes
             </button>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="invoice-final-notes-panel">
+              <div className="form-group">
+                <label htmlFor="invoice-notes">Notes</label>
+                <textarea
+                  id="invoice-notes"
+                  className="invoice-notes-textarea"
+                  rows={4}
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                />
+              </div>
+              {notesError ? <p className="invoice-notes-error">{notesError}</p> : null}
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={savingNotes}
+                onClick={() => void handleSaveNotes()}
+              >
+                {savingNotes ? 'Saving…' : 'Save Notes'}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <InvoicePreviewModal
         open={modalOpen}

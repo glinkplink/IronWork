@@ -134,7 +134,13 @@ export function WorkOrdersPage({
                       Pending
                     </button>
                   ) : (
-                    <span className="badge-invoiced">Invoiced</span>
+                    <button
+                      type="button"
+                      className="badge-invoiced"
+                      onClick={() => onOpenPendingInvoice(job, inv)}
+                    >
+                      Invoiced
+                    </button>
                   )}
                 </div>
               </li>

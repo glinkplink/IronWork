@@ -118,6 +118,39 @@ function buildLineItemsAndTotals(
   return { line_items: items, subtotal };
 }
 
+function formatTaxPercent(rate: number): string {
+  return `${Math.round(rate * 100)}%`;
+}
+
+function InvoicePreviewSummary({
+  subtotal,
+  tax_amount,
+  total,
+  tax_rate,
+}: {
+  subtotal: number;
+  tax_amount: number;
+  total: number;
+  tax_rate: number;
+}) {
+  return (
+    <div className="invoice-wizard-summary" role="region" aria-label="Amount preview">
+      <div className="invoice-wizard-summary-row">
+        <span>Subtotal</span>
+        <span className="invoice-wizard-summary-value">${subtotal.toFixed(2)}</span>
+      </div>
+      <div className="invoice-wizard-summary-row">
+        <span>Tax ({formatTaxPercent(tax_rate)})</span>
+        <span className="invoice-wizard-summary-value">${tax_amount.toFixed(2)}</span>
+      </div>
+      <div className="invoice-wizard-summary-row invoice-wizard-summary-total">
+        <span>Total</span>
+        <span className="invoice-wizard-summary-value">${total.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+}
+
 interface InvoiceWizardProps {
   userId: string;
   job: Job;
@@ -331,9 +364,11 @@ export function InvoiceWizard({
   return (
     <div className="invoice-wizard">
       <div className="invoice-wizard-toolbar">
-        <button type="button" className="btn-secondary" onClick={onCancel}>
+        <button type="button" className="home-work-orders-link invoice-wizard-toolbar-cancel" onClick={onCancel}>
           Cancel
         </button>
+        <span className="invoice-wizard-toolbar-title" aria-hidden="true" />
+        <span className="invoice-wizard-toolbar-balance" aria-hidden="true" />
       </div>
 
       {error ? (
@@ -344,131 +379,157 @@ export function InvoiceWizard({
 
       {step === 1 && job.price_type === 'fixed' ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-wizard-step-title">Pricing</h2>
+          <h2 className="invoice-flow-section-title">Pricing</h2>
           <p className="invoice-wizard-hint">
             Work order:{' '}
             {job.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : 'No WO #'}
           </p>
-          <label className="field-label" htmlFor="fixed-total">
-            Total amount
-          </label>
-          <input
-            id="fixed-total"
-            type="number"
-            min={0}
-            step="0.01"
-            className="field-input"
-            value={fixedTotal}
-            onChange={(e) => setFixedTotal(Number(e.target.value))}
+          <div className="form-group">
+            <label htmlFor="fixed-total">Total amount</label>
+            <input
+              id="fixed-total"
+              type="number"
+              min={0}
+              step="0.01"
+              value={fixedTotal}
+              onChange={(e) => setFixedTotal(Number(e.target.value))}
+            />
+          </div>
+          <InvoicePreviewSummary
+            subtotal={subtotal}
+            tax_amount={tax_amount}
+            total={total}
+            tax_rate={TAX_RATE}
           />
-          <p className="invoice-wizard-live-total">
-            Subtotal (preview): ${subtotal.toFixed(2)} · Tax: ${tax_amount.toFixed(2)} · Total: $
-            {total.toFixed(2)}
-          </p>
-          <button type="button" className="btn-primary" onClick={handleFixedConfirm}>
-            Confirm
-          </button>
+          <div className="invoice-wizard-step-actions">
+            <button type="button" className="btn-primary btn-large" onClick={handleFixedConfirm}>
+              Confirm
+            </button>
+          </div>
         </section>
       ) : null}
 
       {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'labor' ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-wizard-step-title">Pricing — Labor</h2>
-          <div className="invoice-wizard-field-row">
-            <label className="field-label" htmlFor="labor-hours">
-              Hours
-            </label>
+          <h2 className="invoice-flow-section-title">Pricing</h2>
+          <p className="invoice-flow-section-subtitle">Labor</p>
+          <div className="form-group">
+            <label htmlFor="labor-hours">Hours</label>
             <input
               id="labor-hours"
               type="number"
               min={0}
               step="0.25"
-              className="field-input"
               value={laborHours}
               onChange={(e) => setLaborHours(e.target.value)}
             />
           </div>
-          <div className="invoice-wizard-field-row">
-            <label className="field-label" htmlFor="labor-rate">
-              Rate ($)
-            </label>
+          <div className="form-group">
+            <label htmlFor="labor-rate">Rate ($)</label>
             <input
               id="labor-rate"
               type="number"
               min={0}
               step="0.01"
-              className="field-input"
               value={laborRate}
               onChange={(e) => setLaborRate(e.target.value)}
             />
           </div>
-          <p className="invoice-wizard-live-total">
-            Subtotal (preview): ${subtotal.toFixed(2)} · Tax: ${tax_amount.toFixed(2)} · Total: $
-            {total.toFixed(2)}
-          </p>
-          <button type="button" className="btn-primary" onClick={handleLaborContinue}>
-            Continue
-          </button>
+          <InvoicePreviewSummary
+            subtotal={subtotal}
+            tax_amount={tax_amount}
+            total={total}
+            tax_rate={TAX_RATE}
+          />
+          <div className="invoice-wizard-step-actions">
+            <button type="button" className="btn-primary btn-large" onClick={handleLaborContinue}>
+              Continue
+            </button>
+          </div>
         </section>
       ) : null}
 
       {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'materials' ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-wizard-step-title">Pricing — Materials</h2>
+          <h2 className="invoice-flow-section-title">Pricing</h2>
+          <p className="invoice-flow-section-subtitle">Materials</p>
+          <button
+            type="button"
+            className="invoice-flow-back-link"
+            onClick={() => {
+              setError('');
+              setPricingSubStep('labor');
+            }}
+          >
+            Back
+          </button>
           <fieldset className="invoice-wizard-yesno">
-            <legend className="field-label">Add materials?</legend>
-            <label className="invoice-wizard-radio">
-              <input
-                type="radio"
-                name="mat-yesno"
-                checked={materialsYes === true}
-                onChange={() => setMaterialsYes(true)}
-              />
-              Yes
-            </label>
-            <label className="invoice-wizard-radio">
-              <input
-                type="radio"
-                name="mat-yesno"
-                checked={materialsYes === false}
-                onChange={() => setMaterialsYes(false)}
-              />
-              No
-            </label>
+            <legend className="invoice-wizard-yesno-legend">Add materials?</legend>
+            <div className="invoice-wizard-yesno-radios">
+              <label className="invoice-wizard-radio">
+                <input
+                  type="radio"
+                  name="mat-yesno"
+                  checked={materialsYes === true}
+                  onChange={() => setMaterialsYes(true)}
+                />
+                Yes
+              </label>
+              <label className="invoice-wizard-radio">
+                <input
+                  type="radio"
+                  name="mat-yesno"
+                  checked={materialsYes === false}
+                  onChange={() => setMaterialsYes(false)}
+                />
+                No
+              </label>
+            </div>
           </fieldset>
           {materialsYes === true ? (
             <div className="invoice-material-rows">
               {materialRows.map((row, index) => (
                 <div key={index} className="invoice-material-row">
-                  <input
-                    type="text"
-                    className="field-input"
-                    placeholder="Description"
-                    value={row.description}
-                    onChange={(e) => updateMaterialRow(index, { description: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    className="field-input"
-                    placeholder="Qty"
-                    min={0}
-                    step="0.01"
-                    value={row.qty}
-                    onChange={(e) => updateMaterialRow(index, { qty: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    className="field-input"
-                    placeholder="Unit price"
-                    min={0}
-                    step="0.01"
-                    value={row.unit_price}
-                    onChange={(e) => updateMaterialRow(index, { unit_price: e.target.value })}
-                  />
+                  <div className="form-group">
+                    <label htmlFor={`mat-desc-${index}`}>Description</label>
+                    <input
+                      id={`mat-desc-${index}`}
+                      type="text"
+                      placeholder="Description"
+                      value={row.description}
+                      onChange={(e) => updateMaterialRow(index, { description: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group invoice-material-row-grid">
+                    <div className="form-group">
+                      <label htmlFor={`mat-qty-${index}`}>Qty</label>
+                      <input
+                        id={`mat-qty-${index}`}
+                        type="number"
+                        placeholder="Qty"
+                        min={0}
+                        step="0.01"
+                        value={row.qty}
+                        onChange={(e) => updateMaterialRow(index, { qty: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor={`mat-up-${index}`}>Unit price</label>
+                      <input
+                        id={`mat-up-${index}`}
+                        type="number"
+                        placeholder="Unit price"
+                        min={0}
+                        step="0.01"
+                        value={row.unit_price}
+                        onChange={(e) => updateMaterialRow(index, { unit_price: e.target.value })}
+                      />
+                    </div>
+                  </div>
                   {materialRows.length > 1 ? (
                     <button
                       type="button"
-                      className="btn-text"
+                      className="btn-text invoice-material-remove"
                       onClick={() => removeMaterialRow(index)}
                     >
                       Remove
@@ -476,43 +537,71 @@ export function InvoiceWizard({
                   ) : null}
                 </div>
               ))}
-              <button type="button" className="btn-secondary" onClick={addMaterialRow}>
+              <button type="button" className="btn-text invoice-add-row-btn" onClick={addMaterialRow}>
                 Add row
               </button>
             </div>
           ) : null}
-          <p className="invoice-wizard-live-total">
-            Subtotal (preview): ${subtotal.toFixed(2)} · Tax: ${tax_amount.toFixed(2)} · Total: $
-            {total.toFixed(2)}
-          </p>
-          <button type="button" className="btn-primary" onClick={handleMaterialsContinue}>
-            Continue
-          </button>
+          <InvoicePreviewSummary
+            subtotal={subtotal}
+            tax_amount={tax_amount}
+            total={total}
+            tax_rate={TAX_RATE}
+          />
+          <div className="invoice-wizard-step-actions">
+            <button type="button" className="btn-primary btn-large" onClick={handleMaterialsContinue}>
+              Continue
+            </button>
+          </div>
         </section>
       ) : null}
 
       {step === 2 ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-wizard-step-title">Due Date</h2>
-          <label className="field-label" htmlFor="due-date">
-            Due date
-          </label>
-          <input
-            id="due-date"
-            type="date"
-            className="field-input"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-          <button type="button" className="btn-primary" onClick={handleDueDateContinue}>
-            Continue
+          <h2 className="invoice-flow-section-title">Due date</h2>
+          <button
+            type="button"
+            className="invoice-flow-back-link"
+            onClick={() => {
+              setError('');
+              setStep(1);
+              if (job.price_type !== 'fixed') {
+                setPricingSubStep('materials');
+              }
+            }}
+          >
+            Back
           </button>
+          <div className="form-group">
+            <label htmlFor="due-date">Due date</label>
+            <input
+              id="due-date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+          <div className="invoice-wizard-step-actions">
+            <button type="button" className="btn-primary btn-large" onClick={handleDueDateContinue}>
+              Continue
+            </button>
+          </div>
         </section>
       ) : null}
 
       {step === 3 ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-wizard-step-title">Payment Methods</h2>
+          <h2 className="invoice-flow-section-title">Payment methods</h2>
+          <button
+            type="button"
+            className="invoice-flow-back-link"
+            onClick={() => {
+              setError('');
+              setStep(2);
+            }}
+          >
+            Back
+          </button>
           <p className="invoice-wizard-hint">Choose methods to show on this invoice.</p>
           <div className="invoice-payment-checkboxes">
             {PAYMENT_METHOD_OPTIONS.map((method) => (
@@ -526,14 +615,16 @@ export function InvoiceWizard({
               </label>
             ))}
           </div>
-          <button
-            type="button"
-            className="btn-primary btn-large"
-            disabled={submitting}
-            onClick={() => void handleGenerate()}
-          >
-            {existingInvoice ? 'Save Invoice' : 'Generate Invoice'}
-          </button>
+          <div className="invoice-wizard-step-actions">
+            <button
+              type="button"
+              className="btn-primary btn-large"
+              disabled={submitting}
+              onClick={() => void handleGenerate()}
+            >
+              {existingInvoice ? 'Save Invoice' : 'Generate Invoice'}
+            </button>
+          </div>
         </section>
       ) : null}
     </div>
