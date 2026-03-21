@@ -64,7 +64,7 @@ body {
   padding: var(--space-md) var(--space-md);
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: var(--space-sm);
   position: relative;
@@ -805,17 +805,17 @@ body {
 }
 
 .home-greeting {
-  font-size: 0.8125rem;
+  font-size: calc(0.8125rem + 9px);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-muted);
-  margin-top: 4px;
+  color: #8a6f12;
+  margin-top: 0;
   margin-bottom: 0;
 }
 
 .home-content h1 {
-  font-size: 2rem;
+  font-size: calc(2rem + 9px);
   font-weight: 700;
   color: var(--text-primary);
   margin-top: 0;
@@ -827,13 +827,16 @@ body {
   margin-top: 24px;
 }
 
-.home-greeting + h1,
+.home-greeting + h1 {
+  margin-top: 52px;
+}
+
 .home-success-banner + h1 {
   margin-top: 32px;
 }
 
 .home-description {
-  font-size: 1rem;
+  font-size: calc(1rem + 9px);
   color: var(--text-secondary);
   margin-bottom: calc(var(--space-xl) + var(--space-lg));
   line-height: 1.65;
@@ -855,6 +858,10 @@ body {
 
 .btn-large:hover {
   background: var(--primary-hover);
+}
+
+.home-content .btn-large {
+  font-size: calc(1rem + 9px);
 }
 
 .btn-home {
@@ -1725,7 +1732,7 @@ body {
   padding: var(--space-md) var(--space-lg);
   border-radius: var(--radius);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: calc(0.875rem + 9px);
   letter-spacing: 0.03em;
   text-align: center;
   margin-top: 24px;
@@ -1913,8 +1920,22 @@ body {
   display: flex;
   justify-content: flex-end;
   width: 100%;
-  margin: 4px 0 16px;
+  margin: -3px 0 50px;
   flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+  /* Must follow base rule above — same specificity; full-bleed under header gear */
+  .app-main > .home-work-orders-bar {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    margin-top: -3px;
+    margin-bottom: 50px;
+    padding-right: var(--space-lg);
+    box-sizing: border-box;
+  }
 }
 
 /* Plain bold text only — no button box (homepage only; not WorkOrdersPage) */
@@ -1925,7 +1946,7 @@ body {
   border: none;
   background: none;
   font-family: inherit;
-  font-size: 0.9375rem;
+  font-size: calc(0.9375rem + 3pt);
   font-weight: 700;
   color: var(--primary);
   text-decoration: none;
@@ -1944,6 +1965,11 @@ body {
 .home-work-orders-link:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+.app-main > .home-work-orders-bar .home-work-orders-link,
+.app-main > .home-work-orders-bar .home-work-orders-link:visited {
+  font-size: calc(0.9375rem + 3pt + 1px);
 }
 
 /* ─── Work Orders list ─────────────────────────────── */

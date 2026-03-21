@@ -34,7 +34,7 @@ export function HomePage({
           ownerName && <p className="home-greeting">Welcome back, {ownerName}</p>
         )}
         <h1>Cover your ass.</h1>
-        <p className="home-description">Work orders and invoices that cover your backend.</p>
+        <p className="home-description">Work orders and invoices that keep your backend tidy.</p>
         <button className="btn-primary btn-large" onClick={onCreateAgreement}>
           Create Work Order
         </button>
