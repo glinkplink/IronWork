@@ -198,6 +198,8 @@ export function InvoiceFinalPage({
 
   const previewHtml = generateInvoiceHtml(invoice, job, profile);
   const isReadOnly = invoice.status === 'downloaded';
+  const customerTitle = job.customer_name.trim() || 'Customer';
+  const invoiceSubline = `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`;
 
   useLayoutEffect(() => {
     setInvoice(invoiceProp);
@@ -304,10 +306,10 @@ export function InvoiceFinalPage({
         </button>
       </div>
 
-      <h1 className="invoice-final-heading">
-        Invoice #{String(invoice.invoice_number).padStart(4, '0')}
-        {isReadOnly ? '' : ' Ready'}
-      </h1>
+      <hgroup>
+        <h1 className="invoice-final-heading">{customerTitle}</h1>
+        <p className="invoice-final-heading-sub">{invoiceSubline}</p>
+      </hgroup>
 
       {!isReadOnly ? (
         <div className="invoice-final-notes-heading-slot">

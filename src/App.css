@@ -2538,11 +2538,21 @@ ul.invoice-payment-list {
 .invoice-final-heading {
   font-size: 1.5rem;
   font-weight: 700;
-  margin: 0 0 var(--space-lg);
+  margin: 0 0 var(--space-xs);
   line-height: 1.25;
+  color: var(--text-primary);
 }
 
-.invoice-final-page--draft .invoice-final-heading {
+.invoice-final-heading-sub {
+  margin: 0 0 var(--space-lg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.invoice-final-page--draft .invoice-final-heading-sub {
   margin-bottom: var(--space-sm);
 }
 
