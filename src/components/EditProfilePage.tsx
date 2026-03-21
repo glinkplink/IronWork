@@ -286,17 +286,24 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
                 />
               </div>
 
-              <div className="form-group">
-                <label>Default Payment Methods</label>
-                <div className="checkbox-group checkbox-group--flex-wrap">
+              <div className="form-group form-group--default-payment-methods">
+                <p className="edit-profile-payment-methods-heading" id="edit-profile-payment-methods-heading">
+                  Default Payment Methods
+                </p>
+                <div
+                  className="payment-method-chip-grid"
+                  role="group"
+                  aria-labelledby="edit-profile-payment-methods-heading"
+                >
                   {PAYMENT_METHOD_OPTIONS.map((method) => (
-                    <label key={method} className="checkbox-label">
+                    <label key={method} className="payment-method-chip">
                       <input
                         type="checkbox"
+                        className="payment-method-chip-input"
                         checked={defaultPaymentMethods.includes(method)}
                         onChange={() => togglePaymentMethod(method)}
                       />
-                      <span>{method}</span>
+                      <span className="payment-method-chip-text">{method}</span>
                     </label>
                   ))}
                 </div>
