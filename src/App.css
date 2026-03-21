@@ -1742,6 +1742,10 @@ body {
     font-size: 2rem;
   }
 
+  .invoice-flow-section-title {
+    font-size: 2rem;
+  }
+
   .app-main {
     padding: var(--space-lg);
   }
@@ -2044,22 +2048,14 @@ body {
 /* ─── Invoice wizard + shared flow typography ───────── */
 
 .invoice-flow-section-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-primary);
+  line-height: 1.2;
   margin: 0 0 24px;
   padding: 0;
-}
-
-.invoice-flow-section-subtitle {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin: 0 0 16px;
 }
 
 .invoice-flow-back-link {

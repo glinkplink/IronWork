@@ -415,8 +415,7 @@ export function InvoiceWizard({
 
       {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'labor' ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-flow-section-title">Pricing</h2>
-          <p className="invoice-flow-section-subtitle">Labor</p>
+          <h2 className="invoice-flow-section-title">Labor</h2>
           <div className="form-group">
             <label htmlFor="labor-hours">Hours</label>
             <input
@@ -455,8 +454,7 @@ export function InvoiceWizard({
 
       {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'materials' ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-flow-section-title">Pricing</h2>
-          <p className="invoice-flow-section-subtitle">Materials</p>
+          <h2 className="invoice-flow-section-title">Materials</h2>
           <button
             type="button"
             className="invoice-flow-back-link"
@@ -606,7 +604,6 @@ export function InvoiceWizard({
           >
             Back
           </button>
-          <p className="invoice-wizard-hint">Choose methods to show on this invoice.</p>
           <div className="invoice-payment-checkboxes">
             <div className="invoice-payment-column">
               {PAYMENT_METHOD_COLUMN_LEFT.map((method) => (
