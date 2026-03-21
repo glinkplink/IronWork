@@ -1048,7 +1048,7 @@ body {
   margin-bottom: 6px;
 }
 
-.edit-profile-page .form-group--default-payment-methods {
+.form-group--default-payment-methods {
   margin-top: var(--space-lg);
   margin-bottom: 24px;
   padding-top: var(--space-lg);
@@ -1057,7 +1057,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.edit-profile-page .edit-profile-payment-methods-heading {
+.edit-profile-payment-methods-heading {
   margin: 0 0 16px;
   padding: 0;
   font-size: 0.75rem;
@@ -1067,13 +1067,13 @@ body {
   color: var(--text-secondary);
 }
 
-.edit-profile-page .payment-method-chip-grid {
+.payment-method-chip-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.edit-profile-page .payment-method-chip {
+.payment-method-chip {
   position: relative;
   display: flex;
   align-items: center;
@@ -1099,27 +1099,27 @@ body {
     color 0.15s;
 }
 
-.edit-profile-page .payment-method-chip:hover {
+.payment-method-chip:hover {
   border-color: var(--border-strong);
 }
 
-.edit-profile-page .payment-method-chip:has(.payment-method-chip-input:checked) {
+.payment-method-chip:has(.payment-method-chip-input:checked) {
   background: var(--primary);
   border-color: var(--primary);
   color: white;
 }
 
-.edit-profile-page .payment-method-chip:has(.payment-method-chip-input:checked):hover {
+.payment-method-chip:has(.payment-method-chip-input:checked):hover {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
 }
 
-.edit-profile-page .payment-method-chip:focus-within {
+.payment-method-chip:focus-within {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
-.edit-profile-page .payment-method-chip-input {
+.payment-method-chip-input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1133,12 +1133,12 @@ body {
   pointer-events: none;
 }
 
-.edit-profile-page .payment-method-chip-text {
+.payment-method-chip-text {
   pointer-events: none;
   line-height: 1.25;
 }
 
-.edit-profile-page .form-group--default-payment-methods .payment-method-chip-input:focus {
+.form-group--default-payment-methods .payment-method-chip-input:focus {
   outline: none;
   box-shadow: none;
 }
@@ -1866,7 +1866,7 @@ body {
     padding: 24px;
   }
 
-  .edit-profile-page .payment-method-chip-grid {
+  .payment-method-chip-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -2367,25 +2367,8 @@ body {
   align-self: flex-start;
 }
 
-.invoice-payment-checkboxes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px var(--space-lg);
-  margin-bottom: 0;
-  align-items: start;
-}
-
-.invoice-payment-column {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.invoice-wizard-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9375rem;
+.invoice-payment-methods-group {
+  margin-top: 0;
 }
 
 .btn-text {

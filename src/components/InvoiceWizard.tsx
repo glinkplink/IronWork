@@ -1,12 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Job, BusinessProfile, Invoice, InvoiceLineItem } from '../types/db';
 import { createInvoice, updateInvoice } from '../lib/db/invoices';
-import {
-  PAYMENT_METHOD_COLUMN_LEFT,
-  PAYMENT_METHOD_COLUMN_RIGHT,
-  PAYMENT_METHOD_OPTIONS,
-  normalizePaymentMethods,
-} from '../lib/payment-methods';
+import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-methods';
 import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
 
 type PricingSubStep = 'labor' | 'materials';
@@ -387,11 +382,6 @@ export function InvoiceWizard({
 
       {step === 1 && job.price_type === 'fixed' ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-flow-section-title">Pricing</h2>
-          <p className="invoice-wizard-hint">
-            Work order:{' '}
-            {job.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : 'No WO #'}
-          </p>
           <div className="form-group">
             <label htmlFor="fixed-total">Total amount</label>
             <input
@@ -586,7 +576,7 @@ export function InvoiceWizard({
 
       {step === 2 ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-flow-section-title">Due date</h2>
+          {job.price_type !== 'fixed' ? <h2 className="invoice-flow-section-title">Due date</h2> : null}
           <button
             type="button"
             className="invoice-flow-back-link"
@@ -619,7 +609,7 @@ export function InvoiceWizard({
 
       {step === 3 ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-flow-section-title">Payment methods</h2>
+          {job.price_type !== 'fixed' ? <h2 className="invoice-flow-section-title">Payment methods</h2> : null}
           <button
             type="button"
             className="invoice-flow-back-link"
@@ -630,28 +620,17 @@ export function InvoiceWizard({
           >
             Back
           </button>
-          <div className="invoice-payment-checkboxes">
-            <div className="invoice-payment-column">
-              {PAYMENT_METHOD_COLUMN_LEFT.map((method) => (
-                <label key={method} className="invoice-wizard-check">
+          <div className="invoice-payment-methods-group" role="group" aria-label="Payment methods">
+            <div className="payment-method-chip-grid">
+              {PAYMENT_METHOD_OPTIONS.map((method) => (
+                <label key={method} className="payment-method-chip">
                   <input
                     type="checkbox"
+                    className="payment-method-chip-input"
                     checked={selectedPaymentMethods.includes(method)}
                     onChange={() => togglePayment(method)}
                   />
-                  {method}
-                </label>
-              ))}
-            </div>
-            <div className="invoice-payment-column">
-              {PAYMENT_METHOD_COLUMN_RIGHT.map((method) => (
-                <label key={method} className="invoice-wizard-check">
-                  <input
-                    type="checkbox"
-                    checked={selectedPaymentMethods.includes(method)}
-                    onChange={() => togglePayment(method)}
-                  />
-                  {method}
+                  <span className="payment-method-chip-text">{method}</span>
                 </label>
               ))}
             </div>
