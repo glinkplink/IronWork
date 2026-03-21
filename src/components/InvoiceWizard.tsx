@@ -65,7 +65,7 @@ function parseExistingIntoState(job: Job, existing: Invoice, profile: BusinessPr
     materialRows,
     due_date: existing.due_date,
     taxPercent: taxRateToPercentValue(existing.tax_rate ?? profile.default_tax_rate ?? DEFAULT_TAX_RATE),
-    selectedPaymentMethods: normalizePaymentMethods(existing.payment_methods),
+    selectedPaymentMethods: defaultPaymentSelection(profile),
   };
 }
 
