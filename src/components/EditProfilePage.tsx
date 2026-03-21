@@ -3,8 +3,7 @@ import { upsertProfile } from '../lib/db/profile';
 import { signOut } from '../lib/auth';
 import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defaults';
 import type { BusinessProfile } from '../types/db';
-
-const PAYMENT_METHOD_OPTIONS = ['Card', 'Cash', 'Check', 'Venmo', 'CashApp', 'Zelle'];
+import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-methods';
 
 interface EditProfilePageProps {
   profile: BusinessProfile;
@@ -32,7 +31,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
     profile.default_negotiation_period ?? 10
   );
   const [defaultPaymentMethods, setDefaultPaymentMethods] = useState<string[]>(
-    profile.default_payment_methods ?? []
+    normalizePaymentMethods(profile.default_payment_methods)
   );
   const [defaultLatePaymentTerms, setDefaultLatePaymentTerms] = useState(
     profile.default_late_payment_terms ??
@@ -91,7 +90,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
       default_assumptions: obligationsArray,
       default_warranty_period: defaultWarrantyPeriod,
       default_negotiation_period: defaultNegotiationPeriod,
-      default_payment_methods: defaultPaymentMethods,
+      default_payment_methods: normalizePaymentMethods(defaultPaymentMethods),
       default_late_payment_terms: defaultLatePaymentTerms,
       default_card_fee_note: defaultCardFeeNote,
     });

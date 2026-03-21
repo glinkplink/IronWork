@@ -1,4 +1,5 @@
 import type { Job, BusinessProfile, Invoice, InvoiceLineItem } from '../types/db';
+import { normalizePaymentMethods } from './payment-methods';
 
 /** Fields required to render invoice HTML (persisted row or equivalent draft). */
 export type InvoiceDraft = Pick<
@@ -128,9 +129,10 @@ export function generateInvoiceHtml(
   const dueDateStr = formatDate(invoice.due_date);
   const rows = lineItemsRows(invoice.line_items);
 
+  const paymentMethods = normalizePaymentMethods(invoice.payment_methods);
   const paymentList =
-    invoice.payment_methods.length > 0
-      ? `<ul class="content-bullets invoice-payment-list">${invoice.payment_methods
+    paymentMethods.length > 0
+      ? `<ul class="content-bullets invoice-payment-list">${paymentMethods
           .map((m) => `<li>${escapeHtml(m)}</li>`)
           .join('')}</ul>`
       : '<p class="content-note">No payment methods listed.</p>';

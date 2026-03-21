@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react';
 import type { Job, BusinessProfile, Invoice, InvoiceLineItem } from '../types/db';
 import { createInvoice, updateInvoice } from '../lib/db/invoices';
-
-/** Left / right columns in step 3 UI */
-const PAYMENT_METHOD_COLUMN_LEFT = ['Card', 'Cash', 'Check'] as const;
-const PAYMENT_METHOD_COLUMN_RIGHT = ['Venmo', 'CashApp', 'Zelle'] as const;
-const PAYMENT_METHOD_OPTIONS = [
-  ...PAYMENT_METHOD_COLUMN_LEFT,
-  ...PAYMENT_METHOD_COLUMN_RIGHT,
-] as const;
+import {
+  PAYMENT_METHOD_COLUMN_LEFT,
+  PAYMENT_METHOD_COLUMN_RIGHT,
+  PAYMENT_METHOD_OPTIONS,
+  normalizePaymentMethods,
+} from '../lib/payment-methods';
 
 const TAX_RATE = 0.06;
 
@@ -27,7 +25,7 @@ function defaultDueDateYmd(): string {
 }
 
 function defaultPaymentSelection(profile: BusinessProfile): string[] {
-  const fromProfile = profile.default_payment_methods?.filter(Boolean) ?? [];
+  const fromProfile = normalizePaymentMethods(profile.default_payment_methods);
   if (fromProfile.length > 0) return [...fromProfile];
   return [...PAYMENT_METHOD_OPTIONS];
 }
@@ -67,7 +65,7 @@ function parseExistingIntoState(job: Job, existing: Invoice) {
     materialsYes,
     materialRows,
     due_date: existing.due_date,
-    selectedPaymentMethods: [...existing.payment_methods],
+    selectedPaymentMethods: normalizePaymentMethods(existing.payment_methods),
   };
 }
 
@@ -334,7 +332,7 @@ export function InvoiceWizard({
           tax_rate: TAX_RATE,
           tax_amount: ta,
           total: tot,
-          payment_methods: selectedPaymentMethods,
+          payment_methods: normalizePaymentMethods(selectedPaymentMethods),
         };
         const { data, error: upErr } = await updateInvoice(next);
         if (upErr || !data) {

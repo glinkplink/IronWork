@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import type { Invoice, InvoiceLineItem } from '../../types/db';
+import { normalizePaymentMethods } from '../payment-methods';
 
 export type CreateInvoiceInput = {
   user_id: string;
@@ -18,7 +19,7 @@ export type CreateInvoiceInput = {
 function mapInvoiceRow(data: Record<string, unknown>): Invoice {
   const line_items = (data.line_items as InvoiceLineItem[]) ?? [];
   const pm = data.payment_methods;
-  const payment_methods = Array.isArray(pm) ? (pm as string[]) : [];
+  const payment_methods = normalizePaymentMethods(Array.isArray(pm) ? (pm as string[]) : []);
 
   return {
     id: data.id as string,
@@ -71,7 +72,7 @@ export const createInvoice = async (
     tax_rate: input.tax_rate,
     tax_amount: input.tax_amount,
     total: input.total,
-    payment_methods: input.payment_methods,
+    payment_methods: normalizePaymentMethods(input.payment_methods),
     notes: input.notes ?? null,
   };
 
@@ -100,7 +101,7 @@ export const updateInvoice = async (
     tax_rate: invoice.tax_rate,
     tax_amount: invoice.tax_amount,
     total: invoice.total,
-    payment_methods: invoice.payment_methods,
+    payment_methods: normalizePaymentMethods(invoice.payment_methods),
     notes: invoice.notes,
   };
 
