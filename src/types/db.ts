@@ -16,6 +16,7 @@ export interface BusinessProfile {
   default_warranty_period: number;
   default_negotiation_period: number;
   default_payment_methods: string[];
+  default_tax_rate: number;
   default_late_payment_terms: string;
   default_card_fee_note: boolean;
   created_at: string;

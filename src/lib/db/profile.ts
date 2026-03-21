@@ -1,11 +1,13 @@
 import { supabase } from '../supabase';
 import type { BusinessProfile } from '../../types/db';
 import { normalizePaymentMethods } from '../payment-methods';
+import { normalizeTaxRate } from '../tax';
 
 function normalizeProfile(profile: BusinessProfile): BusinessProfile {
   return {
     ...profile,
     default_payment_methods: normalizePaymentMethods(profile.default_payment_methods),
+    default_tax_rate: normalizeTaxRate(profile.default_tax_rate),
   };
 }
 
@@ -54,6 +56,8 @@ export const upsertProfile = async (
       profile.default_payment_methods === undefined
         ? undefined
         : normalizePaymentMethods(profile.default_payment_methods),
+    default_tax_rate:
+      profile.default_tax_rate === undefined ? undefined : normalizeTaxRate(profile.default_tax_rate),
   };
 
   const { data, error } = await supabase

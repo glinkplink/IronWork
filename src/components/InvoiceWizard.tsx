@@ -7,8 +7,7 @@ import {
   PAYMENT_METHOD_OPTIONS,
   normalizePaymentMethods,
 } from '../lib/payment-methods';
-
-const TAX_RATE = 0.06;
+import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
 
 type PricingSubStep = 'labor' | 'materials';
 
@@ -30,7 +29,7 @@ function defaultPaymentSelection(profile: BusinessProfile): string[] {
   return [...PAYMENT_METHOD_OPTIONS];
 }
 
-function parseExistingIntoState(job: Job, existing: Invoice) {
+function parseExistingIntoState(job: Job, existing: Invoice, profile: BusinessProfile) {
   const laborItems = existing.line_items.filter((i) => i.kind === 'labor');
   const matItems = existing.line_items.filter((i) => i.kind === 'material');
 
@@ -65,6 +64,7 @@ function parseExistingIntoState(job: Job, existing: Invoice) {
     materialsYes,
     materialRows,
     due_date: existing.due_date,
+    taxPercent: taxRateToPercentValue(existing.tax_rate ?? profile.default_tax_rate ?? DEFAULT_TAX_RATE),
     selectedPaymentMethods: normalizePaymentMethods(existing.payment_methods),
   };
 }
@@ -123,7 +123,7 @@ function buildLineItemsAndTotals(
 }
 
 function formatTaxPercent(rate: number): string {
-  return `${Math.round(rate * 100)}%`;
+  return `${(rate * 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
 }
 
 function InvoicePreviewSummary({
@@ -144,7 +144,7 @@ function InvoicePreviewSummary({
         <span className="invoice-wizard-summary-value">${subtotal.toFixed(2)}</span>
       </div>
       <div className="invoice-wizard-summary-row">
-        <span>Tax ({formatTaxPercent(tax_rate)})</span>
+        <span>{`Tax (${formatTaxPercent(tax_rate)})`}</span>
         <span className="invoice-wizard-summary-value">${tax_amount.toFixed(2)}</span>
       </div>
       <div className="invoice-wizard-summary-row invoice-wizard-summary-total">
@@ -174,7 +174,7 @@ export function InvoiceWizard({
 }: InvoiceWizardProps) {
   const initial = useMemo(() => {
     if (existingInvoice) {
-      return parseExistingIntoState(job, existingInvoice);
+      return parseExistingIntoState(job, existingInvoice, profile);
     }
     return {
       fixedTotal: job.price,
@@ -183,6 +183,7 @@ export function InvoiceWizard({
       materialsYes: null as boolean | null,
       materialRows: [{ description: '', qty: '1', unit_price: '' }] as MaterialRow[],
       due_date: defaultDueDateYmd(),
+      taxPercent: taxRateToPercentValue(profile.default_tax_rate ?? DEFAULT_TAX_RATE),
       selectedPaymentMethods: defaultPaymentSelection(profile),
     };
   }, [job, existingInvoice, profile]);
@@ -199,6 +200,7 @@ export function InvoiceWizard({
   const [materialsYes, setMaterialsYes] = useState<boolean | null>(initial.materialsYes);
   const [materialRows, setMaterialRows] = useState<MaterialRow[]>(initial.materialRows);
   const [dueDate, setDueDate] = useState(initial.due_date);
+  const [taxPercent, setTaxPercent] = useState(initial.taxPercent);
   const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>(
     initial.selectedPaymentMethods
   );
@@ -236,7 +238,8 @@ export function InvoiceWizard({
     materialsYes === true,
     materialRows
   );
-  const tax_amount = Math.round(subtotal * TAX_RATE * 100) / 100;
+  const taxRate = normalizeTaxRate(percentValueToTaxRate(taxPercent));
+  const tax_amount = Math.round(subtotal * taxRate * 100) / 100;
   const total = Math.round((subtotal + tax_amount) * 100) / 100;
 
   const goStep2 = () => {
@@ -316,7 +319,8 @@ export function InvoiceWizard({
       setError('Select at least one payment method.');
       return;
     }
-    const ta = Math.round(built.subtotal * TAX_RATE * 100) / 100;
+    const normalizedTaxRate = normalizeTaxRate(percentValueToTaxRate(taxPercent));
+    const ta = Math.round(built.subtotal * normalizedTaxRate * 100) / 100;
     const tot = Math.round((built.subtotal + ta) * 100) / 100;
     const invoice_date = new Date().toISOString().split('T')[0];
 
@@ -329,7 +333,7 @@ export function InvoiceWizard({
           due_date: dueDate,
           line_items: built.line_items,
           subtotal: built.subtotal,
-          tax_rate: TAX_RATE,
+          tax_rate: normalizedTaxRate,
           tax_amount: ta,
           total: tot,
           payment_methods: normalizePaymentMethods(selectedPaymentMethods),
@@ -348,7 +352,7 @@ export function InvoiceWizard({
           due_date: dueDate,
           line_items: built.line_items,
           subtotal: built.subtotal,
-          tax_rate: TAX_RATE,
+          tax_rate: normalizedTaxRate,
           tax_amount: ta,
           total: tot,
           payment_methods: selectedPaymentMethods,
@@ -399,11 +403,22 @@ export function InvoiceWizard({
               onChange={(e) => setFixedTotal(Number(e.target.value))}
             />
           </div>
+          <div className="form-group">
+            <label htmlFor="fixed-tax">Tax (%)</label>
+            <input
+              id="fixed-tax"
+              type="number"
+              min={0}
+              step="0.01"
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(e.target.value)}
+            />
+          </div>
           <InvoicePreviewSummary
             subtotal={subtotal}
             tax_amount={tax_amount}
             total={total}
-            tax_rate={TAX_RATE}
+            tax_rate={taxRate}
           />
           <div className="invoice-wizard-step-actions">
             <button type="button" className="btn-primary btn-large" onClick={handleFixedConfirm}>
@@ -438,11 +453,22 @@ export function InvoiceWizard({
               onChange={(e) => setLaborRate(e.target.value)}
             />
           </div>
+          <div className="form-group">
+            <label htmlFor="labor-tax">Tax (%)</label>
+            <input
+              id="labor-tax"
+              type="number"
+              min={0}
+              step="0.01"
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(e.target.value)}
+            />
+          </div>
           <InvoicePreviewSummary
             subtotal={subtotal}
             tax_amount={tax_amount}
             total={total}
-            tax_rate={TAX_RATE}
+            tax_rate={taxRate}
           />
           <div className="invoice-wizard-step-actions">
             <button type="button" className="btn-primary btn-large" onClick={handleLaborContinue}>
@@ -544,11 +570,22 @@ export function InvoiceWizard({
               </button>
             </div>
           ) : null}
+          <div className="form-group">
+            <label htmlFor="materials-tax">Tax (%)</label>
+            <input
+              id="materials-tax"
+              type="number"
+              min={0}
+              step="0.01"
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(e.target.value)}
+            />
+          </div>
           <InvoicePreviewSummary
             subtotal={subtotal}
             tax_amount={tax_amount}
             total={total}
-            tax_rate={TAX_RATE}
+            tax_rate={taxRate}
           />
           <div className="invoice-wizard-step-actions">
             <button type="button" className="btn-primary btn-large" onClick={handleMaterialsContinue}>

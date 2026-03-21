@@ -4,6 +4,7 @@ import { signOut } from '../lib/auth';
 import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defaults';
 import type { BusinessProfile } from '../types/db';
 import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-methods';
+import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
 
 interface EditProfilePageProps {
   profile: BusinessProfile;
@@ -32,6 +33,9 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
   );
   const [defaultPaymentMethods, setDefaultPaymentMethods] = useState<string[]>(
     normalizePaymentMethods(profile.default_payment_methods)
+  );
+  const [defaultTaxRate, setDefaultTaxRate] = useState(
+    taxRateToPercentValue(profile.default_tax_rate ?? DEFAULT_TAX_RATE)
   );
   const [defaultLatePaymentTerms, setDefaultLatePaymentTerms] = useState(
     profile.default_late_payment_terms ??
@@ -91,6 +95,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
       default_warranty_period: defaultWarrantyPeriod,
       default_negotiation_period: defaultNegotiationPeriod,
       default_payment_methods: normalizePaymentMethods(defaultPaymentMethods),
+      default_tax_rate: normalizeTaxRate(percentValueToTaxRate(defaultTaxRate)),
       default_late_payment_terms: defaultLatePaymentTerms,
       default_card_fee_note: defaultCardFeeNote,
     });
@@ -267,6 +272,18 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
                     placeholder="10"
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="defaultTaxRate">Default Tax (%)</label>
+                <input
+                  id="defaultTaxRate"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={defaultTaxRate}
+                  onChange={(e) => setDefaultTaxRate(e.target.value)}
+                />
               </div>
 
               <div className="form-group">
