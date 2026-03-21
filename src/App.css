@@ -591,6 +591,8 @@ body {
   padding: 0.7rem 0.8rem;
   vertical-align: top;
   border: 1px solid var(--agreement-margin-line);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .table-label {
@@ -609,6 +611,7 @@ body {
   background: #fff;
   color: var(--text-primary);
   white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 /* Section 1 — plain date/address (no box) + 3-col party table */
@@ -638,11 +641,14 @@ body {
 }
 
 .parties-plain-value {
+  flex: 1 1 0;
   font-size: 0.95rem;
   line-height: 1.55;
   color: var(--text-primary);
   white-space: pre-wrap;
-  min-width: min(100%, 12rem);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
 }
 
 .parties-layout > .parties-plain:last-child {
@@ -651,6 +657,17 @@ body {
 
 .content-table.parties-party-table {
   table-layout: fixed;
+}
+
+/* Match header column split; long emails/phones must wrap (mobile modal + PDF) */
+.content-table.parties-party-table td.table-label {
+  width: 26%;
+}
+
+.content-table.parties-party-table td.table-value {
+  width: 37%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Header row: all three cells — full light-blue band + blue text */
