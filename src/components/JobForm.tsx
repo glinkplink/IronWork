@@ -436,25 +436,23 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
             rows={3}
           />
         </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="target_start">Target Start Date</label>
-            <input
-              id="target_start"
-              type="date"
-              value={job.target_start}
-              onChange={(e) => updateField('target_start', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="target_completion_date">Target Completion Date</label>
-            <input
-              id="target_completion_date"
-              type="date"
-              value={job.target_completion_date}
-              onChange={(e) => updateField('target_completion_date', e.target.value)}
-            />
-          </div>
+        <div className="form-group">
+          <label htmlFor="target_start">Target Start Date</label>
+          <input
+            id="target_start"
+            type="date"
+            value={job.target_start}
+            onChange={(e) => updateField('target_start', e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="target_completion_date">Target Completion Date</label>
+          <input
+            id="target_completion_date"
+            type="date"
+            value={job.target_completion_date}
+            onChange={(e) => updateField('target_completion_date', e.target.value)}
+          />
         </div>
       </section>
 
