@@ -30,7 +30,7 @@ export function buildPdfHtml(previewMarkup: string): string {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Dancing+Script:wght@400;700&amp;display=swap"
+      href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&amp;family=Dancing+Script:wght@400;700&amp;display=swap"
       rel="stylesheet"
     />
     <style>

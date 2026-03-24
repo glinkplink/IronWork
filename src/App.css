@@ -389,14 +389,28 @@ body {
 
 .help-text-italic {
   font-style: italic;
-  margin-top: var(--space-md);
-  margin-bottom: 0;
 }
 
-/* Italic hint directly under label (before input) — no extra top gap */
+/* Label → 2px → italic hint → 6px → input (warranty / negotiation JobForm) */
+.form-group:has(> .help-text-below-label) > label {
+  margin-bottom: 2px;
+}
+
 .help-text.help-text-italic.help-text-below-label {
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--text-muted);
   margin-top: 0;
-  margin-bottom: var(--space-sm);
+  margin-bottom: 6px;
+}
+
+/* Descriptor under input (negotiation field); upright, distinct from italic hint */
+.help-text.help-text-below-input {
+  font-size: 0.7rem;
+  font-style: normal;
+  color: var(--text-muted);
+  margin-top: 4px;
+  margin-bottom: 0;
 }
 
 /* ─── List Items (exclusions/assumptions) ───────────── */

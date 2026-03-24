@@ -643,40 +643,38 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
 
       <section className="form-section">
         <h2>Workmanship Warranty &amp; Dispute Resolution</h2>
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="workmanship_warranty_days">
-              Workmanship Warranty (Days)
-            </label>
-            <p className="help-text help-text-italic help-text-below-label">
-              If no warranty, enter 0 and the section will be omitted.
-            </p>
-            <input
-              id="workmanship_warranty_days"
-              type="number"
-              value={rawWarranty}
-              onChange={handleWarrantyChange}
-              min="0"
-              placeholder="30"
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="negotiation_period">
-              Negotiation Period (Days)
-            </label>
-            <p className="help-text help-text-italic help-text-below-label">
-              If no negotiations, enter 0 and the section will be omitted.
-            </p>
-            <input
-              id="negotiation_period"
-              type="number"
-              value={rawNegotiation}
-              onChange={handleNegotiationChange}
-              min="0"
-              placeholder="10"
-            />
-            <p className="help-text">Good-faith negotiation window before formal dispute process</p>
-          </div>
+        <div className="form-group">
+          <label htmlFor="workmanship_warranty_days">
+            Workmanship Warranty (Days)
+          </label>
+          <p className="help-text help-text-italic help-text-below-label">
+            If no warranty, enter 0 and the section will be omitted.
+          </p>
+          <input
+            id="workmanship_warranty_days"
+            type="number"
+            value={rawWarranty}
+            onChange={handleWarrantyChange}
+            min="0"
+            placeholder="30"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="negotiation_period">Negotiation Period (Days)</label>
+          <p className="help-text help-text-italic help-text-below-label">
+            If no negotiations, enter 0 and the section will be omitted.
+          </p>
+          <input
+            id="negotiation_period"
+            type="number"
+            value={rawNegotiation}
+            onChange={handleNegotiationChange}
+            min="0"
+            placeholder="10"
+          />
+          <p className="help-text help-text-below-input">
+            Good-faith negotiation window before formal dispute process
+          </p>
         </div>
       </section>
 
