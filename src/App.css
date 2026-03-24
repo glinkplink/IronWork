@@ -432,8 +432,7 @@ body {
 .list-item textarea {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 120px;
-  height: 120px;
+  min-height: 40px;
   max-height: 120px;
   padding: 9px var(--space-md);
   font-size: 0.9375rem;
@@ -446,6 +445,7 @@ body {
   white-space: normal;
   overflow-y: auto;
   resize: none;
+  field-sizing: content;
 }
 
 .list-item textarea:focus {
