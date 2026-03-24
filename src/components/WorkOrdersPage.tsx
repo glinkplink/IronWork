@@ -112,8 +112,6 @@ export function WorkOrdersPage({
 
       {loading ? (
         <p className="work-orders-loading">Loading…</p>
-      ) : jobs.length === 0 ? (
-        <p className="work-orders-empty">No work orders yet.</p>
       ) : (
         <>
           <div className="work-orders-summary-strip" aria-label="Work order contract totals">
@@ -126,6 +124,9 @@ export function WorkOrdersPage({
               <span className="work-orders-summary-amount">{formatUsd(pendingContractTotal)}</span>
             </span>
           </div>
+          {jobs.length === 0 ? (
+            <p className="work-orders-empty">No work orders yet.</p>
+          ) : (
           <ul className="work-orders-list">
           {jobs.map((job) => {
             const inv = invoiceByJobId.get(job.id) ?? null;
@@ -153,7 +154,7 @@ export function WorkOrdersPage({
                       className="wo-row-create-invoice-outline"
                       onClick={() => onStartInvoice(job)}
                     >
-                      Create Invoice
+                      Invoice
                     </button>
                   ) : inv.status === 'draft' ? (
                     <button
@@ -177,6 +178,7 @@ export function WorkOrdersPage({
             );
           })}
           </ul>
+          )}
         </>
       )}
     </div>
