@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { WelderJob, JobType, MaterialsProvider, PriceType } from '../types';
 import type { Client } from '../types/db';
 import { searchClients } from '../lib/db/clients';
@@ -45,7 +45,9 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
   };
 
   const customerNameRef = useRef(job.customer_name);
-  customerNameRef.current = job.customer_name;
+  useLayoutEffect(() => {
+    customerNameRef.current = job.customer_name;
+  });
 
   const comboboxId = useId();
   const listboxId = `${comboboxId}-client-listbox`;
@@ -61,20 +63,24 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
 
   useEffect(() => {
     if (dropdownSuppressed) {
-      setClientMatches([]);
-      setClientListOpen(false);
-      setClientHighlightIndex(-1);
-      setClientSearchLoading(false);
-      return;
+      const id = window.setTimeout(() => {
+        setClientMatches([]);
+        setClientListOpen(false);
+        setClientHighlightIndex(-1);
+        setClientSearchLoading(false);
+      }, 0);
+      return () => window.clearTimeout(id);
     }
 
     const trimmed = job.customer_name.trim();
     if (!trimmed) {
-      setClientMatches([]);
-      setClientListOpen(false);
-      setClientHighlightIndex(-1);
-      setClientSearchLoading(false);
-      return;
+      const id = window.setTimeout(() => {
+        setClientMatches([]);
+        setClientListOpen(false);
+        setClientHighlightIndex(-1);
+        setClientSearchLoading(false);
+      }, 0);
+      return () => window.clearTimeout(id);
     }
 
     const id = window.setTimeout(() => {
