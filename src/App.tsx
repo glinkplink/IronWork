@@ -380,6 +380,13 @@ function App() {
         <div className="header-actions">
           <button
             type="button"
+            className="header-work-orders-link"
+            onClick={openWorkOrders}
+          >
+            Work Orders
+          </button>
+          <button
+            type="button"
             className="btn-header-settings"
             onClick={() => setView('profile')}
             aria-label="Edit profile"
@@ -420,28 +427,14 @@ function App() {
         </nav>
       )}
 
-      <main className="app-main">
+      <main className={view === 'home' ? 'app-main app-main--home' : 'app-main'}>
         {view === 'home' ? (
-          <>
-            <div className="home-work-orders-bar">
-              <a
-                href="#"
-                className="home-work-orders-link"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openWorkOrders();
-                }}
-              >
-                Work Orders
-              </a>
-            </div>
-            <HomePage
-              onCreateAgreement={createNewAgreement}
-              ownerName={profile?.owner_name || profile?.business_name}
-              showSuccessBanner={showSuccessBanner}
-              onDismissBanner={() => setShowSuccessBanner(false)}
-            />
-          </>
+          <HomePage
+            onCreateAgreement={createNewAgreement}
+            ownerName={profile?.owner_name || profile?.business_name}
+            showSuccessBanner={showSuccessBanner}
+            onDismissBanner={() => setShowSuccessBanner(false)}
+          />
         ) : view === 'work-orders' && user ? (
           <WorkOrdersPage
             userId={user.id}
