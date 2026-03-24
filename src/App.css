@@ -2072,7 +2072,7 @@ body {
   margin-bottom: var(--space-md);
   padding-bottom: var(--space-sm);
   border-bottom: 1px solid var(--border);
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
 }
 
 .work-orders-summary-item {
@@ -2089,6 +2089,7 @@ body {
 
 .work-orders-summary-amount {
   font-weight: 700;
+  font-size: 1.05em;
 }
 
 .work-orders-summary-invoiced .work-orders-summary-amount {
@@ -2103,7 +2104,6 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--border);
 }
 
 .work-orders-row {
@@ -2178,11 +2178,35 @@ body {
   flex-shrink: 0;
 }
 
-.wo-row-invoice-btn {
+.wo-row-create-invoice-outline {
+  display: inline-block;
+  margin: 0;
   padding: 8px var(--space-md);
   font-size: 0.8125rem;
-  text-transform: uppercase;
+  font-weight: 600;
+  font-family: inherit;
   letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--primary);
+  background: transparent;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.wo-row-create-invoice-outline:hover {
+  background: var(--primary-light);
+  color: var(--primary-hover);
+}
+
+.wo-row-create-invoice-outline:focus {
+  outline: none;
+}
+
+.wo-row-create-invoice-outline:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .badge-pending {
@@ -2192,12 +2216,16 @@ body {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  border: 1px solid var(--border-strong);
+  border: none;
   border-radius: var(--radius);
-  background: #f5e6c8;
-  color: #5c4a1a;
+  background: #d4a017;
+  color: #1a1508;
   cursor: pointer;
   font-family: inherit;
+}
+
+.badge-pending:hover {
+  filter: brightness(0.95);
 }
 
 .badge-invoiced {
@@ -2207,12 +2235,16 @@ body {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius);
-  background: #dcefe0;
-  color: #1e4d2b;
+  background: #2d6a2e;
+  color: #f7faf7;
   cursor: pointer;
   font-family: inherit;
+}
+
+.badge-invoiced:hover {
+  filter: brightness(1.05);
 }
 
 .work-orders-success-banner {

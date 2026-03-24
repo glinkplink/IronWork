@@ -121,7 +121,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
 
           <div className="page-header">
             <h1>Edit Profile</h1>
-            <p>Update your business details and default agreement language used in your Work Agreements.</p>
+            <p>Update your business details and default agreement language used in your Work Orders.</p>
           </div>
 
           <form onSubmit={handleSubmit}>

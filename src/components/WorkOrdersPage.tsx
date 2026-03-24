@@ -79,12 +79,14 @@ export function WorkOrdersPage({
     typeof job.price === 'number' && Number.isFinite(job.price) ? job.price : 0;
 
   const invoicedContractTotal = jobs.reduce((acc, job) => {
-    if (!invoiceByJobId.has(job.id)) return acc;
+    const inv = invoiceByJobId.get(job.id);
+    if (inv?.status !== 'downloaded') return acc;
     return acc + contractPrice(job);
   }, 0);
 
   const pendingContractTotal = jobs.reduce((acc, job) => {
-    if (invoiceByJobId.has(job.id)) return acc;
+    const inv = invoiceByJobId.get(job.id);
+    if (inv && inv.status !== 'draft') return acc;
     return acc + contractPrice(job);
   }, 0);
 
@@ -148,10 +150,10 @@ export function WorkOrdersPage({
                   {!inv ? (
                     <button
                       type="button"
-                      className="btn-primary wo-row-invoice-btn"
+                      className="wo-row-create-invoice-outline"
                       onClick={() => onStartInvoice(job)}
                     >
-                      Invoice
+                      Create Invoice
                     </button>
                   ) : inv.status === 'draft' ? (
                     <button
