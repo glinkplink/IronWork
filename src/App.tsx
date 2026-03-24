@@ -427,7 +427,7 @@ function App() {
         </nav>
       )}
 
-      <main className={view === 'home' ? 'app-main app-main--home' : 'app-main'}>
+      <main className="app-main">
         {view === 'home' ? (
           <HomePage
             onCreateAgreement={createNewAgreement}

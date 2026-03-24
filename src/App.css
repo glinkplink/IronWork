@@ -17,6 +17,7 @@
   --text-secondary: #5A5650;
   --text-muted: #8A8680;
   --accent-gold: #8a6f12;
+  --home-parchment: #f0ebe1;
 
   /* Agreement / PDF — match v2 template (blue headings, label column) */
   --agreement-section-blue: var(--primary);
@@ -73,9 +74,9 @@ body {
 }
 
 .app-header h1 {
-  font-size: 1.75rem;
+  font-size: 1.125rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
@@ -132,36 +133,14 @@ body {
 
 .app-main {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: var(--space-md);
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
-}
-
-/* Home only: subtle paper texture (CSS-only, no assets) */
-.app-main--home {
-  background-color: var(--surface);
-  background-image:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.35) 0%,
-      transparent 42%,
-      transparent 100%
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 3px,
-      rgba(138, 111, 18, 0.02) 3px,
-      rgba(138, 111, 18, 0.02) 4px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 3px,
-      rgba(26, 25, 23, 0.015) 3px,
-      rgba(26, 25, 23, 0.015) 4px
-    );
+  background-color: var(--home-parchment);
 }
 
 /* ─── Form Sections ─────────────────────────────────── */
@@ -827,10 +806,12 @@ body {
 /* ─── Home Page ─────────────────────────────────────── */
 
 .home-page {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 60vh;
+  justify-content: center;
+  min-height: 0;
   padding: 0 0 var(--space-xl);
 }
 
@@ -845,12 +826,12 @@ body {
   letter-spacing: 0.02em;
   text-transform: none;
   color: var(--text-muted);
-  margin-top: 0;
+  margin-top: 1.25rem;
   margin-bottom: 0;
 }
 
 .home-content h1 {
-  font-size: calc(2rem + 9px);
+  font-size: calc(1.6rem + 4px);
   font-weight: 700;
   color: var(--text-primary);
   margin-top: 0;
@@ -863,7 +844,7 @@ body {
 }
 
 .home-greeting + h1 {
-  margin-top: 52px;
+  margin-top: 38px;
 }
 
 .home-success-banner + h1 {
@@ -871,7 +852,7 @@ body {
 }
 
 .home-description {
-  font-size: calc(1rem + 9px);
+  font-size: 1rem;
   color: var(--text-secondary);
   margin-bottom: calc(var(--space-xl) + var(--space-lg));
   line-height: 1.65;
@@ -896,7 +877,10 @@ body {
 }
 
 .home-content .btn-large {
-  font-size: calc(1rem + 9px);
+  font-size: 0.9375rem;
+  min-height: 48px;
+  padding: 10px var(--space-xl);
+  box-sizing: border-box;
 }
 
 .home-content .btn-primary.btn-large {
@@ -939,23 +923,25 @@ body {
 
 .header-work-orders-link {
   font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.88);
+  opacity: 0.92;
   background: transparent;
   border: none;
   border-radius: var(--radius);
-  padding: 0.5rem 0.6rem;
+  padding: 0.4rem 0.45rem;
   margin: 0;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, opacity 0.15s;
 }
 
 .header-work-orders-link:hover {
   color: var(--accent-gold);
   background: rgba(255, 255, 255, 0.06);
+  opacity: 1;
 }
 
 .header-work-orders-link:focus {
@@ -996,8 +982,8 @@ body {
 }
 
 .btn-header-settings-icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
 }
 
@@ -1948,6 +1934,37 @@ body {
     font-size: 2rem;
   }
 
+  .header-work-orders-link {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    opacity: 1;
+    padding: 0.5rem 0.6rem;
+  }
+
+  .btn-header-settings-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .home-content h1 {
+    font-size: calc(2rem + 9px);
+  }
+
+  .home-description {
+    font-size: calc(1rem + 9px);
+  }
+
+  .home-content .btn-large {
+    font-size: calc(1rem + 9px);
+    min-height: unset;
+    padding: 14px var(--space-xl);
+  }
+
+  .home-greeting + h1 {
+    margin-top: 52px;
+  }
+
   .invoice-flow-section-title {
     font-size: 2rem;
   }
@@ -2052,6 +2069,42 @@ body {
   height: 0;
   overflow: hidden;
   pointer-events: none;
+}
+
+.work-orders-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+}
+
+.work-orders-summary-item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.work-orders-summary-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.work-orders-summary-amount {
+  font-weight: 700;
+}
+
+.work-orders-summary-invoiced .work-orders-summary-amount {
+  color: #065f46;
+}
+
+.work-orders-summary-pending .work-orders-summary-amount {
+  color: var(--danger);
 }
 
 .work-orders-list {

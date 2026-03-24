@@ -3,6 +3,16 @@ import type { Job, Invoice } from '../types/db';
 import { listJobs } from '../lib/db/jobs';
 import { listInvoices } from '../lib/db/invoices';
 
+function formatUsd(amount: number): string {
+  const n = Number.isFinite(amount) ? amount : 0;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
 function formatRowDate(job: Job): string {
   const raw = job.agreement_date || job.created_at?.split('T')[0] || '';
   if (!raw) return '—';
@@ -67,6 +77,18 @@ export function WorkOrdersPage({
     }
   }
 
+  let invoicedContractTotal = 0;
+  let pendingContractTotal = 0;
+  for (const job of jobs) {
+    const inv = invoiceByJobId.get(job.id);
+    const p = typeof job.price === 'number' && Number.isFinite(job.price) ? job.price : 0;
+    if (inv?.status === 'downloaded') {
+      invoicedContractTotal += p;
+    } else {
+      pendingContractTotal += p;
+    }
+  }
+
   return (
     <div className="work-orders-page">
       <div className="work-orders-toolbar">
@@ -96,7 +118,18 @@ export function WorkOrdersPage({
       ) : jobs.length === 0 ? (
         <p className="work-orders-empty">No work orders yet.</p>
       ) : (
-        <ul className="work-orders-list">
+        <>
+          <div className="work-orders-summary-strip" aria-label="Work order contract totals">
+            <span className="work-orders-summary-item work-orders-summary-invoiced">
+              <span className="work-orders-summary-label">Invoiced:</span>
+              <span className="work-orders-summary-amount">{formatUsd(invoicedContractTotal)}</span>
+            </span>
+            <span className="work-orders-summary-item work-orders-summary-pending">
+              <span className="work-orders-summary-label">Pending Invoice:</span>
+              <span className="work-orders-summary-amount">{formatUsd(pendingContractTotal)}</span>
+            </span>
+          </div>
+          <ul className="work-orders-list">
           {jobs.map((job) => {
             const inv = invoiceByJobId.get(job.id) ?? null;
             const woLabel =
@@ -146,7 +179,8 @@ export function WorkOrdersPage({
               </li>
             );
           })}
-        </ul>
+          </ul>
+        </>
       )}
     </div>
   );
