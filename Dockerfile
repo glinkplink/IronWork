@@ -17,14 +17,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV NODE_ENV=production
 # Listen on all interfaces (required for Render / Docker)
 ENV HOST=0.0.0.0
 
 WORKDIR /app
 
 COPY package*.json ./
-# Full install so devDependencies (vite, typescript, etc.) exist for `npm run build`
+# NODE_ENV=production before npm ci skips devDependencies — tsc/vite missing → build exit 127
 RUN npm ci
 
 COPY . .
@@ -36,6 +35,8 @@ ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 RUN npm run build
 # Drop devDependencies for a smaller runtime image; keeps puppeteer-core in dependencies
 RUN npm prune --omit=dev
+
+ENV NODE_ENV=production
 
 EXPOSE 3000
 
