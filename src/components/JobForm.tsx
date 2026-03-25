@@ -5,6 +5,7 @@ import { searchClients } from '../lib/db/clients';
 import { formatJobSiteAddress, governingStateFromSiteState } from '../lib/job-site-address';
 import {
   fetchGeoapifyAddressSuggestions,
+  type GeoapifyBiasProximity,
   type JobSiteAddressSuggestion,
 } from '../lib/geoapify-autocomplete';
 
@@ -91,6 +92,8 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
   const jobSiteStreetBlurCloseTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   /** Only the latest autocomplete request may apply results (avoids stale short-query responses clearing longer-query UI). */
   const geoFetchSeqRef = useRef(0);
+  /** Filled by one-time browser geolocation when API key present — used as Geoapify `bias=proximity:lon,lat`. */
+  const geoBiasProximityRef = useRef<GeoapifyBiasProximity | null>(null);
 
   const [geoMatches, setGeoMatches] = useState<JobSiteAddressSuggestion[]>([]);
   const [geoHighlightIndex, setGeoHighlightIndex] = useState(-1);
@@ -100,6 +103,24 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
   useLayoutEffect(() => {
     jobSiteStreetQueryRef.current = job.job_site_street;
   });
+
+  useEffect(() => {
+    if (!geoapifyApiKey || typeof navigator === 'undefined' || !navigator.geolocation) {
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        geoBiasProximityRef.current = {
+          lon: pos.coords.longitude,
+          lat: pos.coords.latitude,
+        };
+      },
+      () => {
+        geoBiasProximityRef.current = null;
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 600_000 }
+    );
+  }, [geoapifyApiKey]);
 
   useEffect(() => {
     if (dropdownSuppressed) {
@@ -209,7 +230,7 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
 
       const fetchSeq = ++geoFetchSeqRef.current;
       setGeoSearchLoading(true);
-      void fetchGeoapifyAddressSuggestions(q, geoapifyApiKey)
+      void fetchGeoapifyAddressSuggestions(q, geoapifyApiKey, geoBiasProximityRef.current)
         .then((rows) => {
           if (fetchSeq !== geoFetchSeqRef.current) {
             return;

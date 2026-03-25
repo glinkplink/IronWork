@@ -38,16 +38,28 @@ function resultToSuggestion(r: GeoapifyJsonResult, index: number): JobSiteAddres
   };
 }
 
+/** Optional lon/lat for `bias=proximity:lon,lat` (Geoapify does not accept `proximity:auto` on the REST API). */
+export type GeoapifyBiasProximity = { lon: number; lat: number };
+
 /** Geoapify Geocoder Autocomplete (US street); `format=json` returns `{ results: [...] }`. */
 export async function fetchGeoapifyAddressSuggestions(
   text: string,
-  apiKey: string
+  apiKey: string,
+  biasProximity?: GeoapifyBiasProximity | null
 ): Promise<JobSiteAddressSuggestion[]> {
   const trimmed = text.trim();
   if (trimmed.length < 3 || !apiKey) return [];
 
   const url = new URL('https://api.geoapify.com/v1/geocode/autocomplete');
   url.searchParams.set('text', trimmed);
+  const b = biasProximity;
+  if (
+    b &&
+    Number.isFinite(b.lon) &&
+    Number.isFinite(b.lat)
+  ) {
+    url.searchParams.set('bias', `proximity:${b.lon},${b.lat}`);
+  }
   url.searchParams.set('filter', 'countrycode:us');
   url.searchParams.set('format', 'json');
   url.searchParams.set('apiKey', apiKey);
