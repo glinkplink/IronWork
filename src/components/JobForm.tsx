@@ -901,7 +901,7 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
             value={job.late_payment_terms}
             onChange={(e) => updateField('late_payment_terms', e.target.value)}
             rows={2}
-            placeholder="Balances unpaid 7 days after completion accrue 1.5% per month"
+              placeholder="Balances unpaid 7 days after completion accrue 1.5% per month."
           />
         </div>
       </section>

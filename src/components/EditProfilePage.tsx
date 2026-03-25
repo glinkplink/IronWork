@@ -7,6 +7,17 @@ import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-
 import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
 import { formatUsPhoneInput } from '../lib/us-phone-input';
 
+const DEFAULT_LATE_PAYMENT_TERMS = 'Balances unpaid 7 days after completion accrue 1.5% per month.';
+
+function normalizeLatePaymentTerms(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return DEFAULT_LATE_PAYMENT_TERMS;
+  if (trimmed === 'Balances unpaid 7 days after completion accrue 1.5% per month') {
+    return DEFAULT_LATE_PAYMENT_TERMS;
+  }
+  return trimmed;
+}
+
 interface EditProfilePageProps {
   profile: BusinessProfile;
   /** Called with the row returned from upsert so parent state updates before any refetch race. */
@@ -40,8 +51,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
     taxRateToPercentValue(profile.default_tax_rate ?? DEFAULT_TAX_RATE)
   );
   const [defaultLatePaymentTerms, setDefaultLatePaymentTerms] = useState(
-    profile.default_late_payment_terms ??
-      'Balances unpaid 7 days after completion accrue 1.5% per month'
+    normalizeLatePaymentTerms(profile.default_late_payment_terms)
   );
   const [defaultCardFeeNote, setDefaultCardFeeNote] = useState(
     profile.default_card_fee_note ?? false
@@ -122,7 +132,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
 
           <div className="page-header">
             <h1>Edit Profile</h1>
-            <p>Update your business details and default agreement language used in your Work Orders.</p>
+            <p>Update your business details and default settings used in your work orders and invoices.</p>
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -196,10 +206,10 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
             </section>
 
             <section className="form-section">
-              <h2>Agreement Defaults</h2>
+              <h2>Work Order Defaults</h2>
 
               <div className="form-group">
-                <label>Default Exclusions</label>
+                <label>Exclusions</label>
                 {defaultExclusions.map((exclusion, index) => (
                   <div key={index} className="list-item-row">
                     <input
@@ -223,7 +233,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
               </div>
 
               <div className="form-group">
-                <label>Default Customer Obligations &amp; Site Conditions</label>
+                <label>Customer Obligations &amp; Site Conditions</label>
                 {defaultCustomerObligations.map((obligation, index) => (
                   <div key={index} className="list-item-row">
                     <input
@@ -248,7 +258,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="defaultWarrantyPeriod">Default Warranty Period (Days)</label>
+                  <label htmlFor="defaultWarrantyPeriod">Warranty Period (Days)</label>
                   <input
                     id="defaultWarrantyPeriod"
                     type="number"
@@ -259,7 +269,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="defaultNegotiationPeriod">Default Negotiation Period (Days)</label>
+                  <label htmlFor="defaultNegotiationPeriod">Negotiation Period (Days)</label>
                   <input
                     id="defaultNegotiationPeriod"
                     type="number"
@@ -272,7 +282,22 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
               </div>
 
               <div className="form-group">
-                <label htmlFor="defaultTaxRate">Default Tax (%)</label>
+                <label htmlFor="defaultLatePaymentTerms">Late Payment Terms</label>
+                <textarea
+                  id="defaultLatePaymentTerms"
+                  value={defaultLatePaymentTerms}
+                  onChange={(e) => setDefaultLatePaymentTerms(e.target.value)}
+                  rows={2}
+                  placeholder={DEFAULT_LATE_PAYMENT_TERMS}
+                />
+              </div>
+            </section>
+
+            <section className="form-section">
+              <h2>Invoice Defaults</h2>
+
+              <div className="form-group">
+                <label htmlFor="defaultTaxRate">Tax (%)</label>
                 <input
                   id="defaultTaxRate"
                   type="number"
@@ -285,7 +310,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
 
               <div className="form-group form-group--default-payment-methods">
                 <p className="edit-profile-payment-methods-heading" id="edit-profile-payment-methods-heading">
-                  Default Payment Methods
+                  Payment Methods
                 </p>
                 <div
                   className="payment-method-chip-grid"
@@ -306,17 +331,6 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
                 </div>
               </div>
 
-              <div className="form-group">
-                <label htmlFor="defaultLatePaymentTerms">Default Late Payment Terms</label>
-                <textarea
-                  id="defaultLatePaymentTerms"
-                  value={defaultLatePaymentTerms}
-                  onChange={(e) => setDefaultLatePaymentTerms(e.target.value)}
-                  rows={2}
-                  placeholder="Balances unpaid 7 days after completion accrue 1.5% per month"
-                />
-              </div>
-
               <div className="checkbox-group checkbox-group--inline-row">
                 <label className="checkbox-label">
                   <input
@@ -324,7 +338,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
                     checked={defaultCardFeeNote}
                     onChange={(e) => setDefaultCardFeeNote(e.target.checked)}
                   />
-                  <span>Include card processing fee note by default (up to 3.5%)</span>
+                  <span>Include credit card processing fee note (up to 3.5%)</span>
                 </label>
               </div>
             </section>

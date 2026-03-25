@@ -1220,10 +1220,10 @@ body {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--agreement-section-blue);
   margin-bottom: var(--space-md);
   padding-bottom: var(--space-sm);
-  border-bottom: 2px solid var(--border);
+  border-bottom: 2px solid var(--agreement-section-blue);
 }
 
 .edit-profile-page .section-description {
