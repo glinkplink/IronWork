@@ -5,7 +5,6 @@ import { searchClients } from '../lib/db/clients';
 import { formatJobSiteAddress, governingStateFromSiteState } from '../lib/job-site-address';
 import {
   fetchGeoapifyAddressSuggestions,
-  type GeoapifyBiasProximity,
   type JobSiteAddressSuggestion,
 } from '../lib/geoapify-autocomplete';
 
@@ -92,9 +91,8 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
   const jobSiteStreetBlurCloseTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   /** Only the latest autocomplete request may apply results (avoids stale short-query responses clearing longer-query UI). */
   const geoFetchSeqRef = useRef(0);
-  /** Filled by one-time browser geolocation when API key present — used as Geoapify `bias=proximity:lon,lat`. */
-  const geoBiasProximityRef = useRef<GeoapifyBiasProximity | null>(null);
 
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | undefined>();
   const [geoMatches, setGeoMatches] = useState<JobSiteAddressSuggestion[]>([]);
   const [geoHighlightIndex, setGeoHighlightIndex] = useState(-1);
   const [geoSearchLoading, setGeoSearchLoading] = useState(false);
@@ -105,22 +103,14 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
   });
 
   useEffect(() => {
-    if (!geoapifyApiKey || typeof navigator === 'undefined' || !navigator.geolocation) {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        geoBiasProximityRef.current = {
-          lon: pos.coords.longitude,
-          lat: pos.coords.latitude,
-        };
-      },
-      () => {
-        geoBiasProximityRef.current = null;
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 600_000 }
+      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {}
     );
-  }, [geoapifyApiKey]);
+  }, []);
 
   useEffect(() => {
     if (dropdownSuppressed) {
@@ -230,7 +220,7 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
 
       const fetchSeq = ++geoFetchSeqRef.current;
       setGeoSearchLoading(true);
-      void fetchGeoapifyAddressSuggestions(q, geoapifyApiKey, geoBiasProximityRef.current)
+      void fetchGeoapifyAddressSuggestions(q, geoapifyApiKey, userCoords)
         .then((rows) => {
           if (fetchSeq !== geoFetchSeqRef.current) {
             return;
@@ -250,7 +240,7 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
     }, 300);
 
     return () => window.clearTimeout(id);
-  }, [job.job_site_street, geoapifyApiKey, geoDropdownSuppressed]);
+  }, [job.job_site_street, geoapifyApiKey, geoDropdownSuppressed, userCoords]);
 
   const applyGeoSuggestion = (s: JobSiteAddressSuggestion) => {
     onChange(
