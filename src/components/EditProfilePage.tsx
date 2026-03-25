@@ -5,6 +5,7 @@ import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defa
 import type { BusinessProfile } from '../types/db';
 import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-methods';
 import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
+import { formatUsPhoneInput } from '../lib/us-phone-input';
 
 interface EditProfilePageProps {
   profile: BusinessProfile;
@@ -16,7 +17,7 @@ interface EditProfilePageProps {
 export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePageProps) {
   const [businessName, setBusinessName] = useState(profile.business_name);
   const [ownerName, setOwnerName] = useState(profile.owner_name ?? '');
-  const [phone, setPhone] = useState(profile.phone ?? '');
+  const [phone, setPhone] = useState(() => formatUsPhoneInput(profile.phone ?? ''));
   const [email, setEmail] = useState(profile.email ?? '');
   const [address, setAddress] = useState(profile.address ?? '');
   const [googleUrl, setGoogleUrl] = useState(profile.google_business_profile_url ?? '');
@@ -87,7 +88,7 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
       user_id: profile.user_id,
       business_name: businessName,
       owner_name: ownerName || null,
-      phone: phone || null,
+      phone: phone.trim() || null,
       email: email || null,
       address: address || null,
       google_business_profile_url: googleUrl || null,
@@ -154,8 +155,11 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
                 <input
                   id="phone"
                   type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(formatUsPhoneInput(e.target.value))}
+                  placeholder="(571) 473-1291"
                 />
               </div>
 

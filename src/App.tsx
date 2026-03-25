@@ -439,7 +439,6 @@ function App() {
       <main className="app-main">
         {view === 'auth' && !user ? (
           <AuthPage
-            onSignUpClick={() => navigateTo('home')}
             onSignInSuccess={() => {
               window.history.replaceState({ view: 'home' }, '');
               setView('home');

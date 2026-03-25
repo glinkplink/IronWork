@@ -35,7 +35,7 @@ export function CaptureModal({ onSubmit, onClose, error, submitting }: CaptureMo
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal capture-modal" onClick={(e) => e.stopPropagation()}>
         <h3>Create your account to save & download</h3>
         <p className="capture-modal-subtitle">
           Your work order is ready. Set up your account to save it and download the PDF.
@@ -46,6 +46,7 @@ export function CaptureModal({ onSubmit, onClose, error, submitting }: CaptureMo
             <input
               id="capture-business-name"
               type="text"
+              autoComplete="organization"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               required
@@ -57,6 +58,7 @@ export function CaptureModal({ onSubmit, onClose, error, submitting }: CaptureMo
             <input
               id="capture-email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -68,6 +70,7 @@ export function CaptureModal({ onSubmit, onClose, error, submitting }: CaptureMo
             <input
               id="capture-password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={6}
@@ -80,7 +83,7 @@ export function CaptureModal({ onSubmit, onClose, error, submitting }: CaptureMo
             <button type="button" className="btn-secondary" onClick={onClose} disabled={submitting}>
               Cancel
             </button>
-            <button type="submit" className="btn-action btn-primary" disabled={submitting}>
+            <button type="submit" className="btn-primary" disabled={submitting}>
               {submitting ? 'Creating Account...' : 'Create Account & Download'}
             </button>
           </div>

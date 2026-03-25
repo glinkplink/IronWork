@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { signIn } from '../lib/auth';
 
 interface AuthPageProps {
-  onSignUpClick?: () => void;
   /** Called after successful sign-in (e.g. leave auth view). */
   onSignInSuccess?: () => void;
 }
 
-export function AuthPage({ onSignUpClick, onSignInSuccess }: AuthPageProps) {
+export function AuthPage({ onSignInSuccess }: AuthPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -53,11 +52,6 @@ export function AuthPage({ onSignUpClick, onSignInSuccess }: AuthPageProps) {
         </button>
         {error && <p className="error">{error}</p>}
       </form>
-      {onSignUpClick && (
-        <button onClick={onSignUpClick}>
-          Don't have an account? Sign up
-        </button>
-      )}
     </div>
   );
 }
