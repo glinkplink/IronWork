@@ -78,7 +78,9 @@ A contractor can **start a work order without signing in**. They fill the job fo
   **`next_wo_number`** bump on new inserts only).
 - **Clients:** Before the job row is written, the app **upserts** a **`clients`** row keyed by
   **`name_normalized`** (`lower(trim(name))`) with display **`name`** trimmed; **`jobs.client_id`**
-  is set to that client’s id. Requires migration **`0004_clients_name_normalized.sql`**.
+  is set to that client’s id. This behavior is part of the current schema; see the applied
+  migrations in `supabase/migrations/` rather than a standalone `0004_clients_name_normalized.sql`
+  file.
 - **WO number:** **`wo_number`** is included only on **insert**; **updates** omit it so the stored
   WO# cannot be overwritten from the client. New drafts get it from **`next_wo_number`**. It is
   **not** on the edit form. **Preview** has no document title; Puppeteer **`headerTemplate`** prints
