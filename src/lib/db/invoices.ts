@@ -1,5 +1,10 @@
 import { supabase } from '../supabase';
-import type { Invoice, InvoiceLineItem, InvoiceLineItemSource } from '../../types/db';
+import type {
+  Invoice,
+  InvoiceLineItem,
+  InvoiceLineItemSource,
+  WorkOrderInvoiceStatus,
+} from '../../types/db';
 import { normalizePaymentMethods } from '../payment-methods';
 
 export type CreateInvoiceInput = {
@@ -153,6 +158,53 @@ export const markInvoiceDownloaded = async (
     return { error: new Error(error.message) };
   }
   return { error: null };
+};
+
+export type ListInvoiceStatusByJobResult =
+  | { data: WorkOrderInvoiceStatus[]; error: null }
+  | { data: null; error: Error };
+
+function mapInvoiceStatusRow(row: Record<string, unknown>): WorkOrderInvoiceStatus | null {
+  const status = row.status;
+  if (status !== 'draft' && status !== 'downloaded') return null;
+  const id = row.id;
+  const job_id = row.job_id;
+  if (typeof id !== 'string' || typeof job_id !== 'string') return null;
+  const num = row.invoice_number;
+  const invoice_number = typeof num === 'number' ? num : Number(num);
+  if (!Number.isFinite(invoice_number)) return null;
+  const created_at = row.created_at;
+  if (typeof created_at !== 'string') return null;
+  return {
+    id,
+    job_id,
+    status,
+    invoice_number,
+    created_at,
+  };
+}
+
+/** Narrow invoice rows for Work Orders list. On query failure returns `{ data: null, error }` — do not treat as empty success. */
+export const listInvoiceStatusByJob = async (
+  userId: string
+): Promise<ListInvoiceStatusByJobResult> => {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('id, job_id, status, invoice_number, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error listing invoice status:', error);
+    return { data: null, error: new Error(error.message) };
+  }
+
+  const out: WorkOrderInvoiceStatus[] = [];
+  for (const row of data ?? []) {
+    const mapped = mapInvoiceStatusRow(row as Record<string, unknown>);
+    if (mapped) out.push(mapped);
+  }
+  return { data: out, error: null };
 };
 
 export const listInvoices = async (userId: string): Promise<Invoice[]> => {

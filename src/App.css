@@ -2425,6 +2425,12 @@ body {
   color: var(--primary);
 }
 
+.work-orders-row-detail-hit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  pointer-events: none;
+}
+
 .work-orders-wo {
   font-weight: 700;
   font-size: 0.875rem;
@@ -2446,6 +2452,19 @@ body {
 
 .work-orders-row-actions {
   flex-shrink: 0;
+}
+
+.work-orders-action-placeholder {
+  display: inline-block;
+  padding: 8px var(--space-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.work-orders-invoice-status-banner {
+  margin-bottom: var(--space-md);
 }
 
 .wo-row-create-invoice-outline {
@@ -2479,6 +2498,11 @@ body {
   outline-offset: 2px;
 }
 
+.wo-row-create-invoice-outline:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .badge-pending {
   display: inline-block;
   padding: 8px var(--space-md);
@@ -2496,6 +2520,12 @@ body {
 
 .badge-pending:hover {
   filter: brightness(0.95);
+}
+
+.badge-pending:disabled,
+.badge-invoiced:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 
 .badge-invoiced {

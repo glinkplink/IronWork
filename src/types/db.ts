@@ -79,6 +79,26 @@ export interface Job {
   updated_at: string;
 }
 
+/** Narrow row for Work Orders list screen only (not full Job). */
+export interface WorkOrderListJob {
+  id: string;
+  wo_number: number | null;
+  customer_name: string;
+  job_type: string;
+  agreement_date: string | null;
+  created_at: string;
+  price: number;
+}
+
+/** Invoice fields needed for Work Orders list actions / summary (no line_items). */
+export interface WorkOrderInvoiceStatus {
+  id: string;
+  job_id: string;
+  status: 'draft' | 'downloaded';
+  invoice_number: number;
+  created_at: string;
+}
+
 export type InvoiceLineItemSource =
   | 'original_scope'
   | 'change_order'
