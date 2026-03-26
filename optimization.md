@@ -13,7 +13,7 @@ All structural changes (App.tsx extraction, CSS splitting) must be done with the
 ## Priority Order
 
 1. ✅ Tests (done)
-2. 🔥 App.tsx state extraction
+2. ✅ App.tsx state extraction (done)
 3. 🧩 CSS split
 4. 🧼 HTML escape utility
 
@@ -31,30 +31,18 @@ The PDF payload tests protect the contract between the client and `/api/pdf`. As
 
 These tests validate behavior, not implementation, ensuring refactors to UI or data flow cannot silently alter document output.
 
-Vitest was added as a dev dependency. `vite.config.ts` received a `test: { environment: 'node' }` block. `App.css?raw` is stubbed via `vi.mock` in the payload test file (Vite's raw suffix isn't available in the Node runner).
+Vitest was added as a dev dependency. `vite.config.ts` uses `import { defineConfig } from 'vitest/config'` so the `test: { environment: 'node' }` block type-checks under `tsc -b`. `App.css?raw` is stubbed via `vi.mock` in the payload test file (Vite's raw suffix isn't available in the Node runner).
+
+### App.tsx — navigation, auth/profile, grouped flow state
+**Files:** `src/hooks/useAppNavigation.ts` (~61 lines), `src/hooks/useAuthProfile.ts` (~189 lines), `src/App.tsx` (~672 lines; previously ~784)
+
+`useAppNavigation` owns `view`, `pushState`/`popstate`, `navigateTo`, and `replaceView` (used after PDF capture and on auth success). `useAuthProfile` wraps `useAuth`, profile fetch/`loadProfile`/`setProfile`, and post-capture `sessionStorage` + `visibilitychange` redirect; it receives `replaceView` and `setWorkOrdersSuccessBanner` from App so redirects stay consistent. Invoice flow, change-order flow, and draft state (job, unsaved modal, WO counter persist error) are grouped into object `useState` values in App. The full view-switching JSX remains in `App.tsx`.
 
 ---
 
 ## To Do
 
-### 1. Break up App.tsx
-**Priority: High**
-**Current size: 783 lines**
-
-`App.tsx` is doing too many things at once: view state machine, auth/profile loading, work-order detail state, invoice flow state, change order flow state, unsaved draft protection, success banners, browser history navigation (`pushState`/`popstate`), and the full conditional render chain across ~10 views.
-
-The risk is not current complexity, but future coupling — new flows (e-sign, payments) will increase cross-dependencies unless state boundaries are established now. Shared state bleeds across flows, and the render chain grows another branch with each addition. This is the exact shape that produces hard-to-trace bugs when the next major feature lands.
-
-**What to do:**
-- Extract a `useAppNavigation` hook to own the `view` state, `pushState`/`popstate` wiring, and the `navigateTo` helper. This alone removes ~80 lines and isolates all history logic in one place.
-- Extract a `useAuthProfile` hook (or expand the existing `useAuth`) to own session loading, profile fetch, and the `postCapture` redirect logic. Right now those effects are interleaved with view state in the root component.
-- Group invoice-flow state (`invoiceJob`, `existingInvoice`, `invoiceFlowSource`) and change-order flow state (`changeOrderFlowJob`, `wizardExistingCO`) into small plain objects or separate hooks so they don't live as ~6 individual `useState` calls in the root.
-
-The render chain (the long `if view === 'x' return <X />` block) can stay in `App.tsx` once the state is extracted — it's the right place for it. The problem is the state, not the rendering.
-
----
-
-### 2. Split App.css
+### 1. Split App.css
 **Priority: Medium**
 **Current size: 3,474 lines**
 
@@ -69,7 +57,7 @@ The payoff: a developer working on the invoice wizard only needs to open one ~20
 
 ---
 
-### 3. Extract shared HTML escaping utility
+### 2. Extract shared HTML escaping utility
 **Priority: Low**
 **Affected files:** `src/lib/agreement-sections-html.ts`, `src/lib/change-order-generator.ts`
 
