@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Job, BusinessProfile, ChangeOrder, ChangeOrderLineItem } from '../types/db';
 import { createChangeOrder, updateChangeOrder, computeCOTotal } from '../lib/db/change-orders';
+import './ChangeOrderWizard.css';
 
 const REASON_PRESETS = [
   'Client requested',
