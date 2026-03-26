@@ -14,7 +14,7 @@ All structural changes (App.tsx extraction, CSS splitting) must be done with the
 
 1. ✅ Tests (done)
 2. ✅ App.tsx state extraction (done)
-3. 🧩 CSS split
+3. ✅ CSS split (done)
 4. 🧼 HTML escape utility
 
 ---
@@ -38,26 +38,18 @@ Vitest was added as a dev dependency. `vite.config.ts` uses `import { defineConf
 
 `useAppNavigation` owns `view`, `pushState`/`popstate`, `navigateTo`, and `replaceView` (used after PDF capture and on auth success). `useAuthProfile` wraps `useAuth`, profile fetch/`loadProfile`/`setProfile`, and post-capture `sessionStorage` + `visibilitychange` redirect; it receives `replaceView` and `setWorkOrdersSuccessBanner` from App so redirects stay consistent. Invoice flow, change-order flow, and draft state (job, unsaved modal, WO counter persist error) are grouped into object `useState` values in App. The full view-switching JSX remains in `App.tsx`.
 
+### CSS split — `App.css` + co-located component sheets
+**Files:** `src/App.css` (~1,858 lines at completion); thirteen `src/components/*.css` files imported only from their owning components.
+
+**Rules:** `App.tsx` still imports `App.css` alone (load order). `App.css?raw` for PDFs is unchanged. Global tokens, app shell, shared primitives (e.g. payment-method chips, work-order row list chrome, `invoice-final-nav` / headings shared with detail pages), agreement/invoice **document** and `@media print` blocks stay in `App.css`.
+
+**Payoff:** Page/feature styles live beside the component that owns them; global/PDF surface stays one file for Puppeteer and shared chrome.
+
 ---
 
 ## To Do
 
-### 1. Split App.css
-**Priority: Medium**
-**Current size: 3,474 lines**
-
-A single 3,474-line stylesheet means every UI change requires mentally scanning a large global surface. It also makes it easy to accidentally break unrelated components with a selector that's broader than intended.
-
-**What to do:**
-- Co-locate styles with components. Move `.job-form-*` rules to a `JobForm.css`, `.invoice-*` to `InvoiceWizard.css`, `.co-*` to `ChangeOrderWizard.css`, etc.
-- Keep `App.css` for the design system tokens (`--primary`, `--surface`, etc.), the base layout (`app-header`, `app-main`, `app-footer`), and any truly global rules.
-- Do not change class names or selectors during the split — this is a file organization change, not a refactor. Move rules, verify visually, commit.
-
-The payoff: a developer working on the invoice wizard only needs to open one ~200-line file, not scroll through 3,474 lines looking for `.invoice-`.
-
----
-
-### 2. Extract shared HTML escaping utility
+### 1. Extract shared HTML escaping utility
 **Priority: Low**
 **Affected files:** `src/lib/agreement-sections-html.ts`, `src/lib/change-order-generator.ts`
 
@@ -67,7 +59,7 @@ Both files define an identical `esc()`/`escapeHtml()` function. If a bug were fo
 - Create `src/lib/html-escape.ts` exporting a single `esc()` function.
 - Replace both inline definitions with an import.
 
-Small change, zero risk, eliminates the duplication permanently. Do this after the App.tsx and CSS work is stable.
+Small change, zero risk, eliminates the duplication permanently. The App.tsx extraction and CSS split are stable; this can be picked up anytime.
 
 ---
 
