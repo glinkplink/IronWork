@@ -1,0 +1,52 @@
+.invoice-preview-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(26, 25, 23, 0.55);
+  display: flex;
+  flex-direction: column;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.invoice-preview-modal-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-start;
+  padding: var(--space-md);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.invoice-preview-modal-scroll {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y pinch-zoom;
+  padding: var(--space-md);
+}
+
+.invoice-preview-modal-sheet {
+  width: 100%;
+  max-width: min(816px, 100%);
+  margin: 0 auto;
+  box-sizing: border-box;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.invoice-preview-page-rhythm {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(1055px),
+    var(--border) 1055px,
+    var(--border) 1056px
+  );
+  background-size: 100% 1056px;
+}

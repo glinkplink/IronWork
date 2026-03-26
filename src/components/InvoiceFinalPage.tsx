@@ -3,6 +3,7 @@ import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { markInvoiceDownloaded, updateInvoice } from '../lib/db/invoices';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import './InvoiceFinalPage.css';
 import appCss from '../App.css?raw';
 
 const PREVIEW_LETTER_WIDTH_PX = 816;

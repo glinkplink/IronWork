@@ -1,3 +1,5 @@
+import './InvoicePreviewModal.css';
+
 interface InvoicePreviewModalProps {
   open: boolean;
   onClose: () => void;
