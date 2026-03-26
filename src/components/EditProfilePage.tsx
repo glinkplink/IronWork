@@ -6,6 +6,7 @@ import type { BusinessProfile } from '../types/db';
 import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-methods';
 import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
 import { formatUsPhoneInput } from '../lib/us-phone-input';
+import './EditProfilePage.css';
 
 const DEFAULT_LATE_PAYMENT_TERMS = 'Balances unpaid 7 days after completion accrue 1.5% per month.';
 
