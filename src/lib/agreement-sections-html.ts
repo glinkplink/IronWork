@@ -1,13 +1,5 @@
 import type { AgreementSection, SectionContentBlock, SignatureBlockData } from '../types';
-
-function esc(value: string | number | null | undefined): string {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
+import { esc } from './html-escape';
 
 function blockHtml(block: SectionContentBlock, signatureData: SignatureBlockData | undefined): string {
   if (block.type === 'paragraph') {

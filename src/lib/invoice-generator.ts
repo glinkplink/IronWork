@@ -1,6 +1,7 @@
 import type { Job, BusinessProfile, Invoice, InvoiceLineItem } from '../types/db';
 import { normalizePaymentMethods } from './payment-methods';
 import { jobLocationSingleLine } from './job-site-address';
+import { esc } from './html-escape';
 
 /** Fields required to render invoice HTML (persisted row or equivalent draft). */
 export type InvoiceDraft = Pick<
@@ -16,15 +17,6 @@ export type InvoiceDraft = Pick<
   | 'payment_methods'
   | 'notes'
 >;
-
-function escapeHtml(value: string | number | null | undefined): string {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
 
 function formatDate(iso: string): string {
   if (!iso) return '';
@@ -52,20 +44,20 @@ function partiesMarkup(
   profile: BusinessProfile | null,
   job: Job
 ): string {
-  const spName = escapeHtml(profile?.business_name ?? '');
-  const spPhone = escapeHtml(profile?.phone ?? '');
-  const spEmail = escapeHtml(profile?.email ?? '');
-  const cuName = escapeHtml(job.customer_name);
-  const cuPhone = escapeHtml(job.customer_phone ?? '');
-  const cuEmail = escapeHtml(job.customer_email ?? '');
-  const jobSite = escapeHtml(jobLocationSingleLine(job.job_location));
+  const spName = esc(profile?.business_name ?? '');
+  const spPhone = esc(profile?.phone ?? '');
+  const spEmail = esc(profile?.email ?? '');
+  const cuName = esc(job.customer_name);
+  const cuPhone = esc(job.customer_phone ?? '');
+  const cuEmail = esc(job.customer_email ?? '');
+  const jobSite = esc(jobLocationSingleLine(job.job_location));
 
   return `
     <div class="parties-layout">
       <div class="parties-plain">
         <div class="parties-plain-row">
           <span class="parties-plain-label">Invoice Date:</span>
-          <span class="parties-plain-value">${escapeHtml(invoiceDateLabel)}</span>
+          <span class="parties-plain-value">${esc(invoiceDateLabel)}</span>
         </div>
       </div>
       <table class="content-table parties-party-table">
@@ -111,10 +103,10 @@ function lineItemsRows(items: InvoiceLineItem[]): string {
     .map(
       (row) => `
     <tr>
-      <td class="table-value">${escapeHtml(row.description)}</td>
-      <td class="table-value" style="text-align:right">${escapeHtml(String(row.qty))}</td>
-      <td class="table-value" style="text-align:right">${escapeHtml(formatPrice(row.unit_price))}</td>
-      <td class="table-value" style="text-align:right">${escapeHtml(formatPrice(row.total))}</td>
+      <td class="table-value">${esc(row.description)}</td>
+      <td class="table-value" style="text-align:right">${esc(String(row.qty))}</td>
+      <td class="table-value" style="text-align:right">${esc(formatPrice(row.unit_price))}</td>
+      <td class="table-value" style="text-align:right">${esc(formatPrice(row.total))}</td>
     </tr>
   `
     )
@@ -134,7 +126,7 @@ export function generateInvoiceHtml(
   const paymentList =
     paymentMethods.length > 0
       ? `<ul class="content-bullets invoice-payment-list">${paymentMethods
-          .map((m) => `<li>${escapeHtml(m)}</li>`)
+          .map((m) => `<li>${esc(m)}</li>`)
           .join('')}</ul>`
       : '<p class="content-note">No payment methods listed.</p>';
 
@@ -142,7 +134,7 @@ export function generateInvoiceHtml(
     invoice.notes?.trim()
       ? `<div class="invoice-notes-section">
           <h3 class="section-title">Notes</h3>
-          <p class="content-paragraph">${escapeHtml(invoice.notes.trim()).replaceAll('\n', '<br />')}</p>
+          <p class="content-paragraph">${esc(invoice.notes.trim()).replaceAll('\n', '<br />')}</p>
         </div>`
       : '';
 
@@ -155,11 +147,11 @@ export function generateInvoiceHtml(
           <tbody>
             <tr>
               <td class="table-label">Invoice date</td>
-              <td class="table-value">${escapeHtml(invoiceDateStr)}</td>
+              <td class="table-value">${esc(invoiceDateStr)}</td>
             </tr>
             <tr>
               <td class="table-label">Due date</td>
-              <td class="table-value invoice-due-date">${escapeHtml(dueDateStr)}</td>
+              <td class="table-value invoice-due-date">${esc(dueDateStr)}</td>
             </tr>
           </tbody>
         </table>
@@ -183,15 +175,15 @@ export function generateInvoiceHtml(
           <tbody>
             <tr>
               <td class="table-label">Subtotal</td>
-              <td class="table-value" style="text-align:right">${escapeHtml(formatPrice(invoice.subtotal))}</td>
+              <td class="table-value" style="text-align:right">${esc(formatPrice(invoice.subtotal))}</td>
             </tr>
             <tr>
-              <td class="table-label">Tax (${escapeHtml(formatTaxPercent(invoice.tax_rate))})</td>
-              <td class="table-value" style="text-align:right">${escapeHtml(formatPrice(invoice.tax_amount))}</td>
+              <td class="table-label">Tax (${esc(formatTaxPercent(invoice.tax_rate))})</td>
+              <td class="table-value" style="text-align:right">${esc(formatPrice(invoice.tax_amount))}</td>
             </tr>
             <tr class="invoice-total-row">
               <td class="table-label"><strong>Total</strong></td>
-              <td class="table-value" style="text-align:right"><strong>${escapeHtml(formatPrice(invoice.total))}</strong></td>
+              <td class="table-value" style="text-align:right"><strong>${esc(formatPrice(invoice.total))}</strong></td>
             </tr>
           </tbody>
         </table>

@@ -15,7 +15,7 @@ All structural changes (App.tsx extraction, CSS splitting) must be done with the
 1. ✅ Tests (done)
 2. ✅ App.tsx state extraction (done)
 3. ✅ CSS split (done)
-4. 🧼 HTML escape utility
+4. ✅ HTML escape utility (done)
 
 ---
 
@@ -23,7 +23,7 @@ All structural changes (App.tsx extraction, CSS splitting) must be done with the
 
 ### Tests — agreement generator + PDF payload contract
 **Files:** `src/lib/__tests__/agreement-generator.test.ts`, `src/lib/__tests__/pdf-payload.test.ts`
-**Coverage:** 68 tests across both files; 0 failures.
+**Coverage:** 74 tests across both files; 0 failures (includes invoice HTML escaping in `pdf-payload.test.ts`).
 
 The agreement generator is core product IP. It conditionally includes/omits legal sections (exclusions, warranty, dispute resolution, change orders, hidden damage) based on job data. A silent regression here — a section appearing when it shouldn't, or vice versa — produces a broken legal document. That is expensive to catch after the fact, especially once clients are signing things.
 
@@ -45,21 +45,16 @@ Vitest was added as a dev dependency. `vite.config.ts` uses `import { defineConf
 
 **Payoff:** Page/feature styles live beside the component that owns them; global/PDF surface stays one file for Puppeteer and shared chrome.
 
+### HTML escape utility — shared `esc()`
+**Files:** `src/lib/html-escape.ts` (single `esc()`); consumers `agreement-sections-html.ts`, `change-order-generator.ts`, `invoice-generator.ts`. **Tests:** `pdf-payload.test.ts` covers agreement sections, change orders, and invoice HTML escaping.
+
+One source of truth for `&`, `<`, `>`, `"`, `'` entity encoding in generated document HTML; newline→`<br />` remains after escape in CO/invoice notes where it already did.
+
 ---
 
 ## To Do
 
-### 1. Extract shared HTML escaping utility
-**Priority: Low**
-**Affected files:** `src/lib/agreement-sections-html.ts`, `src/lib/change-order-generator.ts`
-
-Both files define an identical `esc()`/`escapeHtml()` function. If a bug were found in the escaping logic (e.g. a missing entity), it would need to be fixed in two places and the second fix could be missed.
-
-**What to do:**
-- Create `src/lib/html-escape.ts` exporting a single `esc()` function.
-- Replace both inline definitions with an import.
-
-Small change, zero risk, eliminates the duplication permanently. The App.tsx extraction and CSS split are stable; this can be picked up anytime.
+_No open items._
 
 ---
 

@@ -1,17 +1,9 @@
 import type { Job, BusinessProfile, ChangeOrder, ChangeOrderLineItem } from '../types/db';
 import { jobLocationSingleLine } from './job-site-address';
+import { esc } from './html-escape';
 
 function coLineItemsTotal(items: ChangeOrderLineItem[]): number {
   return Math.round(items.reduce((s, i) => s + i.quantity * i.unit_rate, 0) * 100) / 100;
-}
-
-function escapeHtml(value: string | number | null | undefined): string {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
 
 function formatDate(iso: string): string {
@@ -38,20 +30,20 @@ function partiesMarkup(
   profile: BusinessProfile | null,
   job: Job
 ): string {
-  const spName = escapeHtml(profile?.business_name ?? '');
-  const spPhone = escapeHtml(profile?.phone ?? '');
-  const spEmail = escapeHtml(profile?.email ?? '');
-  const cuName = escapeHtml(job.customer_name);
-  const cuPhone = escapeHtml(job.customer_phone ?? '');
-  const cuEmail = escapeHtml(job.customer_email ?? '');
-  const jobSite = escapeHtml(jobLocationSingleLine(job.job_location));
+  const spName = esc(profile?.business_name ?? '');
+  const spPhone = esc(profile?.phone ?? '');
+  const spEmail = esc(profile?.email ?? '');
+  const cuName = esc(job.customer_name);
+  const cuPhone = esc(job.customer_phone ?? '');
+  const cuEmail = esc(job.customer_email ?? '');
+  const jobSite = esc(jobLocationSingleLine(job.job_location));
 
   return `
     <div class="parties-layout">
       <div class="parties-plain">
         <div class="parties-plain-row">
           <span class="parties-plain-label">Date:</span>
-          <span class="parties-plain-value">${escapeHtml(dateLabel)}</span>
+          <span class="parties-plain-value">${esc(dateLabel)}</span>
         </div>
       </div>
       <table class="content-table parties-party-table">
@@ -93,10 +85,10 @@ function lineItemsRows(items: ChangeOrderLineItem[]): string {
     .map(
       (row) => `
     <tr>
-      <td class="table-value">${escapeHtml(row.description)}</td>
-      <td class="table-value" style="text-align:right">${escapeHtml(String(row.quantity))}</td>
-      <td class="table-value" style="text-align:right">${escapeHtml(formatPrice(row.unit_rate))}</td>
-      <td class="table-value" style="text-align:right">${escapeHtml(formatPrice(row.quantity * row.unit_rate))}</td>
+      <td class="table-value">${esc(row.description)}</td>
+      <td class="table-value" style="text-align:right">${esc(String(row.quantity))}</td>
+      <td class="table-value" style="text-align:right">${esc(formatPrice(row.unit_rate))}</td>
+      <td class="table-value" style="text-align:right">${esc(formatPrice(row.quantity * row.unit_rate))}</td>
     </tr>
   `
     )
@@ -113,7 +105,7 @@ function signatureBlocks(job: Job, profile: BusinessProfile | null): string {
     <div class="signature-block-identifier">Customer</div>
     <div class="signature-field">
       <span class="signature-field-label">Name</span>
-      <div class="signature-field-value">${escapeHtml(job.customer_name)}</div>
+      <div class="signature-field-value">${esc(job.customer_name)}</div>
     </div>
     <div class="signature-field">
       <span class="signature-field-label">Signature</span>
@@ -128,17 +120,17 @@ function signatureBlocks(job: Job, profile: BusinessProfile | null): string {
     <div class="signature-block-identifier">Service Provider</div>
     <div class="signature-field">
       <span class="signature-field-label">Name</span>
-      <div class="signature-field-value">${escapeHtml(ownerName)}</div>
+      <div class="signature-field-value">${esc(ownerName)}</div>
     </div>
     <div class="signature-field">
       <span class="signature-field-label">Signature</span>
       <div class="signature-field-value">
-        <div class="signature-autofill-name">${escapeHtml(ownerName)}</div>
+        <div class="signature-autofill-name">${esc(ownerName)}</div>
       </div>
     </div>
     <div class="signature-field">
       <span class="signature-field-label">Date</span>
-      <div class="signature-field-value">${escapeHtml(ownerDate)}</div>
+      <div class="signature-field-value">${esc(ownerDate)}</div>
     </div>
   </div>
 </div>`;
@@ -160,7 +152,7 @@ export function generateChangeOrderHtml(
       ? `
       <h3 class="section-title">Schedule impact</h3>
       <p class="content-paragraph">
-        Additional ${escapeHtml(String(co.time_amount))} ${escapeHtml(co.time_unit)}${co.time_note.trim() ? `. ${escapeHtml(co.time_note.trim())}` : ''}.
+        Additional ${esc(String(co.time_amount))} ${esc(co.time_unit)}${co.time_note.trim() ? `. ${esc(co.time_note.trim())}` : ''}.
       </p>`
       : '';
 
@@ -177,13 +169,13 @@ export function generateChangeOrderHtml(
     <div class="agreement-document change-order-document">
       <h2 class="invoice-title">${coNum}</h2>
       <p class="content-paragraph" style="text-align:center;margin-top:-0.5rem;">
-        For ${escapeHtml(woNum)} — ${escapeHtml(job.asset_or_item_description || 'Work order')}
+        For ${esc(woNum)} — ${esc(job.asset_or_item_description || 'Work order')}
       </p>
       ${partiesMarkup(dateStr, profile, job)}
       <h3 class="section-title">Description of change</h3>
-      <p class="content-paragraph">${escapeHtml(co.description).replaceAll('\n', '<br />')}</p>
+      <p class="content-paragraph">${esc(co.description).replaceAll('\n', '<br />')}</p>
       <h3 class="section-title">Reason</h3>
-      <p class="content-paragraph">${escapeHtml(co.reason).replaceAll('\n', '<br />')}</p>
+      <p class="content-paragraph">${esc(co.reason).replaceAll('\n', '<br />')}</p>
       <h3 class="section-title">Cost adjustment</h3>
       <table class="content-table invoice-line-table">
         <thead>
@@ -198,7 +190,7 @@ export function generateChangeOrderHtml(
           ${lineItemsRows(co.line_items) || `<tr><td colspan="4" class="table-value">No line items</td></tr>`}
         </tbody>
       </table>
-      <p class="content-paragraph" style="text-align:right;font-weight:600;">Total: ${escapeHtml(formatPrice(total))}</p>
+      <p class="content-paragraph" style="text-align:right;font-weight:600;">Total: ${esc(formatPrice(total))}</p>
       ${scheduleBlock}
       ${approvalBlock}
     </div>

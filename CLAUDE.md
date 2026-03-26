@@ -93,6 +93,7 @@ src/
     job-to-welder-job.ts     # Job row + profile → WelderJob
     invoice-generator.ts     # Invoice HTML string
     agreement-sections-html.ts # Agreement sections → HTML string (combined PDFs)
+    html-escape.ts           # esc() for generated HTML (WO / CO / invoice strings)
     change-order-generator.ts # Change order HTML + WO + approved COs
     payment-methods.ts, tax.ts, defaults.ts
     db/

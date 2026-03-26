@@ -21,6 +21,7 @@ import { generateAgreement } from '../agreement-generator';
 
 import type { WelderJob } from '../../types';
 import type { BusinessProfile, Job, ChangeOrder } from '../../types/db';
+import { generateInvoiceHtml, type InvoiceDraft } from '../invoice-generator';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -139,6 +140,21 @@ const baseCo: ChangeOrder = {
   time_note: 'Extra day for cure',
   created_at: '2024-06-05T00:00:00Z',
   updated_at: '2024-06-05T00:00:00Z',
+};
+
+const baseInvoiceDraft: InvoiceDraft = {
+  invoice_number: 1,
+  invoice_date: '2024-06-15',
+  due_date: '2024-06-30',
+  line_items: [
+    { kind: 'labor', description: 'Welding labor', qty: 1, unit_price: 100, total: 100 },
+  ],
+  subtotal: 100,
+  tax_rate: 0,
+  tax_amount: 0,
+  total: 100,
+  payment_methods: ['Cash'],
+  notes: null,
 };
 
 // ── A. Filename helpers ───────────────────────────────────────────────────────
@@ -311,6 +327,69 @@ describe('generateChangeOrderHtml', () => {
     const out = generateChangeOrderHtml(co, baseDbJob, baseProfile);
     expect(out).not.toContain('<b>bold');
     expect(out).toContain('&lt;b&gt;');
+  });
+});
+
+// ── E2. Invoice HTML ──────────────────────────────────────────────────────────
+
+describe('generateInvoiceHtml', () => {
+  const html = generateInvoiceHtml(baseInvoiceDraft, baseDbJob, baseProfile);
+
+  it('returns a non-empty string', () => {
+    expect(html.length).toBeGreaterThan(0);
+  });
+
+  it('contains the invoice title', () => {
+    expect(html).toContain('INVOICE');
+  });
+
+  it('escapes HTML in line item description', () => {
+    const invoice: InvoiceDraft = {
+      ...baseInvoiceDraft,
+      line_items: [
+        {
+          kind: 'labor',
+          description: '<img src=x onerror=alert(1)>',
+          qty: 1,
+          unit_price: 10,
+          total: 10,
+        },
+      ],
+      subtotal: 10,
+      total: 10,
+    };
+    const out = generateInvoiceHtml(invoice, baseDbJob, baseProfile);
+    expect(out).not.toContain('<img ');
+    expect(out).toContain('&lt;img');
+  });
+
+  it('escapes HTML in notes and preserves newlines as br', () => {
+    const invoice: InvoiceDraft = {
+      ...baseInvoiceDraft,
+      notes: '<script>x</script>\nSecond line',
+    };
+    const out = generateInvoiceHtml(invoice, baseDbJob, baseProfile);
+    expect(out).not.toContain('<script>');
+    expect(out).toContain('&lt;script&gt;');
+    expect(out).toContain('<br />');
+  });
+
+  it('escapes HTML in payment method labels', () => {
+    const invoice: InvoiceDraft = {
+      ...baseInvoiceDraft,
+      payment_methods: ['Pay <online> & "now"'],
+    };
+    const out = generateInvoiceHtml(invoice, baseDbJob, baseProfile);
+    expect(out).not.toContain('<online>');
+    expect(out).toContain('&lt;online&gt;');
+    expect(out).toContain('&amp;');
+    expect(out).toContain('&quot;now&quot;');
+  });
+
+  it('is deterministic', () => {
+    expect(generateInvoiceHtml(baseInvoiceDraft, baseDbJob, baseProfile)).toBe(
+      generateInvoiceHtml(baseInvoiceDraft, baseDbJob, baseProfile)
+    );
   });
 });
 

@@ -113,6 +113,7 @@ scope-lock/
 │   │   ├── auth.ts                   # signUp / signIn / signOut helpers
 │   │   ├── agreement-generator.ts    # Pure domain logic: agreement section model
 │   │   ├── agreement-sections-html.ts # Agreement body HTML string (combined WO+CO PDFs)
+│   │   ├── html-escape.ts            # esc() for generator HTML strings
 │   │   ├── change-order-generator.ts # Change order HTML + combined WO + approved COs
 │   │   ├── agreement-pdf.ts          # PDF HTML wrapper + fetch/download blob (Puppeteer)
 │   │   ├── job-site-address.ts       # Multiline job_location, parse for client autofill, single-line PDF
@@ -351,7 +352,7 @@ The checkbox sections below track shipped work and the longer backlog; the three
 - New pages and major components should import their own CSS file (for example `WorkOrdersPage.tsx` + `WorkOrdersPage.css`).
 - If a style is only used by one page/component, keep it with that page/component rather than promoting it to a global stylesheet.
 - Shared utility logic belongs in `src/lib/`; avoid duplicated helper functions across generators when one utility can keep behavior consistent.
-- HTML escaping is a good candidate for a future shared helper in `src/lib/`; until that exists, keep the current duplicated inline `esc()` / `escapeHtml()` helpers in mind when editing generators.
+- HTML escaping for generated strings lives in `src/lib/html-escape.ts` (`esc`); agreement, change-order, and invoice generators import it—do not reintroduce parallel `escapeHtml` / local `esc` copies.
 
 ## Environment Variables
 
