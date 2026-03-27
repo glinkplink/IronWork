@@ -37,7 +37,8 @@ export function jobRowToWelderJob(job: Job, profile: BusinessProfile | null): We
     job_site_zip: '',
     governing_state: job.governing_state ?? '',
     job_type: jobType,
-    other_classification: jobType === 'other' ? job.job_type : undefined,
+    other_classification:
+      jobType === 'other' ? (job.other_classification?.trim() || undefined) : undefined,
     asset_or_item_description: job.asset_or_item_description,
     requested_work: job.requested_work,
     materials_provided_by: materialsProviderFromRow(job.materials_provided_by),

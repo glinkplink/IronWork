@@ -30,6 +30,7 @@ const listJobA: WorkOrderListJob = {
   wo_number: 1,
   customer_name: 'Customer A',
   job_type: 'repair',
+  other_classification: null,
   agreement_date: '2025-01-01',
   created_at: '2025-01-01T12:00:00Z',
   price: 100,
@@ -40,6 +41,7 @@ const listJobB: WorkOrderListJob = {
   wo_number: 2,
   customer_name: 'Customer B',
   job_type: 'repair',
+  other_classification: null,
   agreement_date: '2025-01-02',
   created_at: '2025-01-02T12:00:00Z',
   price: 200,
@@ -54,6 +56,7 @@ function minimalFullJob(id: string, customer: string): Job {
     customer_phone: null,
     job_location: 'x',
     job_type: 'repair',
+    other_classification: null,
     asset_or_item_description: 'x',
     requested_work: 'x',
     materials_provided_by: null,
@@ -134,6 +137,25 @@ describe('WorkOrdersPage', () => {
       warning: null,
     } satisfies ListInvoiceStatusByJobResult);
     getJobById.mockImplementation((id: string) => Promise.resolve(minimalFullJob(id, id)));
+  });
+
+  it('shows date on first meta line and capitalized job type on second', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Customer A')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Jan 1, 2025')).toBeInTheDocument();
+    expect(screen.getByText('Repair')).toBeInTheDocument();
+  });
+
+  it('shows Specify text for Other job type with first letter capitalized', async () => {
+    listJobsForWorkOrders.mockResolvedValue([
+      { ...listJobA, job_type: 'other', other_classification: 'body shop work' },
+    ]);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Body shop work')).toBeInTheDocument();
+    });
   });
 
   it('shows invoice column loading while jobs are shown and invoice status is still loading', async () => {

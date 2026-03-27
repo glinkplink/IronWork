@@ -134,3 +134,16 @@
 .work-orders-summary-pending .work-orders-summary-amount {
   color: #9a3412;
 }
+
+.work-orders-page .work-orders-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: calc(0.8125rem + 1px);
+}
+
+.work-orders-page .work-orders-meta-date,
+.work-orders-page .work-orders-meta-type {
+  font-size: inherit;
+  line-height: 1.35;
+}

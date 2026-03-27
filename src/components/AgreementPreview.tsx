@@ -22,6 +22,9 @@ function getRequiredFieldIssues(job: WelderJob): string[] {
   if (!job.asset_or_item_description?.trim()) issues.push('Item / structure');
   if (!job.requested_work?.trim()) issues.push('Work requested');
   if (!job.job_type?.trim()) issues.push('Job type');
+  if (job.job_type === 'other' && !job.other_classification?.trim()) {
+    issues.push('Specify (job type Other)');
+  }
   if (typeof job.price !== 'number' || !Number.isFinite(job.price) || job.price <= 0) {
     issues.push('Total contract price (must be greater than 0)');
   }

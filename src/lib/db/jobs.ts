@@ -8,11 +8,16 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
     typeof priceRaw === 'number' && Number.isFinite(priceRaw)
       ? priceRaw
       : Number(priceRaw) || 0;
+  const ocRaw = row.other_classification;
+  const other_classification =
+    ocRaw != null && String(ocRaw).trim() !== '' ? String(ocRaw).trim() : null;
+
   return {
     id: String(row.id),
     wo_number: row.wo_number != null ? Number(row.wo_number) : null,
     customer_name: String(row.customer_name ?? ''),
     job_type: String(row.job_type ?? ''),
+    other_classification,
     agreement_date: (row.agreement_date as string | null) ?? null,
     created_at: String(row.created_at ?? ''),
     price,
@@ -165,6 +170,8 @@ export const saveWorkOrder = async (
     job_location: job.job_location,
     governing_state: job.governing_state?.trim() || null,
     job_type: job.job_type,
+    other_classification:
+      job.job_type === 'other' ? (job.other_classification?.trim() || null) : null,
     asset_or_item_description: job.asset_or_item_description,
     requested_work: job.requested_work,
     materials_provided_by: job.materials_provided_by,

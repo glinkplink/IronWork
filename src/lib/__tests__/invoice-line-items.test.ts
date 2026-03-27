@@ -45,6 +45,7 @@ const baseJob: Job = {
   customer_email: 'jane@example.com',
   job_location: '123 Main St',
   job_type: 'repair',
+  other_classification: null,
   asset_or_item_description: 'Steel trailer hitch',
   requested_work: 'Weld cracked hitch receiver and reinforce bracket',
   materials_provided_by: 'welder',

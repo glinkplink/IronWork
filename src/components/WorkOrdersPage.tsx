@@ -9,6 +9,7 @@ import type {
 import { listJobsForWorkOrders, getJobById } from '../lib/db/jobs';
 import { listInvoiceStatusByJob, getInvoice, invoiceStatusMapFromRows } from '../lib/db/invoices';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
+import { formatWorkOrderListJobType } from '../lib/work-order-list-label';
 import './WorkOrdersPage.css';
 
 const HIDE_COMPLETE_PROFILE_CTA_PREFIX = 'scope-lock-hide-complete-profile-cta:';
@@ -279,7 +280,10 @@ export function WorkOrdersPage({
                         <span className="work-orders-customer">{job.customer_name}</span>
                       </button>
                       <span className="work-orders-meta">
-                        {job.job_type} · {formatRowDate(job)}
+                        <span className="work-orders-meta-date">{formatRowDate(job)}</span>
+                        <span className="work-orders-meta-type">
+                          {formatWorkOrderListJobType(job)}
+                        </span>
                       </span>
                     </div>
                     <div className="work-orders-row-actions">

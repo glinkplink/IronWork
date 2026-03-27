@@ -47,6 +47,8 @@ export interface Job {
   customer_phone: string | null;
   job_location: string;
   job_type: string;
+  /** Free-text when job_type is `other` (JobForm "Specify"). */
+  other_classification: string | null;
   asset_or_item_description: string;
   requested_work: string;
   materials_provided_by: 'welder' | 'customer' | 'mixed' | null;
@@ -89,6 +91,7 @@ export interface WorkOrderListJob {
   wo_number: number | null;
   customer_name: string;
   job_type: string;
+  other_classification: string | null;
   agreement_date: string | null;
   created_at: string;
   price: number;

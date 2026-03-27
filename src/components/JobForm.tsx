@@ -843,13 +843,14 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
         </div>
         {job.job_type === 'other' && (
           <div className="form-group">
-            <label htmlFor="other_classification">Specify</label>
+            <label htmlFor="other_classification">Specify *</label>
             <input
               id="other_classification"
               type="text"
               value={job.other_classification ?? ''}
               onChange={(e) => updateField('other_classification', e.target.value)}
               placeholder="Enter custom classification"
+              required
             />
           </div>
         )}

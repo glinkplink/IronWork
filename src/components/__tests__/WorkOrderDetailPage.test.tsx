@@ -50,6 +50,7 @@ function minimalJob(): Job {
     customer_phone: null,
     job_location: 'Here',
     job_type: 'repair',
+    other_classification: null,
     asset_or_item_description: 'Thing',
     requested_work: 'Weld',
     materials_provided_by: null,
