@@ -3,11 +3,9 @@ import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { markInvoiceDownloaded, updateInvoice } from '../lib/db/invoices';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { useScaledPreview } from '../hooks/useScaledPreview';
 import './InvoiceFinalPage.css';
 import appCss from '../App.css?raw';
-
-const PREVIEW_LETTER_WIDTH_PX = 816;
-const PREVIEW_DESKTOP_UPSCALE_MQ = '(min-width: 1024px)';
 
 function getInvoicePdfFilename(invoiceNumber: number, customerName: string): string {
   const sanitized = (customerName || 'customer').replace(/\s+/g, '_');
@@ -190,15 +188,20 @@ export function InvoiceFinalPage({
   );
 
   const documentRef = useRef<HTMLDivElement | null>(null);
-  const previewViewportRef = useRef<HTMLDivElement | null>(null);
-  const previewSheetRef = useRef<HTMLDivElement | null>(null);
-  const [previewContentHeight, setPreviewContentHeight] = useState(0);
-  const [previewScale, setPreviewScale] = useState(1);
 
   const previewHtml = generateInvoiceHtml(invoice, job, profile);
   const isReadOnly = invoice.status === 'downloaded';
   const customerTitle = job.customer_name.trim() || 'Customer';
   const invoiceSubline = `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`;
+
+  const {
+    viewportRef: previewViewportRef,
+    sheetRef: previewSheetRef,
+    scale: previewScale,
+    spacerHeight,
+    spacerWidth,
+    letterWidthPx,
+  } = useScaledPreview(invoice, job, profile);
 
   useLayoutEffect(() => {
     setInvoice(invoiceProp);
@@ -208,41 +211,6 @@ export function InvoiceFinalPage({
   useEffect(() => {
     if (invoiceProp.status === 'downloaded') setHasPersistedDownloadOnce(true);
   }, [invoiceProp.status]);
-
-  useLayoutEffect(() => {
-    const viewport = previewViewportRef.current;
-    if (!viewport) return;
-
-    const computeScale = () => {
-      const w = viewport.getBoundingClientRect().width;
-      if (w <= 0) return 1;
-      const maxScale = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ).matches ? 1.5 : 1;
-      return Math.min(w / PREVIEW_LETTER_WIDTH_PX, maxScale);
-    };
-
-    const updateScale = () => setPreviewScale(computeScale());
-    updateScale();
-    const ro = new ResizeObserver(updateScale);
-    ro.observe(viewport);
-    const mq = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ);
-    mq.addEventListener('change', updateScale);
-    window.addEventListener('resize', updateScale);
-    return () => {
-      ro.disconnect();
-      mq.removeEventListener('change', updateScale);
-      window.removeEventListener('resize', updateScale);
-    };
-  }, []);
-
-  useLayoutEffect(() => {
-    const sheet = previewSheetRef.current;
-    if (!sheet) return;
-    const updateHeight = () => setPreviewContentHeight(sheet.scrollHeight);
-    updateHeight();
-    const ro = new ResizeObserver(updateHeight);
-    ro.observe(sheet);
-    return () => ro.disconnect();
-  }, [invoice, job, profile]);
 
   const handleDownload = async () => {
     setDownloadError('');
@@ -359,15 +327,15 @@ export function InvoiceFinalPage({
           <div
             className="agreement-preview-scale-spacer"
             style={{
-              width: PREVIEW_LETTER_WIDTH_PX * previewScale,
-              height: previewContentHeight * previewScale,
+              width: spacerWidth,
+              height: spacerHeight,
             }}
           >
             <div
               ref={previewSheetRef}
               className="agreement-preview-scale-sheet"
               style={{
-                width: PREVIEW_LETTER_WIDTH_PX,
+                width: letterWidthPx,
                 transform: previewScale !== 1 ? `scale(${previewScale})` : undefined,
                 transformOrigin: 'top left',
               }}
