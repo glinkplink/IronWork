@@ -122,7 +122,7 @@ export function InvoiceWizard({
 
   const [changeOrdersOnJob, setChangeOrdersOnJob] = useState<ChangeOrder[]>([]);
   const [selectedCoIds, setSelectedCoIds] = useState<Set<string>>(() => new Set());
-  /** Job id for which approved COs were auto-selected once (avoids ref/effect ordering race; preserves manual edits). */
+  /** Job id for which change orders were auto-selected once (avoids ref/effect ordering race; preserves manual edits). */
   const [coInitJobId, setCoInitJobId] = useState<string | null>(null);
 
   const [error, setError] = useState('');

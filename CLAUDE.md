@@ -94,7 +94,7 @@ src/
     invoice-generator.ts     # Invoice HTML string
     agreement-sections-html.ts # Agreement sections → HTML string (combined PDFs)
     html-escape.ts           # esc() for generated HTML (WO / CO / invoice strings)
-    change-order-generator.ts # Change order HTML + WO + approved COs
+    change-order-generator.ts # Change order HTML + combined WO + listed COs
     payment-methods.ts, tax.ts, defaults.ts
     db/
       profile.ts             # getProfile, upsertProfile, updateNextWoNumber

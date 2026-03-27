@@ -2,7 +2,7 @@
 
 Work agreement generator for contractors (initially welders). Contractors fill out a job form and get a professional PDF agreement to send to clients.
 
-**Important:** This is not a static single-page app you can drop on pure CDN hosting. **Every PDF** (work order, invoice, change order, and combined work order + approved change orders) is produced by a **Node process** that runs **Puppeteer** against a **local Chrome/Chromium** binary. The UI and `/api/pdf` are intended to run **on the same origin** so the browser can `POST` HTML + metadata to the server without cross-origin configuration.
+**Important:** This is not a static single-page app you can drop on pure CDN hosting. **Every PDF** (work order, invoice, change order, and combined work order + change orders) is produced by a **Node process** that runs **Puppeteer** against a **local Chrome/Chromium** binary. The UI and `/api/pdf` are intended to run **on the same origin** so the browser can `POST` HTML + metadata to the server without cross-origin configuration.
 
 ---
 
@@ -98,7 +98,7 @@ Put these in **`.env.local`** (see `.env.example`).
 
 **Signed in with profile**
 
-- **Home**, **Work Orders**, **Edit profile** (gear). **Work order drafts** while editing a new job are **in-memory** until **Download & Save** persists the job (and upserts **clients** by normalized name). **Invoices** and **change orders** are persisted in Postgres; change orders are created from **Work Order detail**, and invoice wizards can attach approved change orders as line items when configured in the UI.
+- **Home**, **Work Orders**, **Edit profile** (gear). **Work order drafts** while editing a new job are **in-memory** until **Download & Save** persists the job (and upserts **clients** by normalized name). **Invoices** and **change orders** are persisted in Postgres; change orders are created from **Work Order detail**, and invoice wizards can include change orders as line items (picker defaults to all on the job).
 
 Session persistence is standard Supabase client behavior (refresh survives page reload).
 

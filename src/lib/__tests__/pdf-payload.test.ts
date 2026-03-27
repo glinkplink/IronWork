@@ -408,7 +408,7 @@ describe('buildCombinedWorkOrderAndChangeOrdersHtml', () => {
     expect(out.trimStart().startsWith(woHtml));
   });
 
-  it('includes approved CO content', () => {
+  it('includes change order content', () => {
     const out = buildCombinedWorkOrderAndChangeOrdersHtml(woHtml, [baseCo], baseDbJob, baseProfile);
     expect(out).toContain('Change Order #0001');
     expect(out).toContain('Additional brace required');
@@ -419,19 +419,19 @@ describe('buildCombinedWorkOrderAndChangeOrdersHtml', () => {
     expect(out).toContain('page-break-before:always');
   });
 
-  it('excludes non-approved COs', () => {
+  it('includes each change order in the list regardless of status', () => {
     const pending = { ...baseCo, co_number: 2, status: 'pending_approval' as const, description: 'Pending work' };
     const out = buildCombinedWorkOrderAndChangeOrdersHtml(woHtml, [pending], baseDbJob, baseProfile);
-    expect(out).not.toContain('Pending work');
-    expect(out).not.toContain('page-break-before:always');
+    expect(out).toContain('Pending work');
+    expect(out).toContain('page-break-before:always');
   });
 
-  it('returns WO-only HTML when no approved COs', () => {
+  it('returns WO-only HTML when there are no change orders', () => {
     const out = buildCombinedWorkOrderAndChangeOrdersHtml(woHtml, [], baseDbJob, baseProfile);
     expect(out.trim()).toBe(woHtml);
   });
 
-  it('handles multiple approved COs', () => {
+  it('handles multiple change orders', () => {
     const co2 = { ...baseCo, co_number: 2, description: 'Second change order' };
     const out = buildCombinedWorkOrderAndChangeOrdersHtml(woHtml, [baseCo, co2], baseDbJob, baseProfile);
     expect(out).toContain('Change Order #0001');

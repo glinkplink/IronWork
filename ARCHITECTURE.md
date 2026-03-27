@@ -123,7 +123,7 @@ scope-lock/
 │   │   ├── agreement-generator.ts    # Pure domain logic: agreement section model
 │   │   ├── agreement-sections-html.ts # Agreement body HTML string (combined WO+CO PDFs)
 │   │   ├── html-escape.ts            # esc() for generator HTML strings
-│   │   ├── change-order-generator.ts # Change order HTML + combined WO + approved COs
+│   │   ├── change-order-generator.ts # Change order HTML + combined WO + listed COs
 │   │   ├── agreement-pdf.ts          # PDF HTML wrapper + fetch/download blob (Puppeteer)
 │   │   ├── job-site-address.ts       # Multiline job_location, parse for client autofill, single-line PDF
 │   │   ├── us-phone-input.ts         # US phone mask (JobForm + EditProfilePage)
@@ -245,13 +245,13 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 ### Combined WO + change-order PDFs (v1)
 
 - Agreement body for PDF is built as an HTML **string** via **`agreementSectionsToHtml`** (mirrors **`AgreementDocumentSections`** markup), not from live DOM `outerHTML`.
-- **`buildCombinedWorkOrderAndChangeOrdersHtml`** appends **`page-break-before: always`** and each **approved** change order only.
+- **`buildCombinedWorkOrderAndChangeOrdersHtml`** appends **`page-break-before: always`** and HTML for **each** change order in the array (caller supplies the list; no status filter inside this helper).
 - Client uses **`fetchHtmlPdfBlob`** / **`downloadPdfBlobToFile`** in **`agreement-pdf.ts`** (same `/api/pdf` JSON shape as work orders and invoices).
 
 ### Invoice `line_items[].source`
 
 - **`InvoiceLineItem.source`**: `original_scope` | `change_order` | `labor` | `material` | `manual` | `legacy`. **`mapInvoiceRow`** defaults missing/invalid to **`legacy`**.
-- **New invoice:** **`InvoiceWizard`** loads change orders for the job; checkboxes (approved **on** by default) add **`change_order`** lines. All new built rows set **`source`**.
+- **New invoice:** **`InvoiceWizard`** loads change orders for the job; **all** are **selected** by default (uncheck to omit); selected rows add **`change_order`** lines. All new built rows set **`source`**.
 - **Edit invoice:** Partition by **`source`**. **`change_order`** rows (and **`legacy`** rows whose description matches **`/^Change Order #/`**) are **preserved**. Rows **`original_scope`**, **`labor`**, **`material`**, **`manual`** are **replaced** from wizard state on save. **Order:** **fixed** → rebuilt original scope then preserved CO lines; **T&M** → preserved CO lines then all labor lines then all material lines. **T&M** editing round-trips **all** labor and material lines (not only the first).
 
 ### Work Orders dashboard rollups (Option B)
