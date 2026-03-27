@@ -54,8 +54,7 @@ export function InvoicePreviewModal({ open, onClose, htmlMarkup }: InvoicePrevie
       </div>
       <div className="invoice-preview-modal-scroll">
         <div
-          className="invoice-preview-modal-sheet invoice-preview-page-rhythm"
-          // Paginated print-style rhythm: horizontal rules every Letter-height at 96dpi (see ARCHITECTURE.md).
+          className="invoice-preview-modal-sheet"
           dangerouslySetInnerHTML={{ __html: htmlMarkup }}
         />
       </div>

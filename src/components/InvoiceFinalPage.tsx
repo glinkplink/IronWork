@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { markInvoiceDownloaded, updateInvoice } from '../lib/db/invoices';
@@ -174,11 +174,18 @@ export function InvoiceFinalPage({
         ref={previewViewportRef}
         className="agreement-preview-scale-viewport invoice-final-mini-viewport"
       >
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           className="invoice-final-mini-preview-hitbox"
-          onClick={() => setModalOpen(true)}
           aria-label="Open full invoice preview"
+          onClick={() => setModalOpen(true)}
+          onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setModalOpen(true);
+            }
+          }}
         >
           <div
             className="agreement-preview-scale-spacer"
@@ -203,7 +210,7 @@ export function InvoiceFinalPage({
               />
             </div>
           </div>
-        </button>
+        </div>
       </div>
 
       <div className="invoice-final-actions">

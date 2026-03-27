@@ -39,14 +39,3 @@
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
-
-.invoice-preview-page-rhythm {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(1055px),
-    var(--border) 1055px,
-    var(--border) 1056px
-  );
-  background-size: 100% 1056px;
-}

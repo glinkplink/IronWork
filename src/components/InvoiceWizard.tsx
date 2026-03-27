@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   Job,
   BusinessProfile,
@@ -119,15 +119,11 @@ export function InvoiceWizard({
 
   const [changeOrdersOnJob, setChangeOrdersOnJob] = useState<ChangeOrder[]>([]);
   const [selectedCoIds, setSelectedCoIds] = useState<Set<string>>(() => new Set());
-  // Ref avoids rerendering while preventing async CO load from reapplying defaults.
-  const coSelectionInitialized = useRef(false);
+  /** Job id for which approved COs were auto-selected once (avoids ref/effect ordering race; preserves manual edits). */
+  const [coInitJobId, setCoInitJobId] = useState<string | null>(null);
 
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    coSelectionInitialized.current = false;
-  }, [job.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,12 +138,13 @@ export function InvoiceWizard({
 
   useEffect(() => {
     if (existingInvoice) return;
-    if (coSelectionInitialized.current) return;
-    if (changeOrdersOnJob.length === 0) return;
-    const approved = changeOrdersOnJob.filter((c) => c.status === 'approved').map((c) => c.id);
+    const rowsForJob = changeOrdersOnJob.filter((c) => c.job_id === job.id);
+    if (rowsForJob.length === 0) return;
+    if (coInitJobId === job.id) return;
+    const approved = rowsForJob.filter((c) => c.status === 'approved').map((c) => c.id);
     setSelectedCoIds(new Set(approved));
-    coSelectionInitialized.current = true;
-  }, [changeOrdersOnJob, existingInvoice]);
+    setCoInitJobId(job.id);
+  }, [changeOrdersOnJob, existingInvoice, job.id, coInitJobId]);
 
   const selectedCOs = existingInvoice
     ? []
@@ -660,7 +657,9 @@ export function InvoiceWizard({
 
       {step === 3 ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-flow-section-title">Payment methods</h2>
+          <h2 className="invoice-flow-section-title" id="invoice-wizard-payment-methods-heading">
+            Payment methods
+          </h2>
           <button
             type="button"
             className="invoice-flow-back-link"
@@ -671,7 +670,11 @@ export function InvoiceWizard({
           >
             Back
           </button>
-          <div className="invoice-payment-methods-group" role="group" aria-label="Payment methods">
+          <div
+            className="invoice-payment-methods-group"
+            role="group"
+            aria-labelledby="invoice-wizard-payment-methods-heading"
+          >
             <div className="payment-method-chip-grid">
               {PAYMENT_METHOD_OPTIONS.map((method) => (
                 <label key={method} className="payment-method-chip">

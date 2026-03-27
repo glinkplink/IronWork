@@ -9,6 +9,9 @@ export const PREVIEW_DESKTOP_UPSCALE_MQ = '(min-width: 1024px)';
 /**
  * Shared scaled “mini sheet” preview: viewport + sheet refs, scale, and spacer dimensions
  * (spacer height = sheet.scrollHeight * scale — matches prior previewContentHeight * previewScale).
+ *
+ * Rest arguments are not read as values: they are forwarded as the dependency array for the
+ * layout effect that remeasures sheet height when caller content changes.
  */
 export function useScaledPreview(...heightRefreshDeps: unknown[]) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
