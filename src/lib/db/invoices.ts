@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import type {
+  ChangeOrderInvoiceStatus,
   Invoice,
   InvoiceLineItem,
   InvoiceLineItemSource,
@@ -19,6 +20,14 @@ export type CreateInvoiceInput = {
   total: number;
   payment_methods: string[];
   notes?: string | null;
+};
+
+type BaseInvoiceStatusRow = {
+  id: string;
+  job_id: string;
+  status: 'draft' | 'downloaded';
+  invoice_number: number;
+  created_at: string;
 };
 
 const VALID_LINE_SOURCES: Record<InvoiceLineItemSource, true> = {
@@ -175,6 +184,10 @@ export type ListInvoiceStatusByJobResult =
   | { data: WorkOrderInvoiceStatus[]; error: null; warning: string | null }
   | { data: null; error: Error; warning: null };
 
+export type ListInvoiceStatusByChangeOrderResult =
+  | { data: ChangeOrderInvoiceStatus[]; error: null; warning: string | null }
+  | { data: null; error: Error; warning: null };
+
 /**
  * Latest invoice per job_id: caller should pass rows ordered by created_at desc; first seen wins.
  */
@@ -190,7 +203,19 @@ export function invoiceStatusMapFromRows(
   return map;
 }
 
-function mapInvoiceStatusRow(row: Record<string, unknown>): WorkOrderInvoiceStatus | null {
+export function changeOrderInvoiceStatusMapFromRows(
+  rows: ChangeOrderInvoiceStatus[]
+): Map<string, ChangeOrderInvoiceStatus> {
+  const map = new Map<string, ChangeOrderInvoiceStatus>();
+  for (const inv of rows) {
+    if (!map.has(inv.change_order_id)) {
+      map.set(inv.change_order_id, inv);
+    }
+  }
+  return map;
+}
+
+function mapBaseInvoiceStatusRow(row: Record<string, unknown>): BaseInvoiceStatusRow | null {
   const status = row.status;
   if (status !== 'draft' && status !== 'downloaded') return null;
   const id = row.id;
@@ -210,13 +235,50 @@ function mapInvoiceStatusRow(row: Record<string, unknown>): WorkOrderInvoiceStat
   };
 }
 
+function parseWorkOrderInvoiceStatusRow(
+  row: Record<string, unknown>
+): WorkOrderInvoiceStatus | null | 'ignore' {
+  const base = mapBaseInvoiceStatusRow(row);
+  if (!base) return null;
+  const lineItems = Array.isArray(row.line_items) ? row.line_items : [];
+  for (const item of lineItems) {
+    if (typeof item !== 'object' || item === null) continue;
+    const coId = (item as Record<string, unknown>).change_order_id;
+    if (typeof coId === 'string' && coId.trim()) {
+      return 'ignore';
+    }
+  }
+  return base;
+}
+
+function parseChangeOrderInvoiceStatusRow(
+  row: Record<string, unknown>
+): ChangeOrderInvoiceStatus | null | 'ignore' {
+  const base = mapBaseInvoiceStatusRow(row);
+  if (!base) return null;
+  const lineItems = Array.isArray(row.line_items) ? row.line_items : [];
+  const ids = new Set<string>();
+  for (const item of lineItems) {
+    if (typeof item !== 'object' || item === null) continue;
+    const coId = (item as Record<string, unknown>).change_order_id;
+    if (typeof coId === 'string' && coId.trim()) ids.add(coId);
+  }
+  if (ids.size === 0) return 'ignore';
+  if (ids.size !== 1) return null;
+  const [change_order_id] = ids;
+  return {
+    ...base,
+    change_order_id,
+  };
+}
+
 /** Narrow invoice rows for Work Orders list. Query failure: `{ data: null, error, warning: null }`. Malformed rows are skipped with a non-blocking `warning`. */
 export const listInvoiceStatusByJob = async (
   userId: string
 ): Promise<ListInvoiceStatusByJobResult> => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, job_id, status, invoice_number, created_at')
+    .select('id, job_id, status, invoice_number, created_at, line_items')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -228,12 +290,47 @@ export const listInvoiceStatusByJob = async (
   const out: WorkOrderInvoiceStatus[] = [];
   let malformedCount = 0;
   for (const row of data ?? []) {
-    const mapped = mapInvoiceStatusRow(row as Record<string, unknown>);
-    if (mapped) {
+    const mapped = parseWorkOrderInvoiceStatusRow(row as Record<string, unknown>);
+    if (mapped && mapped !== 'ignore') {
       out.push(mapped);
-    } else {
+    } else if (mapped === null) {
       malformedCount += 1;
       console.error('listInvoiceStatusByJob: malformed invoice row (skipped)', row);
+    }
+  }
+  const warning =
+    malformedCount > 0
+      ? `${malformedCount} invoice row(s) could not be read and were skipped. Other invoices still work.`
+      : null;
+  return { data: out, error: null, warning };
+};
+
+/** Latest invoice per change_order_id inferred from line_items[].change_order_id. */
+export const listInvoiceStatusByChangeOrder = async (
+  userId: string,
+  jobId: string
+): Promise<ListInvoiceStatusByChangeOrderResult> => {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('id, job_id, status, invoice_number, created_at, line_items')
+    .eq('user_id', userId)
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error listing invoice status by change order:', error);
+    return { data: null, error: new Error(error.message), warning: null };
+  }
+
+  const out: ChangeOrderInvoiceStatus[] = [];
+  let malformedCount = 0;
+  for (const row of data ?? []) {
+    const mapped = parseChangeOrderInvoiceStatusRow(row as Record<string, unknown>);
+    if (mapped && mapped !== 'ignore') {
+      out.push(mapped);
+    } else if (mapped === null) {
+      malformedCount += 1;
+      console.error('listInvoiceStatusByChangeOrder: malformed invoice row (skipped)', row);
     }
   }
   const warning =
@@ -276,11 +373,34 @@ export const getInvoiceByJobId = async (jobId: string): Promise<Invoice | null> 
     .select('*')
     .eq('job_id', jobId)
     .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error('Error fetching invoice by job:', error);
+    return null;
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  for (const row of rows) {
+    const mapped = parseWorkOrderInvoiceStatusRow(row as Record<string, unknown>);
+    if (!mapped || mapped === 'ignore') continue;
+    return mapInvoiceRow(row as Record<string, unknown>);
+  }
+  return null;
+};
+
+export const getInvoiceByChangeOrderId = async (jobId: string, changeOrderId: string): Promise<Invoice | null> => {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('job_id', jobId)
+    .contains('line_items', [{ change_order_id: changeOrderId }])
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) {
-    console.error('Error fetching invoice by job:', error);
+    console.error('Error fetching invoice by change order:', error);
     return null;
   }
 

@@ -1,15 +1,19 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Job, Invoice } from '../types/db';
+import type { ChangeOrder, Job, Invoice } from '../types/db';
 import type { AppView } from './useAppNavigation';
 
 export type InvoiceFlowState = {
   invoiceFlowJob: Job | null;
+  invoiceFlowChangeOrder: ChangeOrder | null;
+  invoiceFlowTarget: 'job' | 'change_order' | null;
   wizardExistingInvoice: Invoice | null;
   activeInvoice: Invoice | null;
 };
 
 const initialInvoice: InvoiceFlowState = {
   invoiceFlowJob: null,
+  invoiceFlowChangeOrder: null,
+  invoiceFlowTarget: null,
   wizardExistingInvoice: null,
   activeInvoice: null,
 };
@@ -32,6 +36,23 @@ export function useInvoiceFlow(
       setInvoice((inv) => ({
         ...inv,
         invoiceFlowJob: jobRow,
+        invoiceFlowChangeOrder: null,
+        invoiceFlowTarget: 'job',
+        wizardExistingInvoice: null,
+        activeInvoice: null,
+      }));
+      navigateTo('invoice-wizard');
+    },
+    [navigateTo]
+  );
+
+  const handleStartChangeOrderInvoice = useCallback(
+    (jobRow: Job, changeOrder: ChangeOrder) => {
+      setInvoice((inv) => ({
+        ...inv,
+        invoiceFlowJob: jobRow,
+        invoiceFlowChangeOrder: changeOrder,
+        invoiceFlowTarget: 'change_order',
         wizardExistingInvoice: null,
         activeInvoice: null,
       }));
@@ -45,6 +66,24 @@ export function useInvoiceFlow(
       setInvoice((i) => ({
         ...i,
         invoiceFlowJob: jobRow,
+        invoiceFlowChangeOrder: null,
+        invoiceFlowTarget: 'job',
+        wizardExistingInvoice: null,
+        activeInvoice: inv,
+      }));
+      navigateTo('invoice-final');
+    },
+    [navigateTo]
+  );
+
+  const handleOpenPendingChangeOrderInvoice = useCallback(
+    (jobRow: Job, changeOrder: ChangeOrder, inv: Invoice) => {
+      setInvoice((i) => ({
+        ...i,
+        invoiceFlowJob: jobRow,
+        invoiceFlowChangeOrder: changeOrder,
+        invoiceFlowTarget: 'change_order',
+        wizardExistingInvoice: null,
         activeInvoice: inv,
       }));
       navigateTo('invoice-final');
@@ -74,6 +113,8 @@ export function useInvoiceFlow(
       setInvoice((prev) => ({
         ...prev,
         invoiceFlowJob: null,
+        invoiceFlowChangeOrder: null,
+        invoiceFlowTarget: null,
         activeInvoice: null,
       }));
       navigateTo('work-orders');
@@ -85,6 +126,8 @@ export function useInvoiceFlow(
     setInvoice((i) => ({
       ...i,
       invoiceFlowJob: null,
+      invoiceFlowChangeOrder: null,
+      invoiceFlowTarget: null,
       activeInvoice: null,
       wizardExistingInvoice: null,
     }));
@@ -108,6 +151,8 @@ export function useInvoiceFlow(
       setInvoice((i) => ({
         ...i,
         invoiceFlowJob: null,
+        invoiceFlowChangeOrder: null,
+        invoiceFlowTarget: null,
         activeInvoice: null,
       }));
       void loadProfile({ silent: true });
@@ -127,7 +172,9 @@ export function useInvoiceFlow(
     state: invoice,
     actions: {
       handleStartInvoice,
+      handleStartChangeOrderInvoice,
       handleOpenPendingInvoice,
+      handleOpenPendingChangeOrderInvoice,
       handleInvoiceWizardSuccess,
       handleInvoiceWizardCancel,
       handleInvoiceFinalWorkOrders,

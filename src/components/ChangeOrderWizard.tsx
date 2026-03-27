@@ -63,9 +63,6 @@ export function ChangeOrderWizard({
   const [timeAmount, setTimeAmount] = useState<number>(existingCO?.time_amount ?? 0);
   const [timeUnit, setTimeUnit] = useState<'hours' | 'days'>(existingCO?.time_unit ?? 'days');
   const [timeNote, setTimeNote] = useState(existingCO?.time_note ?? '');
-  const [requiresApproval, setRequiresApproval] = useState(
-    existingCO?.requires_approval ?? true
-  );
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -129,7 +126,7 @@ export function ChangeOrderWizard({
     const fields = {
       description: description.trim(),
       reason: reasonValue,
-      requires_approval: requiresApproval,
+      requires_approval: true,
       line_items: lineItems.filter((row) => {
         const q = row.quantity;
         const ur = row.unit_rate;
@@ -149,10 +146,9 @@ export function ChangeOrderWizard({
     setSubmitting(true);
     try {
       if (existingCO) {
-        const nextStatus: ChangeOrder['status'] = requiresApproval ? 'pending_approval' : 'approved';
         const { data, error: upErr } = await updateChangeOrder(userId, existingCO.id, {
           ...fields,
-          status: nextStatus,
+          status: 'approved',
         });
         if (upErr || !data) {
           setError(upErr?.message || 'Could not save change order.');
@@ -450,15 +446,6 @@ export function ChangeOrderWizard({
               </div>
             ) : null}
           </div>
-
-          <label className="co-approval-check">
-            <input
-              type="checkbox"
-              checked={requiresApproval}
-              onChange={(e) => setRequiresApproval(e.target.checked)}
-            />
-            <span>Needs client sign-off before invoicing</span>
-          </label>
 
           <div className="co-wizard-footer">
             <button type="button" className="btn-secondary btn-large co-wizard-back" onClick={goBack}>

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Job, BusinessProfile, ChangeOrder, Invoice } from '../types/db';
+import type {
+  BusinessProfile,
+  ChangeOrder,
+  ChangeOrderInvoiceStatus,
+  Job,
+} from '../types/db';
 import { generateAgreement } from '../lib/agreement-generator';
 import { jobRowToWelderJob } from '../lib/job-to-welder-job';
 import {
@@ -15,27 +20,32 @@ import {
 import { agreementSectionsToHtml } from '../lib/agreement-sections-html';
 import { buildCombinedWorkOrderAndChangeOrdersHtml } from '../lib/change-order-generator';
 import { AgreementDocumentSections } from './AgreementDocumentSections';
-import { listChangeOrders, computeCOTotal } from '../lib/db/change-orders';
-import { getInvoiceByJobId } from '../lib/db/invoices';
+import { computeCOTotal, listChangeOrders } from '../lib/db/change-orders';
+import {
+  changeOrderInvoiceStatusMapFromRows,
+  listInvoiceStatusByChangeOrder,
+} from '../lib/db/invoices';
 import './WorkOrderDetailPage.css';
 
 interface WorkOrderDetailPageProps {
+  userId: string;
   job: Job;
   profile: BusinessProfile | null;
   changeOrderListVersion?: number;
   onBack: () => void;
   onStartChangeOrder: () => void;
-  onStartInvoice: (inv: Invoice | null) => void;
+  onStartChangeOrderInvoice: (co: ChangeOrder, invoiceId: string | null) => void;
   onOpenCODetail: (co: ChangeOrder) => void;
 }
 
 export function WorkOrderDetailPage({
+  userId,
   job,
   profile,
   changeOrderListVersion = 0,
   onBack,
   onStartChangeOrder,
-  onStartInvoice,
+  onStartChangeOrderInvoice,
   onOpenCODetail,
 }: WorkOrderDetailPageProps) {
   const documentRef = useRef<HTMLDivElement | null>(null);
@@ -45,7 +55,11 @@ export function WorkOrderDetailPage({
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([]);
   const [coLoading, setCoLoading] = useState(true);
   const [coError, setCoError] = useState('');
-  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [coInvoiceStatusLoading, setCoInvoiceStatusLoading] = useState(true);
+  const [coInvoiceStatusError, setCoInvoiceStatusError] = useState<string | null>(null);
+  const [coInvoiceStatusRows, setCoInvoiceStatusRows] = useState<ChangeOrderInvoiceStatus[] | null>(
+    null
+  );
 
   const welderJob = useMemo(() => jobRowToWelderJob(job, profile), [job, profile]);
   const sections = useMemo(() => generateAgreement(welderJob, profile), [welderJob, profile]);
@@ -73,8 +87,30 @@ export function WorkOrderDetailPage({
   }, [loadCOs, changeOrderListVersion]);
 
   useEffect(() => {
-    void getInvoiceByJobId(job.id).then(setInvoice);
-  }, [job.id]);
+    let cancelled = false;
+    setCoInvoiceStatusLoading(true);
+    setCoInvoiceStatusError(null);
+    setCoInvoiceStatusRows(null);
+
+    void (async () => {
+      const result = await listInvoiceStatusByChangeOrder(userId, job.id);
+      if (cancelled) return;
+      setCoInvoiceStatusLoading(false);
+      if (result.error) {
+        setCoInvoiceStatusError(
+          `Could not load invoice status (${result.error.message}). Invoice actions are unavailable.`
+        );
+        setCoInvoiceStatusRows(null);
+      } else {
+        setCoInvoiceStatusError(null);
+        setCoInvoiceStatusRows(result.data);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [job.id, userId, changeOrderListVersion]);
 
   const handleDownloadPdf = async () => {
     setPdfError('');
@@ -100,18 +136,17 @@ export function WorkOrderDetailPage({
     };
   }, [profile, welderJob]);
 
+  const coInvoiceById = useMemo(() => {
+    if (coInvoiceStatusRows === null) return null;
+    return changeOrderInvoiceStatusMapFromRows(coInvoiceStatusRows);
+  }, [coInvoiceStatusRows]);
+
   const downloadCombinedPdf = async () => {
     setPdfError('');
     setDownloading(true);
     try {
       const innerWo = `<div class="agreement-document">${agreementSectionsToHtml(sections)}</div>`;
-      const approved = changeOrders.filter((c) => c.status === 'approved');
-      const combined = buildCombinedWorkOrderAndChangeOrdersHtml(
-        innerWo,
-        approved,
-        job,
-        profile
-      );
+      const combined = buildCombinedWorkOrderAndChangeOrdersHtml(innerWo, changeOrders, job, profile);
       const blob = await fetchHtmlPdfBlob({
         filename: getPdfFilename(welderJob.wo_number, job.customer_name),
         innerMarkup: combined,
@@ -126,8 +161,6 @@ export function WorkOrderDetailPage({
       setDownloading(false);
     }
   };
-
-  const approvedCount = changeOrders.filter((c) => c.status === 'approved').length;
 
   return (
     <div className="work-order-detail-page">
@@ -154,36 +187,13 @@ export function WorkOrderDetailPage({
       </div>
 
       <p className="co-section-label" style={{ marginTop: 'var(--space-lg)' }}>
-        Invoice
-      </p>
-      <div className="work-orders-row wo-detail-invoice-strip">
-        <div className="work-orders-row-main">
-          <span className="work-orders-meta wo-detail-invoice-meta">
-            {invoice
-              ? `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`
-              : 'No invoice yet for this work order.'}
-          </span>
-        </div>
-        <div className="work-orders-row-actions">
-          {!invoice ? (
-            <button type="button" className="wo-row-create-invoice-outline" onClick={() => onStartInvoice(null)}>
-              Invoice
-            </button>
-          ) : invoice.status === 'draft' ? (
-            <button type="button" className="badge-pending" onClick={() => onStartInvoice(invoice)}>
-              Pending
-            </button>
-          ) : (
-            <button type="button" className="badge-invoiced" onClick={() => onStartInvoice(invoice)}>
-              Invoiced
-            </button>
-          )}
-        </div>
-      </div>
-
-      <p className="co-section-label" style={{ marginTop: 'var(--space-lg)' }}>
         Change orders
       </p>
+      {coInvoiceStatusError ? (
+        <p className="work-orders-empty" role="alert">
+          {coInvoiceStatusError}
+        </p>
+      ) : null}
       {coError ? (
         <p className="work-orders-empty" role="alert">
           {coError}
@@ -194,24 +204,73 @@ export function WorkOrderDetailPage({
         <p className="work-orders-empty">No change orders yet.</p>
       ) : (
         <ul className="work-orders-list" style={{ listStyle: 'none', margin: '0 0 var(--space-lg)', padding: 0 }}>
-          {changeOrders.map((co) => (
-            <li key={co.id} className="co-list-item">
-              <div className="work-orders-row-main">
-                <button
-                  type="button"
-                  className="work-orders-row-detail-hit"
-                  onClick={() => onOpenCODetail(co)}
-                >
-                  <span className="co-list-number">CO #{String(co.co_number).padStart(4, '0')}</span>
-                  <span className="co-list-desc">{co.description || '—'}</span>
-                </button>
-                <span className="work-orders-meta">
-                  <span className={`co-status-badge ${co.status === 'pending_approval' ? 'pending' : co.status}`}>{co.status.replace('_', ' ')}</span>
-                  {' '}${computeCOTotal(co.line_items).toFixed(2)}
-                </span>
-              </div>
-            </li>
-          ))}
+          {changeOrders.map((co) => {
+            const inv = coInvoiceById?.get(co.id) ?? null;
+            return (
+              <li key={co.id} className="co-list-item">
+                <div className="work-orders-row-main">
+                  <button
+                    type="button"
+                    className="work-orders-row-detail-hit"
+                    onClick={() => onOpenCODetail(co)}
+                  >
+                    <span className="co-list-number">CO #{String(co.co_number).padStart(4, '0')}</span>
+                    <span className="co-list-desc">{co.description || '—'}</span>
+                  </button>
+                  <span className="work-orders-meta">
+                    <span className={`co-status-badge ${co.status === 'pending_approval' ? 'pending' : co.status}`}>
+                      {co.status.replace('_', ' ')}
+                    </span>
+                    {' '}${computeCOTotal(co.line_items).toFixed(2)}
+                  </span>
+                </div>
+                <div className="work-orders-row-actions">
+                  {coInvoiceStatusLoading ? (
+                    <button
+                      type="button"
+                      className="wo-row-create-invoice-outline work-orders-invoice-status-loading"
+                      disabled
+                      aria-busy="true"
+                    >
+                      Loading…
+                    </button>
+                  ) : coInvoiceStatusError ? (
+                    <button
+                      type="button"
+                      className="wo-row-create-invoice-outline work-orders-invoice-status-unavailable"
+                      disabled
+                    >
+                      Unavailable
+                    </button>
+                  ) : !inv ? (
+                    <button
+                      type="button"
+                      className="wo-row-create-invoice-outline"
+                      onClick={() => onStartChangeOrderInvoice(co, null)}
+                    >
+                      Invoice
+                    </button>
+                  ) : inv.status === 'draft' ? (
+                    <button
+                      type="button"
+                      className="badge-pending"
+                      onClick={() => onStartChangeOrderInvoice(co, inv.id)}
+                    >
+                      Pending
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="badge-invoiced"
+                      onClick={() => onStartChangeOrderInvoice(co, inv.id)}
+                    >
+                      Invoiced
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -235,9 +294,9 @@ export function WorkOrderDetailPage({
         <button
           type="button"
           className="btn-secondary btn-large work-order-detail-download"
-          disabled={downloading || approvedCount === 0}
+          disabled={downloading || changeOrders.length === 0}
           onClick={() => void downloadCombinedPdf()}
-          title={approvedCount === 0 ? 'No approved change orders' : undefined}
+          title={changeOrders.length === 0 ? 'No change orders' : undefined}
         >
           Download WO + Changes
         </button>

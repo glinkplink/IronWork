@@ -44,6 +44,7 @@ type BuildInvoiceLineItemsOpts = {
   materialsYes: boolean;
   materialRows: MaterialRow[];
   selectedCOs: ChangeOrder[];
+  includeBaseScope?: boolean;
   existingLineItems?: InvoiceLineItem[];
 };
 
@@ -368,18 +369,21 @@ function mergeEditedInvoiceLineItems(
 }
 
 export function buildInvoiceLineItems(opts: BuildInvoiceLineItemsOpts): InvoiceLineItem[] {
+  const includeBaseScope = opts.includeBaseScope ?? true;
   const structuredLineMetadata = opts.existingLineItems
     ? hasStructuredInvoiceLineMetadata(opts.existingLineItems)
     : false;
   const idPool = buildEditableIdPool(opts.existingLineItems ?? []);
-  const editable = buildEditableInvoiceLineItems(
-    opts.job,
-    opts.fixedTotal,
-    opts.laborRows,
-    opts.materialsYes,
-    opts.materialRows,
-    idPool
-  );
+  const editable = includeBaseScope
+    ? buildEditableInvoiceLineItems(
+        opts.job,
+        opts.fixedTotal,
+        opts.laborRows,
+        opts.materialsYes,
+        opts.materialRows,
+        idPool
+      )
+    : [];
 
   if (opts.existingLineItems) {
     return mergeEditedInvoiceLineItems(opts.existingLineItems, editable, structuredLineMetadata);

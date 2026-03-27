@@ -68,6 +68,7 @@ function InvoicePreviewSummary({
 interface InvoiceWizardProps {
   userId: string;
   job: Job;
+  changeOrder: ChangeOrder | null;
   profile: BusinessProfile;
   existingInvoice: Invoice | null;
   onCancel: () => void;
@@ -77,11 +78,13 @@ interface InvoiceWizardProps {
 export function InvoiceWizard({
   userId,
   job,
+  changeOrder,
   profile,
   existingInvoice,
   onCancel,
   onSuccess,
 }: InvoiceWizardProps) {
+  const isChangeOrderInvoice = changeOrder !== null;
   const initial = useMemo(() => {
     if (existingInvoice) {
       return {
@@ -138,17 +141,23 @@ export function InvoiceWizard({
 
   useEffect(() => {
     if (existingInvoice) return;
+    if (isChangeOrderInvoice && changeOrder) {
+      setSelectedCoIds(new Set([changeOrder.id]));
+      setCoInitJobId(job.id);
+      return;
+    }
     const rowsForJob = changeOrdersOnJob.filter((c) => c.job_id === job.id);
     if (rowsForJob.length === 0) return;
     if (coInitJobId === job.id) return;
-    const approved = rowsForJob.filter((c) => c.status === 'approved').map((c) => c.id);
-    setSelectedCoIds(new Set(approved));
+    setSelectedCoIds(new Set(rowsForJob.map((c) => c.id)));
     setCoInitJobId(job.id);
-  }, [changeOrdersOnJob, existingInvoice, job.id, coInitJobId]);
+  }, [changeOrdersOnJob, existingInvoice, isChangeOrderInvoice, changeOrder, job.id, coInitJobId]);
 
   const selectedCOs = existingInvoice
     ? []
-    : changeOrdersOnJob.filter((c) => selectedCoIds.has(c.id));
+    : changeOrdersOnJob.filter((c) =>
+        isChangeOrderInvoice && changeOrder ? c.id === changeOrder.id : selectedCoIds.has(c.id)
+      );
 
   const mergedLineItems = buildInvoiceLineItems({
     job,
@@ -157,6 +166,7 @@ export function InvoiceWizard({
     materialsYes: materialsYes === true,
     materialRows,
     selectedCOs,
+    includeBaseScope: !isChangeOrderInvoice,
     existingLineItems: existingInvoice?.line_items,
   });
 
@@ -341,13 +351,13 @@ export function InvoiceWizard({
   };
 
   const coPickerSection =
-    !existingInvoice && changeOrdersOnJob.length > 0 ? (
+    !existingInvoice && !isChangeOrderInvoice && changeOrdersOnJob.length > 0 ? (
       <div className="invoice-co-picker">
         <h3 className="invoice-flow-section-title" style={{ fontSize: '1rem' }}>
           Change orders on this job
         </h3>
         <p className="content-note" style={{ marginBottom: 12 }}>
-          Include approved change orders as invoice lines. Uncheck any you do not bill on this invoice.
+          Include change orders as invoice lines. Uncheck any you do not bill on this invoice.
         </p>
         <ul className="invoice-co-picker-list">
           {changeOrdersOnJob.map((co) => (
@@ -396,7 +406,39 @@ export function InvoiceWizard({
         </div>
       ) : null}
 
-      {step === 1 && job.price_type === 'fixed' ? (
+      {step === 1 && isChangeOrderInvoice && changeOrder ? (
+        <section className="invoice-wizard-step">
+          <h2 className="invoice-flow-section-title">Pricing</h2>
+          {editCoNote}
+          <p className="content-note" style={{ marginBottom: 16 }}>
+            This invoice is for CO #{String(changeOrder.co_number).padStart(4, '0')} only.
+          </p>
+          <div className="form-group">
+            <label htmlFor="fixed-tax">Tax (%)</label>
+            <input
+              id="fixed-tax"
+              type="number"
+              min={0}
+              step="0.01"
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(e.target.value)}
+            />
+          </div>
+          <InvoicePreviewSummary
+            subtotal={subtotal}
+            tax_amount={tax_amount}
+            total={total}
+            tax_rate={taxRate}
+          />
+          <div className="invoice-wizard-step-actions">
+            <button type="button" className="btn-primary btn-large" onClick={handleFixedConfirm}>
+              Confirm
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {step === 1 && !isChangeOrderInvoice && job.price_type === 'fixed' ? (
         <section className="invoice-wizard-step">
           <h2 className="invoice-flow-section-title">Pricing</h2>
           {editCoNote}
@@ -437,7 +479,7 @@ export function InvoiceWizard({
         </section>
       ) : null}
 
-      {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'labor' ? (
+      {step === 1 && !isChangeOrderInvoice && job.price_type !== 'fixed' && pricingSubStep === 'labor' ? (
         <section className="invoice-wizard-step">
           <h2 className="invoice-flow-section-title">Labor</h2>
           {editCoNote}
@@ -516,7 +558,7 @@ export function InvoiceWizard({
         </section>
       ) : null}
 
-      {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'materials' ? (
+      {step === 1 && !isChangeOrderInvoice && job.price_type !== 'fixed' && pricingSubStep === 'materials' ? (
         <section className="invoice-wizard-step">
           <h2 className="invoice-flow-section-title">Materials</h2>
           <button
@@ -631,7 +673,7 @@ export function InvoiceWizard({
             onClick={() => {
               setError('');
               setStep(1);
-              if (job.price_type !== 'fixed') {
+              if (!isChangeOrderInvoice && job.price_type !== 'fixed') {
                 setPricingSubStep('materials');
               }
             }}

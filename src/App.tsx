@@ -10,6 +10,7 @@ import { useAuthProfile } from './hooks/useAuthProfile';
 import { upsertProfile } from './lib/db/profile';
 import { signUp } from './lib/auth';
 import { getDefaultCustomerObligations, getDefaultExclusions } from './lib/defaults';
+import { getInvoice } from './lib/db/invoices';
 import type { BusinessProfile, Job } from './types/db';
 import { Settings } from 'lucide-react';
 import { WorkOrdersPage } from './components/WorkOrdersPage';
@@ -199,21 +200,25 @@ function App() {
         />
       );
     }
-    if (view === 'work-order-detail' && profile && workOrderDetailJob) {
+    if (view === 'work-order-detail' && user && profile && workOrderDetailJob) {
       return (
         <WorkOrderDetailPage
           key={`${workOrderDetailJob.id}-${changeOrderListVersion}`}
+          userId={user.id}
           job={workOrderDetailJob}
           profile={profile}
           changeOrderListVersion={changeOrderListVersion}
           onBack={handleBackFromWorkOrderDetail}
           onStartChangeOrder={changeOrderFlow.handleStartChangeOrderFromDetail}
-          onStartInvoice={(inv) => {
-            if (inv) {
-              invoiceFlow.handleOpenPendingInvoice(workOrderDetailJob, inv);
-            } else {
-              invoiceFlow.handleStartInvoice(workOrderDetailJob);
+          onStartChangeOrderInvoice={(co, invoiceId) => {
+            if (!invoiceId) {
+              invoiceFlow.handleStartChangeOrderInvoice(workOrderDetailJob, co);
+              return;
             }
+            void getInvoice(invoiceId).then((inv) => {
+              if (!inv) return;
+              invoiceFlow.handleOpenPendingChangeOrderInvoice(workOrderDetailJob, co, inv);
+            });
           }}
           onOpenCODetail={changeOrderFlow.handleOpenCODetail}
         />
@@ -227,14 +232,9 @@ function App() {
           co={changeOrder.coDetailCO}
           job={workOrderDetailJob}
           profile={profile}
-          invoice={null}
           onBack={changeOrderFlow.handleBackFromCODetail}
           onEdit={changeOrderFlow.handleEditCOFromDetail}
           onDelete={changeOrderFlow.handleDeleteCOFromDetail}
-          onStartInvoice={() => invoiceFlow.handleStartInvoice(workOrderDetailJob)}
-          onOpenPendingInvoice={(inv) =>
-            invoiceFlow.handleOpenPendingInvoice(workOrderDetailJob, inv)
-          }
         />
       );
     }
@@ -254,9 +254,10 @@ function App() {
     if (view === 'invoice-wizard' && user && profile && invoice.invoiceFlowJob) {
       return (
         <InvoiceWizard
-          key={`${invoice.invoiceFlowJob.id}-${invoice.wizardExistingInvoice?.id ?? 'new'}`}
+          key={`${invoice.invoiceFlowJob.id}-${invoice.invoiceFlowChangeOrder?.id ?? 'job'}-${invoice.wizardExistingInvoice?.id ?? 'new'}`}
           userId={user.id}
           job={invoice.invoiceFlowJob}
+          changeOrder={invoice.invoiceFlowTarget === 'change_order' ? invoice.invoiceFlowChangeOrder : null}
           profile={profile}
           existingInvoice={invoice.wizardExistingInvoice}
           onCancel={invoiceFlow.handleInvoiceWizardCancel}

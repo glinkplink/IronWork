@@ -94,7 +94,7 @@ export async function createChangeOrder(
   jobId: string,
   fields: CreateChangeOrderFields
 ): Promise<{ data: ChangeOrder | null; error: Error | null }> {
-  const status: ChangeOrder['status'] = fields.requires_approval ? 'pending_approval' : 'approved';
+  const status: ChangeOrder['status'] = 'approved';
   const row = {
     p_user_id: userId,
     p_job_id: jobId,

@@ -1,31 +1,22 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
-import type { Job, BusinessProfile, ChangeOrder } from '../../types/db';
-import { WorkOrderDetailPage } from '../WorkOrderDetailPage';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { BusinessProfile, ChangeOrder, Invoice, Job } from '../../types/db';
+import { InvoiceWizard } from '../InvoiceWizard';
 
+const createInvoice = vi.fn();
+const updateInvoice = vi.fn();
 const listChangeOrders = vi.fn();
-const listInvoiceStatusByChangeOrder = vi.fn();
-
-vi.mock('../../lib/db/change-orders', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../lib/db/change-orders')>();
-  return {
-    ...actual,
-    listChangeOrders: (...args: unknown[]) => listChangeOrders(...args),
-  };
-});
 
 vi.mock('../../lib/db/invoices', () => ({
-  changeOrderInvoiceStatusMapFromRows: (rows: unknown[]) => {
-    const map = new Map<string, (typeof rows)[number]>();
-    rows.forEach((row) => {
-      const record = row as { change_order_id: string };
-      if (!map.has(record.change_order_id)) map.set(record.change_order_id, row);
-    });
-    return map;
-  },
-  listInvoiceStatusByChangeOrder: (...args: unknown[]) => listInvoiceStatusByChangeOrder(...args),
+  createInvoice: (...args: unknown[]) => createInvoice(...args),
+  updateInvoice: (...args: unknown[]) => updateInvoice(...args),
+}));
+
+vi.mock('../../lib/db/change-orders', () => ({
+  listChangeOrders: (...args: unknown[]) => listChangeOrders(...args),
 }));
 
 function minimalJob(): Job {
@@ -109,8 +100,8 @@ function makeCO(n: number, description: string): ChangeOrder {
     description,
     reason: 'reason',
     status: 'approved',
-    requires_approval: false,
-    line_items: [],
+    requires_approval: true,
+    line_items: [{ id: `li-${n}`, description: 'Extra', quantity: 2, unit_rate: 50 }],
     time_amount: 0,
     time_unit: 'hours',
     time_note: '',
@@ -119,38 +110,60 @@ function makeCO(n: number, description: string): ChangeOrder {
   };
 }
 
-describe('WorkOrderDetailPage', () => {
+function renderWizard(opts?: { changeOrder?: ChangeOrder | null; existingInvoice?: Invoice | null }) {
+  const onSuccess = vi.fn();
+  render(
+    <InvoiceWizard
+      userId="u1"
+      job={minimalJob()}
+      changeOrder={opts?.changeOrder ?? null}
+      profile={minimalProfile()}
+      existingInvoice={opts?.existingInvoice ?? null}
+      onCancel={() => {}}
+      onSuccess={onSuccess}
+    />
+  );
+  return { onSuccess };
+}
+
+describe('InvoiceWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    listInvoiceStatusByChangeOrder.mockResolvedValue({ data: [], error: null, warning: null });
     listChangeOrders.mockResolvedValue([makeCO(1, 'First'), makeCO(2, 'Second')]);
+    createInvoice.mockResolvedValue({
+      data: { id: 'inv-1', invoice_number: 1 },
+      error: null,
+    });
+    updateInvoice.mockResolvedValue({ data: null, error: null });
   });
 
-  it('shows one invoice control per change-order row and no job-level invoice strip', async () => {
-    render(
-      <WorkOrderDetailPage
-        userId="u1"
-        job={minimalJob()}
-        profile={minimalProfile()}
-        onBack={() => {}}
-        onStartChangeOrder={() => {}}
-        onStartChangeOrderInvoice={() => {}}
-        onOpenCODetail={() => {}}
-      />
-    );
+  it('creates a CO-scoped invoice without showing the multi-CO picker', async () => {
+    const user = userEvent.setup();
+    renderWizard({ changeOrder: makeCO(2, 'Second') });
 
-    await screen.findByText('CO #0001');
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /^Invoice$/i })).toHaveLength(2);
+      expect(screen.getByText(/CO #0002 only/i)).toBeInTheDocument();
     });
+    expect(screen.queryByText(/Change orders on this job/i)).toBeNull();
 
-    expect(screen.queryByText(/^Invoice #/i)).toBeNull();
+    await user.click(screen.getByRole('button', { name: /confirm/i }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(screen.getByRole('button', { name: /generate invoice/i }));
 
-    const coList = document.querySelector('ul.work-orders-list');
-    expect(coList).toBeTruthy();
     await waitFor(() => {
-      expect(within(coList as HTMLElement).getAllByRole('listitem')).toHaveLength(2);
+      expect(createInvoice).toHaveBeenCalledTimes(1);
     });
-    expect(within(coList as HTMLElement).getAllByRole('button', { name: /^Invoice$/i })).toHaveLength(2);
+    const payload = createInvoice.mock.calls[0][0];
+    expect(payload.line_items).toHaveLength(1);
+    expect(payload.line_items[0].change_order_id).toBe('co-2');
+    expect(payload.line_items[0].source).toBe('change_order');
+  });
+
+  it('keeps the job invoice flow showing the change-order picker', async () => {
+    renderWizard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Change orders on this job/i)).toBeInTheDocument();
+    });
   });
 });

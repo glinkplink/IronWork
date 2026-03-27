@@ -198,18 +198,17 @@ export function generateChangeOrderHtml(
 }
 
 /**
- * Work order agreement inner HTML + page breaks + each approved change order.
+ * Work order agreement inner HTML + page breaks + each saved change order.
  * `workOrderInnerHtml` should be `<div class="agreement-document">…sections…</div>`.
  */
 export function buildCombinedWorkOrderAndChangeOrdersHtml(
   workOrderInnerHtml: string,
-  approvedChangeOrders: ChangeOrder[],
+  changeOrders: ChangeOrder[],
   job: Job,
   profile: BusinessProfile | null
 ): string {
   const parts: string[] = [workOrderInnerHtml];
-  for (const co of approvedChangeOrders) {
-    if (co.status !== 'approved') continue;
+  for (const co of changeOrders) {
     parts.push(
       `<div class="pdf-page-break" style="page-break-before:always;break-before:page;"></div>${generateChangeOrderHtml(co, job, profile)}`
     );

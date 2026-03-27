@@ -103,6 +103,15 @@ export interface WorkOrderInvoiceStatus {
   created_at: string;
 }
 
+export interface ChangeOrderInvoiceStatus {
+  id: string;
+  job_id: string;
+  change_order_id: string;
+  status: 'draft' | 'downloaded';
+  invoice_number: number;
+  created_at: string;
+}
+
 export type InvoiceLineItemSource =
   | 'original_scope'
   | 'change_order'
