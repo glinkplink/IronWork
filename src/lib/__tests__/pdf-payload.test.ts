@@ -3,6 +3,9 @@ import { describe, it, expect, vi } from 'vitest';
 // agreement-pdf.ts imports App.css with Vite's ?raw suffix, which is not
 // available in the Node/Vitest environment. Stub it out before importing.
 vi.mock('../../App.css?raw', () => ({ default: '/* stubbed */' }));
+vi.mock('../change-order-document.css?raw', () => ({
+  default: '.change-order-document .parties-layout.co-doc-parties { padding-top: 5px; }',
+}));
 
 import {
   getPdfFilename,
@@ -226,6 +229,10 @@ describe('buildPdfHtml', () => {
     expect(html).toContain('</html>');
   });
 
+  it('inlines change-order document CSS for CO PDF layout', () => {
+    expect(buildPdfHtml('')).toContain('.change-order-document .parties-layout.co-doc-parties');
+  });
+
   it('includes Barlow font link', () => {
     expect(buildPdfHtml('')).toContain('Barlow');
   });
@@ -291,6 +298,12 @@ describe('generateChangeOrderHtml', () => {
 
   it('returns a non-empty string', () => {
     expect(html.length).toBeGreaterThan(0);
+  });
+
+  it('wraps parties, main body, and approval for PDF layout', () => {
+    expect(html).toContain('parties-layout co-doc-parties');
+    expect(html).toContain('class="co-doc-main"');
+    expect(html).toContain('class="co-doc-approval"');
   });
 
   it('contains the CO number', () => {

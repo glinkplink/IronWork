@@ -19,6 +19,7 @@ import {
 } from '../lib/agreement-pdf';
 import { agreementSectionsToHtml } from '../lib/agreement-sections-html';
 import { buildCombinedWorkOrderAndChangeOrdersHtml } from '../lib/change-order-generator';
+import '../lib/change-order-document.css';
 import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { computeCOTotal, listChangeOrders } from '../lib/db/change-orders';
 import {

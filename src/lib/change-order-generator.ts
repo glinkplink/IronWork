@@ -39,7 +39,7 @@ function partiesMarkup(
   const jobSite = esc(jobLocationSingleLine(job.job_location));
 
   return `
-    <div class="parties-layout">
+    <div class="parties-layout co-doc-parties">
       <div class="parties-plain">
         <div class="parties-plain-row">
           <span class="parties-plain-label">Date:</span>
@@ -158,18 +158,23 @@ export function generateChangeOrderHtml(
 
   const approvalBlock = co.requires_approval
     ? `
+      <div class="co-doc-approval">
       <h3 class="section-title">Approval</h3>
       <p class="content-paragraph">The Customer acknowledges and agrees to this change order by signing below.</p>
-      ${signatureBlocks(job, profile)}`
+      ${signatureBlocks(job, profile)}
+      </div>`
     : `
+      <div class="co-doc-approval">
       <h3 class="section-title">Approval</h3>
-      <p class="content-paragraph">This change order has been documented and does not require separate approval per the agreement terms.</p>`;
+      <p class="content-paragraph">This change order has been documented and does not require separate approval per the agreement terms.</p>
+      </div>`;
 
   return `
     <div class="agreement-document change-order-document">
       <h2 class="invoice-title">${coNum}</h2>
       <p class="co-doc-wo-ref">Applies to ${esc(woNum)}</p>
       ${partiesMarkup(dateStr, profile, job)}
+      <div class="co-doc-main">
       <h3 class="section-title">Description of change</h3>
       <p class="content-paragraph">${esc(co.description).replaceAll('\n', '<br />')}</p>
       <h3 class="section-title">Reason</h3>
@@ -190,6 +195,7 @@ export function generateChangeOrderHtml(
       </table>
       <p class="content-paragraph" style="text-align:right;font-weight:600;">Total: ${esc(formatPrice(total))}</p>
       ${scheduleBlock}
+      </div>
       ${approvalBlock}
     </div>
   `;

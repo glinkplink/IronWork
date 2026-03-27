@@ -1,6 +1,7 @@
 import type { WelderJob } from '../types';
 import type { BusinessProfile, Invoice, Job } from '../types/db';
 import appCss from '../App.css?raw';
+import changeOrderDocumentCss from './change-order-document.css?raw';
 
 export function getPdfFilename(woNumber: number, customerName: string): string {
   const sanitized = (customerName || 'customer').replace(/\s+/g, '_');
@@ -35,6 +36,8 @@ export function buildPdfHtml(previewMarkup: string): string {
     />
     <style>
       ${appCss}
+
+      ${changeOrderDocumentCss}
 
       :root {
         color-scheme: light;

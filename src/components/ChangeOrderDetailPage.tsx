@@ -8,6 +8,7 @@ import {
   downloadPdfBlobToFile,
 } from '../lib/agreement-pdf';
 import { generateChangeOrderHtml } from '../lib/change-order-generator';
+import '../lib/change-order-document.css';
 import { computeCOTotal, deleteChangeOrder } from '../lib/db/change-orders';
 import { jobRowToWelderJob } from '../lib/job-to-welder-job';
 import './ChangeOrderDetailPage.css';
@@ -123,7 +124,7 @@ export function ChangeOrderDetailPage({
           disabled={downloading}
           onClick={() => void handleDownload()}
         >
-          {downloading ? 'Downloading…' : 'Download CO'}
+          {downloading ? 'Downloading…' : 'Download Change Order'}
         </button>
         <button
           type="button"

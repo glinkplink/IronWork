@@ -1,0 +1,32 @@
+/* Change order PDF + preview body (from change-order-generator.ts). Scoped to .change-order-document only. */
+
+.change-order-document .parties-layout.co-doc-parties {
+  padding-top: 5px;
+}
+
+.change-order-document .parties-layout.co-doc-parties > .parties-plain:last-child {
+  margin-bottom: 4rem;
+}
+
+.change-order-document .co-doc-main .section-title {
+  margin-top: 2rem;
+}
+
+.change-order-document .co-doc-main > .section-title:first-child {
+  margin-top: 0;
+}
+
+.change-order-document .co-doc-main .content-paragraph {
+  margin-bottom: 1.25rem;
+}
+
+.change-order-document .co-doc-main .content-table {
+  margin-bottom: 1.25rem;
+}
+
+.change-order-document .co-doc-approval {
+  page-break-before: always;
+  break-before: page;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
