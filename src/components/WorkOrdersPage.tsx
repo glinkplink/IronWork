@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BusinessProfile, Job, Invoice, WorkOrderListJob, WorkOrderInvoiceStatus } from '../types/db';
+import { useEffect, useMemo, useState } from 'react';
+import type {
+  BusinessProfile,
+  Job,
+  Invoice,
+  WorkOrderListJob,
+  WorkOrderInvoiceStatus,
+} from '../types/db';
 import { listJobsForWorkOrders, getJobById } from '../lib/db/jobs';
-import {
-  listInvoiceStatusByJob,
-  getInvoice,
-  invoiceStatusMapFromRows,
-} from '../lib/db/invoices';
+import { listInvoiceStatusByJob, getInvoice, invoiceStatusMapFromRows } from '../lib/db/invoices';
+import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
 import './WorkOrdersPage.css';
 
 const HIDE_COMPLETE_PROFILE_CTA_PREFIX = 'scope-lock-hide-complete-profile-cta:';
@@ -63,12 +66,20 @@ export function WorkOrdersPage({
   const [invoiceStatusError, setInvoiceStatusError] = useState<string | null>(null);
   /** Non-null array only after a successful invoice-status fetch (may be empty). */
   const [invoiceStatusRows, setInvoiceStatusRows] = useState<WorkOrderInvoiceStatus[] | null>(null);
-  const [actionLoadingJobIds, setActionLoadingJobIds] = useState<Set<string>>(() => new Set());
-  /** Synchronous guard so rapid double-clicks on one row do not start duplicate hydrations. */
-  const actionLoadingIdsRef = useRef<Set<string>>(new Set());
 
-  const jobCacheRef = useRef<Map<string, Job>>(new Map());
-  const invoiceCacheRef = useRef<Map<string, Invoice>>(new Map());
+  const {
+    busyJobIds: actionLoadingJobIds,
+    handleOpenDetail,
+    handleStartInvoice,
+    handleOpenPendingInvoice,
+  } = useWorkOrderRowActions({
+    userId,
+    getJobById,
+    getInvoice,
+    onOpenWorkOrderDetail,
+    onStartInvoice,
+    onOpenPendingInvoice,
+  });
 
   const hideCtaKey = `${HIDE_COMPLETE_PROFILE_CTA_PREFIX}${userId}`;
   const [hideCompleteProfileCta, setHideCompleteProfileCta] = useState(() => {
@@ -81,8 +92,6 @@ export function WorkOrdersPage({
 
   useEffect(() => {
     let cancelled = false;
-    jobCacheRef.current = new Map();
-    invoiceCacheRef.current = new Map();
     setJobsLoading(true);
     setInvoiceStatusLoading(true);
     setInvoiceStatusError(null);
@@ -157,75 +166,6 @@ export function WorkOrdersPage({
       /* ignore */
     }
     setHideCompleteProfileCta(true);
-  };
-
-  const beginRowAction = (jobId: string) => {
-    if (actionLoadingIdsRef.current.has(jobId)) return false;
-    actionLoadingIdsRef.current.add(jobId);
-    setActionLoadingJobIds(new Set(actionLoadingIdsRef.current));
-    return true;
-  };
-
-  const endRowAction = (jobId: string) => {
-    actionLoadingIdsRef.current.delete(jobId);
-    setActionLoadingJobIds(new Set(actionLoadingIdsRef.current));
-  };
-
-  const runWithJobHydration = async (
-    listJob: WorkOrderListJob,
-    fn: (fullJob: Job) => void
-  ) => {
-    if (!beginRowAction(listJob.id)) return;
-    try {
-      let full: Job | undefined = jobCacheRef.current.get(listJob.id);
-      if (full === undefined) {
-        const fetched = await getJobById(listJob.id);
-        if (fetched) {
-          jobCacheRef.current.set(listJob.id, fetched);
-          full = fetched;
-        }
-      }
-      if (full) fn(full);
-      else console.error('WorkOrdersPage: getJobById returned no row for', listJob.id);
-    } finally {
-      endRowAction(listJob.id);
-    }
-  };
-
-  const handleOpenDetail = (listJob: WorkOrderListJob) => {
-    void runWithJobHydration(listJob, (full) => onOpenWorkOrderDetail(full));
-  };
-
-  const handleStartInvoice = (listJob: WorkOrderListJob) => {
-    void runWithJobHydration(listJob, (full) => onStartInvoice(full));
-  };
-
-  const handleOpenPendingInvoice = (listJob: WorkOrderListJob, status: WorkOrderInvoiceStatus) => {
-    if (!beginRowAction(listJob.id)) return;
-    void (async () => {
-      try {
-        let fullJob: Job | undefined = jobCacheRef.current.get(listJob.id);
-        if (fullJob === undefined) {
-          const j = await getJobById(listJob.id);
-          if (j) {
-            jobCacheRef.current.set(listJob.id, j);
-            fullJob = j;
-          }
-        }
-        let fullInv: Invoice | undefined = invoiceCacheRef.current.get(status.id);
-        if (fullInv === undefined) {
-          const inv = await getInvoice(status.id);
-          if (inv) {
-            invoiceCacheRef.current.set(status.id, inv);
-            fullInv = inv;
-          }
-        }
-        if (fullJob && fullInv) onOpenPendingInvoice(fullJob, fullInv);
-        else console.error('WorkOrdersPage: missing full job or invoice for pending flow');
-      } finally {
-        endRowAction(listJob.id);
-      }
-    })();
   };
 
   const summaryInvoicedDisplay =
