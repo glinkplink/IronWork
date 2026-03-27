@@ -18,7 +18,6 @@ supabase/.branches
 future/
 
 # Local agent / IDE state (do not commit)
-.cursor/
 .sally/
 .claude/
 
