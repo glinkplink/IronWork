@@ -1672,11 +1672,17 @@ body {
 
 /* ── Change Order Document ── */
 
+.change-order-document .invoice-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
 .co-doc-wo-ref {
-  text-align: center;
-  font-size: 0.8125rem;
+  text-align: left;
+  font-size: 0.9375rem;
   color: var(--text-muted);
-  margin: -0.25rem 0 0.75rem;
+  margin: 0 0 0.75rem;
 }
 
 /* ── Change Order Wizard ── */
