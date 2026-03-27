@@ -13,6 +13,13 @@ import {
   type JobSiteAddressSuggestion,
 } from '../lib/geoapify-autocomplete';
 import { formatUsPhoneInput } from '../lib/us-phone-input';
+import {
+  daysToPreset,
+  presetToDays,
+  type PaymentTermsPreset,
+  validateLateFeeRate,
+  validatePaymentTermsDays,
+} from '../lib/payment-terms';
 import './JobForm.css';
 
 function patchJobSite(
@@ -53,6 +60,22 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
   const [rawNegotiation, setRawNegotiation] = useState(() =>
     String(job.negotiation_period ?? 0)
   );
+
+  const [rawCustomPaymentDays, setRawCustomPaymentDays] = useState(() =>
+    String(job.payment_terms_days)
+  );
+  const [rawLateFeeRate, setRawLateFeeRate] = useState(() => String(job.late_fee_rate));
+  /** Keeps select on "Custom" while editing even when days match a preset (e.g. 14). */
+  const [paymentTermsUiPreset, setPaymentTermsUiPreset] = useState<PaymentTermsPreset>(() =>
+    daysToPreset(job.payment_terms_days)
+  );
+  const [paymentTermsDaysError, setPaymentTermsDaysError] = useState<string | null>(null);
+  const [lateFeeRateError, setLateFeeRateError] = useState<string | null>(null);
+  /** Only re-copy job → raw strings when job payment fields actually change (avoids StrictMode / effect wiping user edits). */
+  const lastSyncedPaymentFromJob = useRef({
+    days: job.payment_terms_days,
+    rate: job.late_fee_rate,
+  });
 
   const skipSyncRef = useRef(false);
 
@@ -441,6 +464,25 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
     });
   }, [job.price, job.deposit_amount, job.workmanship_warranty_days, job.negotiation_period]);
 
+  useEffect(() => {
+    const prev = lastSyncedPaymentFromJob.current;
+    if (
+      prev.days === job.payment_terms_days &&
+      prev.rate === job.late_fee_rate
+    ) {
+      return;
+    }
+    lastSyncedPaymentFromJob.current = {
+      days: job.payment_terms_days,
+      rate: job.late_fee_rate,
+    };
+    Promise.resolve().then(() => {
+      setRawCustomPaymentDays(String(job.payment_terms_days));
+      setRawLateFeeRate(String(job.late_fee_rate));
+      setPaymentTermsUiPreset(daysToPreset(job.payment_terms_days));
+    });
+  }, [job.payment_terms_days, job.late_fee_rate]);
+
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     setRawPrice(raw);
@@ -486,6 +528,113 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
   };
   const removeObligation = (index: number) =>
     updateField('customer_obligations', job.customer_obligations.filter((_, i) => i !== index));
+
+  const handlePaymentTermsPresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const preset = e.target.value as PaymentTermsPreset;
+    const days = presetToDays(preset);
+    setPaymentTermsDaysError(null);
+    if (days != null) {
+      updateField('payment_terms_days', days);
+      setRawCustomPaymentDays(String(days));
+      setPaymentTermsUiPreset(preset);
+      return;
+    }
+    setPaymentTermsUiPreset('custom');
+    setRawCustomPaymentDays(String(job.payment_terms_days));
+  };
+
+  const handleCustomPaymentDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const s = e.target.value;
+    setRawCustomPaymentDays(s);
+    setPaymentTermsDaysError(null);
+    const trimmed = s.trim();
+    if (trimmed === '') return;
+    const n = parseInt(trimmed, 10);
+    if (Number.isInteger(n) && validatePaymentTermsDays(n) === null) {
+      updateField('payment_terms_days', n);
+    }
+  };
+
+  const handleCustomPaymentDaysBlur = () => {
+    const trimmed = rawCustomPaymentDays.trim();
+    if (trimmed === '') {
+      // Keep empty until user fills or Preview validates — do not snap back (blur runs before Preview click).
+      setPaymentTermsDaysError(null);
+      return;
+    }
+    const n = parseInt(trimmed, 10);
+    const err = validatePaymentTermsDays(n);
+    if (err) {
+      setPaymentTermsDaysError(err);
+      return;
+    }
+    updateField('payment_terms_days', n);
+    setPaymentTermsDaysError(null);
+  };
+
+  const handleLateFeeRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const s = e.target.value;
+    setRawLateFeeRate(s);
+    setLateFeeRateError(null);
+    if (s.trim() === '') return;
+    const n = parseFloat(s);
+    if (Number.isFinite(n) && validateLateFeeRate(n) === null) {
+      updateField('late_fee_rate', n);
+    }
+  };
+
+  const handleLateFeeRateBlur = () => {
+    const trimmed = rawLateFeeRate.trim();
+    if (trimmed === '') {
+      setLateFeeRateError(null);
+      return;
+    }
+    const n = parseFloat(trimmed);
+    const err = validateLateFeeRate(n);
+    if (err) {
+      setLateFeeRateError(err);
+      return;
+    }
+    updateField('late_fee_rate', n);
+    setLateFeeRateError(null);
+  };
+
+  const handleGoToPreview = () => {
+    if (!onGoToPreview) return;
+
+    let blocked = false;
+
+    if (paymentTermsUiPreset === 'custom') {
+      const trimmed = rawCustomPaymentDays.trim();
+      if (trimmed === '') {
+        setPaymentTermsDaysError('Enter payment terms (days)');
+        blocked = true;
+      } else {
+        const n = parseInt(trimmed, 10);
+        const msg = validatePaymentTermsDays(n);
+        if (msg) {
+          setPaymentTermsDaysError(msg);
+          blocked = true;
+        }
+      }
+    }
+
+    const lateTrim = rawLateFeeRate.trim();
+    if (lateTrim === '') {
+      setLateFeeRateError('Enter a late fee rate');
+      blocked = true;
+    } else {
+      const n = parseFloat(lateTrim);
+      const msg = validateLateFeeRate(n);
+      if (msg) {
+        setLateFeeRateError(msg);
+        blocked = true;
+      }
+    }
+
+    if (blocked) return;
+    onGoToPreview();
+  };
 
   return (
     <form className="job-form" onSubmit={(e) => e.preventDefault()}>
@@ -900,13 +1049,8 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
             <label htmlFor="payment_terms">Payment Terms</label>
             <select
               id="payment_terms"
-              value={[7, 14, 30].includes(job.payment_terms_days) ? `net_${job.payment_terms_days}` : 'custom'}
-              onChange={(e) => {
-                const preset = e.target.value;
-                if (preset !== 'custom') {
-                  updateField('payment_terms_days', parseInt(preset.replace('net_', ''), 10));
-                }
-              }}
+              value={paymentTermsUiPreset}
+              onChange={handlePaymentTermsPresetChange}
             >
               <option value="net_7">Net 7</option>
               <option value="net_14">Net 14</option>
@@ -914,30 +1058,43 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
               <option value="custom">Custom</option>
             </select>
           </div>
-          {![7, 14, 30].includes(job.payment_terms_days) && (
+          {paymentTermsUiPreset === 'custom' && (
             <div className="form-group">
               <label htmlFor="payment_terms_days">Days</label>
               <input
                 id="payment_terms_days"
-                type="number"
-                value={job.payment_terms_days}
-                onChange={(e) => updateField('payment_terms_days', parseInt(e.target.value) || 0)}
-                min="1"
+                type="text"
+                inputMode="numeric"
+                value={rawCustomPaymentDays}
+                onChange={handleCustomPaymentDaysChange}
+                onBlur={handleCustomPaymentDaysBlur}
                 placeholder="14"
+                autoComplete="off"
               />
+              {paymentTermsDaysError && (
+                <p className="job-form-field-error" role="alert">
+                  {paymentTermsDaysError}
+                </p>
+              )}
             </div>
           )}
           <div className="form-group">
             <label htmlFor="late_fee_rate">Late Fee (%/month)</label>
             <input
               id="late_fee_rate"
-              type="number"
-              value={job.late_fee_rate}
-              onChange={(e) => updateField('late_fee_rate', parseFloat(e.target.value) || 0)}
-              min="0"
-              step="0.1"
+              type="text"
+              inputMode="decimal"
+              value={rawLateFeeRate}
+              onChange={handleLateFeeRateChange}
+              onBlur={handleLateFeeRateBlur}
               placeholder="1.5"
+              autoComplete="off"
             />
+            {lateFeeRateError && (
+              <p className="job-form-field-error" role="alert">
+                {lateFeeRateError}
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -1004,7 +1161,7 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
 
       {onGoToPreview && (
         <div className="job-form-preview-footer">
-          <button type="button" className="btn-action btn-primary" onClick={onGoToPreview}>
+          <button type="button" className="btn-action btn-primary" onClick={handleGoToPreview}>
             Preview
           </button>
         </div>

@@ -1,3 +1,9 @@
+.job-form-field-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--danger);
+}
+
 .job-form-preview-footer {
   margin-top: var(--space-xl);
   padding-top: var(--space-lg);

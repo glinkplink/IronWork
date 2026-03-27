@@ -5,6 +5,10 @@ import { supabase } from '../lib/supabase';
 import { getProfile, updateNextWoNumber } from '../lib/db/profile';
 import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defaults';
 import sampleJob from '../data/sample-job.json';
+import {
+  DEFAULT_LATE_FEE_RATE,
+  DEFAULT_PAYMENT_TERMS_DAYS,
+} from '../lib/payment-terms';
 import type { AppView } from './useAppNavigation';
 
 export type WorkOrderDraftState = {
@@ -33,8 +37,8 @@ function buildNewAgreementDraft(currentProfile: BusinessProfile | null): WelderJ
         agreement_date: today,
         exclusions: getDefaultExclusions(p.default_exclusions),
         customer_obligations: getDefaultCustomerObligations(p.default_assumptions),
-        payment_terms_days: p.default_payment_terms_days ?? 14,
-        late_fee_rate: p.default_late_fee_rate ?? 1.5,
+        payment_terms_days: p.default_payment_terms_days ?? DEFAULT_PAYMENT_TERMS_DAYS,
+        late_fee_rate: p.default_late_fee_rate ?? DEFAULT_LATE_FEE_RATE,
         workmanship_warranty_days: p.default_warranty_period ?? 30,
         negotiation_period: p.default_negotiation_period ?? 10,
       }
