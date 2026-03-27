@@ -69,9 +69,9 @@ src/
     EditProfilePage.tsx      # Edit business profile + agreement defaults
     EditProfilePage.css      # EditProfilePage-only styles
     WorkOrdersPage.tsx       # List jobs; invoice actions; opens detail
-    WorkOrdersPage.css       # WorkOrdersPage-only list/dashboard chrome
-    WorkOrderDetailPage.tsx  # Saved job → agreement + change orders + PDFs
-    WorkOrderDetailPage.css  # WO detail CO sublist (e.g. `.co-list-*`)
+    WorkOrdersPage.css       # WorkOrdersPage-only list/dashboard chrome + invoice warning banner
+    WorkOrderDetailPage.tsx  # Saved job → agreement + job-level invoice strip + change orders + PDFs
+    WorkOrderDetailPage.css  # WO detail invoice strip + CO sublist (e.g. `.co-list-*`)
     ChangeOrderDetailPage.tsx # Saved change order → HTML/PDF + actions
     ChangeOrderDetailPage.css # CO detail-only chrome (e.g. `.co-detail-*`)
     ChangeOrderWizard.tsx    # Create/edit change order (3 steps)
@@ -103,7 +103,14 @@ src/
       invoices.ts            # Invoice CRUD + mark downloaded; line item `source` in JSON
       change-orders.ts       # Change order CRUD + totals
   hooks/
+    useAppNavigation.ts      # URL/history-backed view state
     useAuth.ts               # Supabase auth state listener
+    useAuthProfile.ts        # Profile loading + capture redirect handling
+    useChangeOrderFlow.ts    # Detail/wizard/detail navigation for change orders
+    useInvoiceFlow.ts        # Invoice wizard/final page flow state
+    useScaledPreview.ts      # 816px preview scaling helpers
+    useWorkOrderDraft.ts     # Draft state + next_wo_number refresh after first save
+    useWorkOrderRowActions.ts # Work Orders row hydration/open/invoice helpers
   types/
     db.ts                    # BusinessProfile, Client, Job, Invoice, …
     index.ts                 # WelderJob, AgreementSection, SignatureBlockData
@@ -128,6 +135,11 @@ server/
 **Signed in but no `business_profiles` row** (edge case): full-screen **BusinessProfileForm** until a profile exists.
 
 **After sign-in (with profile):** **Home**, **Work Orders**, **gear (Edit profile)**; session persists via Supabase (refresh-safe).
+
+**Work Orders details worth remembering:**
+- `WorkOrdersPage` shows **Contract value** rollups from `job.price`, not invoice totals.
+- If invoice-status rows are partially malformed, the page shows a warning banner but keeps valid invoice actions enabled.
+- `WorkOrderDetailPage` has a single **job-level** invoice strip; invoice actions are not rendered per change-order row.
 
 **`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).
 
@@ -159,7 +171,7 @@ Migrations are in `supabase/migrations/` — apply via Supabase CLI (`npx supaba
 | Jobs | Yes — on **Download & Save** (`saveWorkOrder`); listed on **Work Orders** |
 | Clients | Yes — upserted on **Download & Save** keyed by `name_normalized`; **JobForm** can search/suggest when `userId` is set |
 | Invoices | Yes — wizard + final page; status `draft` / `downloaded` |
-| Change orders | Yes — wizard + detail; migration **0005_change_orders.sql** |
+| Change orders | Yes — wizard + detail; `create_change_order` RPC + migration **0006_change_order_creation_lock.sql** for atomic numbering |
 
 ---
 

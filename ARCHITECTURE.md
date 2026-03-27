@@ -98,7 +98,7 @@ scope-lock/
 │   │   ├── EditProfilePage.tsx       # Edit profile + agreement defaults
 │   │   ├── HomePage.tsx              # Landing; Create Work Order
 │   │   ├── WorkOrdersPage.tsx        # List jobs + invoice actions; row opens detail
-│   │   ├── WorkOrderDetailPage.tsx   # Saved job → agreement + change orders + PDFs
+│   │   ├── WorkOrderDetailPage.tsx   # Saved job → agreement + job-level invoice strip + change orders + PDFs
 │   │   ├── ChangeOrderWizard.tsx     # Create/edit change order (3 steps)
 │   │   ├── AgreementDocumentSections.tsx # Renders AgreementSection[] (preview + detail + PDF body)
 │   │   ├── InvoiceWizard.tsx         # Invoice steps (pricing, due date, payment methods)
@@ -109,7 +109,14 @@ scope-lock/
 │   ├── data/
 │   │   └── sample-job.json           # Fallback defaults for new agreements
 │   ├── hooks/
-│   │   └── useAuth.ts                # Auth state hook (Supabase session)
+│   │   ├── useAppNavigation.ts       # URL/history-backed view state
+│   │   ├── useAuth.ts                # Auth state hook (Supabase session)
+│   │   ├── useAuthProfile.ts         # Profile loading + capture redirect handling
+│   │   ├── useChangeOrderFlow.ts     # Detail/wizard/detail navigation for COs
+│   │   ├── useInvoiceFlow.ts         # Invoice wizard/final page flow state
+│   │   ├── useScaledPreview.ts       # 816px preview scaling for WO/invoice mini previews
+│   │   ├── useWorkOrderDraft.ts      # New/edit draft state + next_wo_number refresh path
+│   │   └── useWorkOrderRowActions.ts # Work Orders row hydration/open/invoice helpers
 │   ├── lib/
 │   │   ├── supabase.ts               # Supabase client singleton
 │   │   ├── auth.ts                   # signUp / signIn / signOut helpers
@@ -143,7 +150,8 @@ scope-lock/
 │       ├── 0002_invoices.sql
 │       ├── 0003_cash_app_normalization.sql
 │       ├── 0004_default_tax_rate.sql
-│       └── 0005_change_orders.sql    # structured COs + backfill + next_co_number
+│       ├── 0005_change_orders.sql    # structured COs + backfill + legacy next_co_number helper
+│       └── 0006_change_order_creation_lock.sql # atomic create_change_order RPC with advisory lock
 ├── public/
 ├── index.html
 ├── package.json
@@ -166,7 +174,7 @@ First Download & Save → CaptureModal → signUp + upsertProfile + saveWorkOrde
       ↓
 [Signed in + profile] → HomePage; header: Work Orders, Edit profile (gear)
       ↓
-Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + change orders + PDFs)
+Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + job-level invoice strip + change orders + PDFs)
                       → Change Order → ChangeOrderWizard → detail (refresh list)
                       → Invoice → InvoiceWizard (optional CO lines on **new** invoices) → InvoiceFinalPage → Download → Work Orders + success banner
       ↓
@@ -199,7 +207,7 @@ Edit profile (gear) → EditProfilePage
 - `db/profile.ts`: Profile CRUD; **`updateNextWoNumber`** uses `.update()` (partial `upsert` 400s on `business_profiles` because `business_name` is NOT NULL)
 - `db/clients.ts`: Client CRUD; **JobForm** searches/suggests clients when `userId` is set; **saveWorkOrder** upserts client by `name_normalized`
 - `db/jobs.ts`: Job CRUD + **saveWorkOrder** (insert/update, client upsert); UI lists jobs on **Work Orders**
-- `db/invoices.ts`: Invoice CRUD; **`createInvoice`** calls Postgres **`next_invoice_number(p_user_id)`** for atomic numbering (increments `business_profiles.next_invoice_number`); **`updateInvoice`** full-row overwrite; **`markInvoiceDownloaded`** sets `status = 'downloaded'`; **`mapInvoiceRow`** normalizes **`line_items[].source`**
+- `db/invoices.ts`: Invoice CRUD; **`createInvoice`** calls Postgres **`next_invoice_number(p_user_id)`** for atomic numbering (increments `business_profiles.next_invoice_number`); **`updateInvoice`** full-row overwrite; **`markInvoiceDownloaded`** sets `status = 'downloaded'`; **`mapInvoiceRow`** normalizes **`line_items[].source`**; **`listInvoiceStatusByJob`** skips malformed rows and returns a non-blocking warning instead of disabling all invoice actions
 - `db/change-orders.ts`: **`listChangeOrders`**, **`createChangeOrder`** (RPC to **`public.create_change_order`**: per-job advisory lock + `MAX(co_number)+1` in SQL), **`updateChangeOrder`**, **`deleteChangeOrder`**, **`computeCOTotal`**
 - `invoice-generator.ts`: Invoice HTML (parties table pattern, line items, tax, payment methods, notes)
 
@@ -249,6 +257,7 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 ### Work Orders dashboard rollups (Option B)
 
 - **Invoiced** / **Pending Invoice** on **`WorkOrdersPage`** sum **`job.price`** only (original contract on the saved work order). They **do not** include change-order deltas or invoice totals. The summary strip is labeled **Contract value** so this is explicit. Using invoice totals for rollups (**Option A**) is deferred.
+- If **`listInvoiceStatusByJob`** encounters malformed invoice rows, the page shows a warning banner and continues rendering valid invoice actions for unaffected jobs. Query failures still disable invoice actions.
 
 ## What Is and Isn't Persisted
 
@@ -260,7 +269,7 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 | Work Agreement (current job) | In-memory while editing | **Download & Save** persists via `saveWorkOrder` |
 | Invoices | Yes | Created at wizard step 3; status `draft` until **Download Invoice** sets `downloaded`. The **first** download per final-page mount runs **`markInvoiceDownloaded`** and navigation callback; repeat clicks only regenerate the PDF (no duplicate status writes). |
 | Clients | Yes (rows) | Upsert on **Download & Save**; **JobForm** customer-name combobox searches when authenticated |
-| Change orders | Yes | **ChangeOrderWizard** + detail page; **`next_co_number`** RPC; insert retry once on unique violation |
+| Change orders | Yes | **ChangeOrderWizard** + detail page; **`create_change_order`** RPC allocates `co_number` under an advisory lock (see **0006**); no client-side retry loop |
 | Completion signoffs | No | Schema only |
 
 ## Portability Considerations

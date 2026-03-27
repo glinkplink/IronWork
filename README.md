@@ -10,7 +10,7 @@ Work agreement generator for contractors (initially welders). Contractors fill o
 
 - **Node.js** (recent LTS is fine)
 - **Chrome or Chromium** installed on the same machine (or container) that runs `server/app-server.mjs`
-- A **Supabase** project with migrations applied (`business_profiles`, `clients`, `jobs`, `change_orders`, `invoices`, RPCs such as `next_invoice_number`, `next_co_number`, etc.)
+- A **Supabase** project with migrations applied (`business_profiles`, `clients`, `jobs`, `change_orders`, `invoices`, RPCs such as `next_invoice_number` and `create_change_order`)
 
 ---
 
@@ -113,6 +113,7 @@ Session persistence is standard Supabase client behavior (refresh survives page 
 - **Work Orders** list, detail, agreement PDF re-download
 - **Change orders:** wizard from detail, statuses, standalone and combined PDFs, optional inclusion on new invoices (`line_items.source` for stable edit behavior)
 - **Invoices:** wizard from a work order → PDF download; persisted rows
+- **Work Orders dashboard:** contract-value rollups use saved work-order totals (`job.price`), and partial invoice-status parse issues show a warning banner instead of disabling all invoice actions
 - Job site autocomplete (optional Geoapify key)
 - US phone formatting on job form and edit profile
 - Work agreement generator (numbered sections), preview, **server PDF** parity, print support
