@@ -250,6 +250,7 @@
   width: 100%;
   background: transparent;
   color: var(--text-secondary);
+  text-transform: none;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);

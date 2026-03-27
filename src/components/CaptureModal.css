@@ -47,31 +47,9 @@
   gap: var(--space-sm) var(--space-md);
 }
 
-.capture-modal .btn-secondary {
-  background: white;
-  color: var(--text-primary);
-  padding: 10px var(--space-lg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+.capture-modal .modal-actions .btn-secondary {
   flex: 1 1 140px;
   min-width: 0;
-}
-
-.capture-modal .btn-secondary:hover:not(:disabled) {
-  background: var(--surface);
-  border-color: var(--border-strong);
-}
-
-.capture-modal .btn-secondary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .capture-modal .btn-primary {

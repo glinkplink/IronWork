@@ -289,6 +289,7 @@ export function AgreementPreview({
               width: letterWidthPx,
               transform: previewScale !== 1 ? `scale(${previewScale})` : undefined,
               transformOrigin: 'top left',
+              willChange: previewScale !== 1 ? 'transform' : undefined,
             }}
           >
             <div ref={documentRef} className="agreement-document">

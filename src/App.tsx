@@ -303,8 +303,10 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1
+        <button
+          type="button"
           className="app-title"
+          aria-label="ScopeLock, go to home"
           onClick={() => {
             navigateTo('home');
             invoiceFlow.resetInvoiceFlow();
@@ -313,7 +315,7 @@ function App() {
           }}
         >
           ScopeLock
-        </h1>
+        </button>
         <div className="header-actions">
           {!user && (
             <button

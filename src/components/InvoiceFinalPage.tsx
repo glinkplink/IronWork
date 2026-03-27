@@ -194,6 +194,7 @@ export function InvoiceFinalPage({
                 width: letterWidthPx,
                 transform: previewScale !== 1 ? `scale(${previewScale})` : undefined,
                 transformOrigin: 'top left',
+                willChange: previewScale !== 1 ? 'transform' : undefined,
               }}
             >
               <div

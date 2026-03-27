@@ -224,22 +224,9 @@
 }
 
 .edit-profile-page .btn-secondary {
-  background: white;
-  color: var(--text-primary);
   padding: 10px var(--space-xl);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-family: inherit;
   font-size: 0.875rem;
-  font-weight: 600;
   letter-spacing: 0.04em;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.edit-profile-page .btn-secondary:hover {
-  background: var(--surface);
-  border-color: var(--border-strong);
 }
 
 .edit-profile-page .success-banner {
