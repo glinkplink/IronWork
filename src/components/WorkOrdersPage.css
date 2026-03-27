@@ -110,16 +110,6 @@
   font-size: 0.9375rem;
 }
 
-.work-orders-summary-contract-label {
-  flex: 1 0 100%;
-  margin: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
 .work-orders-summary-item {
   display: inline-flex;
   flex-wrap: wrap;

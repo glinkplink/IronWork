@@ -243,11 +243,8 @@ export function WorkOrdersPage({
           <div
             className="work-orders-summary-strip"
             role="group"
-            aria-labelledby="work-orders-contract-value-label"
+            aria-label="Invoiced and pending invoice totals from work order prices"
           >
-            <span id="work-orders-contract-value-label" className="work-orders-summary-contract-label">
-              Contract value
-            </span>
             <span className="work-orders-summary-item work-orders-summary-invoiced">
               <span className="work-orders-summary-label">Invoiced:</span>
               <span className="work-orders-summary-amount">{summaryInvoicedDisplay}</span>

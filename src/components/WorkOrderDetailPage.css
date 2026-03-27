@@ -66,3 +66,7 @@
   font-weight: 600;
   color: #2a7a3b;
 }
+
+.work-orders-empty.wo-co-finalized-block {
+  text-align: center;
+}

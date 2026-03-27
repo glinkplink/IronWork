@@ -227,7 +227,9 @@ export function WorkOrderDetailPage({
         </p>
       ) : null}
       {!coNewCoBlockLoading && !coNewCoBlockError && coNewCoBlockedByInvoice ? (
-        <p className="work-orders-empty">Work order invoice has been finalized. New change orders cannot be added.</p>
+        <p className="work-orders-empty wo-co-finalized-block">
+          Work order invoice has been finalized. New change orders cannot be added.
+        </p>
       ) : null}
       {coInvoiceStatusError ? (
         <p className="work-orders-empty" role="alert">
