@@ -92,6 +92,7 @@ export function WorkOrdersPage({
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset-before-fetch pattern; all calls batch in React 18
     setJobsLoading(true);
     setInvoiceStatusLoading(true);
     setInvoiceStatusError(null);
