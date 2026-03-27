@@ -102,11 +102,11 @@ export function ChangeOrderWizard({
         Number.isFinite(q) &&
         q > 0 &&
         Number.isFinite(ur) &&
-        ur >= 0
+        ur > 0
       );
     });
     if (!valid) {
-      setError('Add at least one line item with description, quantity greater than 0, and rate.');
+      setError('Add at least one line item with a description, quantity greater than 0, and a rate greater than 0.');
       return false;
     }
     if (timeAmount < 0) {

@@ -1672,12 +1672,18 @@ body {
 
 /* ── Change Order Wizard ── */
 
+.invoice-wizard.co-wizard {
+  max-width: none;
+  padding: 0 var(--space-md);
+}
+
 .invoice-wizard.co-wizard .invoice-wizard-toolbar {
   margin-bottom: var(--space-md);
 }
 
 .invoice-wizard.co-wizard .invoice-wizard-step {
   padding-top: var(--space-md);
+  border-top: none;
 }
 
 .invoice-wizard.co-wizard .co-wizard-step .form-group {
@@ -1806,13 +1812,15 @@ body {
 }
 
 .invoice-line-table th {
-  border: 1px solid #cccccc;
+  border: 1px solid var(--agreement-margin-line);
   padding: 0.7rem 0.8rem;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-muted);
-  background: var(--surface-white);
+  color: var(--agreement-section-blue);
+  background: var(--agreement-label-column-bg);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .invoice-totals-block {
