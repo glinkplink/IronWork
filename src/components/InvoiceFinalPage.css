@@ -30,6 +30,10 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  resize: vertical;
+  min-height: 4.5rem;
+  font-family: inherit;
+  font-size: inherit;
 }
 
 .invoice-final-mini-viewport {
@@ -54,6 +58,15 @@
   background: transparent;
   cursor: zoom-in;
   text-align: center;
+}
+
+.invoice-final-mini-preview-hitbox:focus {
+  outline: none;
+}
+
+.invoice-final-mini-preview-hitbox:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .invoice-final-actions {

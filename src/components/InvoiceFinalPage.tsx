@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { markInvoiceDownloaded, updateInvoice } from '../lib/db/invoices';
@@ -30,10 +30,9 @@ export function InvoiceFinalPage({
   onAfterDownload,
   onInvoiceUpdated,
 }: InvoiceFinalPageProps) {
-  const [invoice, setInvoice] = useState(invoiceProp);
   const [modalOpen, setModalOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
-  const [notesDraft, setNotesDraft] = useState(invoiceProp.notes ?? '');
+  const [notesDraft, setNotesDraft] = useState(() => invoiceProp.notes ?? '');
   const [downloadError, setDownloadError] = useState('');
   const [notesError, setNotesError] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -45,10 +44,10 @@ export function InvoiceFinalPage({
 
   const documentRef = useRef<HTMLDivElement | null>(null);
 
-  const previewHtml = generateInvoiceHtml(invoice, job, profile);
-  const isReadOnly = invoice.status === 'downloaded';
+  const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
+  const isReadOnly = invoiceProp.status === 'downloaded';
   const customerTitle = job.customer_name.trim() || 'Customer';
-  const invoiceSubline = `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`;
+  const invoiceSubline = `Invoice #${String(invoiceProp.invoice_number).padStart(4, '0')}`;
 
   const {
     viewportRef: previewViewportRef,
@@ -57,12 +56,11 @@ export function InvoiceFinalPage({
     spacerHeight,
     spacerWidth,
     letterWidthPx,
-  } = useScaledPreview(invoice, job, profile);
+  } = useScaledPreview(invoiceProp, job, profile);
 
-  useLayoutEffect(() => {
-    setInvoice(invoiceProp);
+  useEffect(() => {
     setNotesDraft(invoiceProp.notes ?? '');
-  }, [invoiceProp]);
+  }, [invoiceProp.id, invoiceProp.notes]);
 
   useEffect(() => {
     if (invoiceProp.status === 'downloaded') setHasPersistedDownloadOnce(true);
@@ -76,18 +74,20 @@ export function InvoiceFinalPage({
     }
     setDownloading(true);
     try {
-      const blob = await fetchInvoicePdfBlob(invoice, job, profile, documentRef.current);
-      downloadPdfBlobToFile(blob, getInvoicePdfFilename(invoice.invoice_number, job.customer_name));
+      const blob = await fetchInvoicePdfBlob(invoiceProp, job, profile, documentRef.current);
+      downloadPdfBlobToFile(
+        blob,
+        getInvoicePdfFilename(invoiceProp.invoice_number, job.customer_name)
+      );
 
       if (!hasPersistedDownloadOnce) {
-        const { error } = await markInvoiceDownloaded(invoice.id);
+        const { error } = await markInvoiceDownloaded(invoiceProp.id);
         if (error) {
           setDownloadError(`PDF downloaded, but status could not be updated: ${error.message}`);
           return;
         }
         setHasPersistedDownloadOnce(true);
-        const nextInv = { ...invoice, status: 'downloaded' as const };
-        setInvoice(nextInv);
+        const nextInv = { ...invoiceProp, status: 'downloaded' as const };
         onInvoiceUpdated(nextInv);
         onAfterDownload(nextInv);
       }
@@ -103,7 +103,7 @@ export function InvoiceFinalPage({
     setSavingNotes(true);
     try {
       const next: Invoice = {
-        ...invoice,
+        ...invoiceProp,
         notes: notesDraft.trim() || null,
       };
       const { data, error } = await updateInvoice(next);
@@ -111,7 +111,6 @@ export function InvoiceFinalPage({
         setNotesError(error?.message || 'Could not save notes.');
         return;
       }
-      setInvoice(data);
       onInvoiceUpdated(data);
     } finally {
       setSavingNotes(false);
@@ -141,10 +140,10 @@ export function InvoiceFinalPage({
             <div className="invoice-final-notes-panel">
               <div className="form-group">
                 <label htmlFor="invoice-notes">Notes</label>
-                <input
+                <textarea
                   id="invoice-notes"
-                  type="text"
                   className="invoice-final-notes-input"
+                  rows={3}
                   value={notesDraft}
                   onChange={(e) => setNotesDraft(e.target.value)}
                   autoComplete="off"
