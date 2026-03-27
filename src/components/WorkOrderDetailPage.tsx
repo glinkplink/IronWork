@@ -23,6 +23,7 @@ import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { computeCOTotal, listChangeOrders } from '../lib/db/change-orders';
 import {
   changeOrderInvoiceStatusMapFromRows,
+  getBlocksNewChangeOrdersForJob,
   listInvoiceStatusByChangeOrder,
 } from '../lib/db/invoices';
 import './WorkOrderDetailPage.css';
@@ -60,6 +61,9 @@ export function WorkOrderDetailPage({
   const [coInvoiceStatusRows, setCoInvoiceStatusRows] = useState<ChangeOrderInvoiceStatus[] | null>(
     null
   );
+  const [coNewCoBlockLoading, setCoNewCoBlockLoading] = useState(true);
+  const [coNewCoBlockError, setCoNewCoBlockError] = useState<string | null>(null);
+  const [coNewCoBlockedByInvoice, setCoNewCoBlockedByInvoice] = useState(false);
 
   const welderJob = useMemo(() => jobRowToWelderJob(job, profile), [job, profile]);
   const sections = useMemo(() => generateAgreement(welderJob, profile), [welderJob, profile]);
@@ -111,6 +115,35 @@ export function WorkOrderDetailPage({
       cancelled = true;
     };
   }, [job.id, userId, changeOrderListVersion]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCoNewCoBlockLoading(true);
+    setCoNewCoBlockError(null);
+    setCoNewCoBlockedByInvoice(false);
+
+    void (async () => {
+      const result = await getBlocksNewChangeOrdersForJob(userId, job.id);
+      if (cancelled) return;
+      setCoNewCoBlockLoading(false);
+      if (result.error) {
+        setCoNewCoBlockedByInvoice(false);
+        setCoNewCoBlockError(
+          `Could not verify whether new change orders are allowed (${result.error.message}). Create Change Order is disabled.`
+        );
+      } else {
+        setCoNewCoBlockError(null);
+        setCoNewCoBlockedByInvoice(result.blocks);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [job.id, userId, changeOrderListVersion]);
+
+  const createChangeOrderDisabled =
+    downloading || coNewCoBlockLoading || coNewCoBlockError !== null || coNewCoBlockedByInvoice;
 
   const handleDownloadPdf = async () => {
     setPdfError('');
@@ -189,6 +222,14 @@ export function WorkOrderDetailPage({
       <p className="co-section-label" style={{ marginTop: 'var(--space-lg)' }}>
         Change orders
       </p>
+      {coNewCoBlockError ? (
+        <p className="work-orders-empty" role="alert">
+          {coNewCoBlockError}
+        </p>
+      ) : null}
+      {!coNewCoBlockLoading && !coNewCoBlockError && coNewCoBlockedByInvoice ? (
+        <p className="work-orders-empty">Work order invoice has been finalized. New change orders cannot be added.</p>
+      ) : null}
       {coInvoiceStatusError ? (
         <p className="work-orders-empty" role="alert">
           {coInvoiceStatusError}
@@ -278,7 +319,17 @@ export function WorkOrderDetailPage({
         <button
           type="button"
           className="btn-secondary btn-large work-order-detail-download"
-          disabled={downloading}
+          data-testid="wo-detail-create-change-order"
+          disabled={createChangeOrderDisabled}
+          title={
+            coNewCoBlockLoading
+              ? 'Loading…'
+              : coNewCoBlockError
+                ? 'Could not verify billing state'
+                : coNewCoBlockedByInvoice
+                  ? 'Work order invoice finalized'
+                  : undefined
+          }
           onClick={() => onStartChangeOrder()}
         >
           Create Change Order

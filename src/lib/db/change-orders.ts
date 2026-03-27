@@ -1,6 +1,10 @@
 import { supabase } from '../supabase';
 import type { ChangeOrder, ChangeOrderLineItem } from '../../types/db';
 
+/** Same text as RAISE in migration `0008_block_co_after_job_invoice.sql`. */
+export const CHANGE_ORDER_BLOCKED_AFTER_FINALIZED_WO_INVOICE =
+  'Change orders cannot be added after the work order invoice has been finalized.';
+
 const VALID_CO_STATUSES: ChangeOrder['status'][] = [
   'draft',
   'pending_approval',
@@ -113,6 +117,9 @@ export async function createChangeOrder(
   if (error) {
     if (isUniqueViolation(error)) {
       return { data: null, error: new Error('Could not save change order. Try again.') };
+    }
+    if (error.message.includes('work order invoice has been finalized')) {
+      return { data: null, error: new Error(CHANGE_ORDER_BLOCKED_AFTER_FINALIZED_WO_INVOICE) };
     }
     return { data: null, error: new Error(error.message) };
   }

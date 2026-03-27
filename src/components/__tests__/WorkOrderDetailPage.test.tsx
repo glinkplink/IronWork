@@ -1,32 +1,45 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import type { Job, BusinessProfile, ChangeOrder } from '../../types/db';
 import { WorkOrderDetailPage } from '../WorkOrderDetailPage';
 
-const listChangeOrders = vi.fn();
-const listInvoiceStatusByChangeOrder = vi.fn();
+const mockFns = vi.hoisted(() => {
+  const listChangeOrders = vi.fn();
+  const listInvoiceStatusByChangeOrder = vi.fn();
+  const coBlockState = { blocks: false, error: null as Error | null };
+  const getBlocksNewChangeOrdersForJob = vi.fn(async () => ({
+    blocks: coBlockState.blocks,
+    error: coBlockState.error,
+  }));
+  return {
+    listChangeOrders,
+    listInvoiceStatusByChangeOrder,
+    getBlocksNewChangeOrdersForJob,
+    setCoBlockResult(next: { blocks: boolean; error: Error | null }) {
+      coBlockState.blocks = next.blocks;
+      coBlockState.error = next.error;
+    },
+  };
+});
 
 vi.mock('../../lib/db/change-orders', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/db/change-orders')>();
   return {
     ...actual,
-    listChangeOrders: (...args: unknown[]) => listChangeOrders(...args),
+    listChangeOrders: (...args: unknown[]) => mockFns.listChangeOrders(...args),
   };
 });
 
-vi.mock('../../lib/db/invoices', () => ({
-  changeOrderInvoiceStatusMapFromRows: (rows: unknown[]) => {
-    const map = new Map<string, (typeof rows)[number]>();
-    rows.forEach((row) => {
-      const record = row as { change_order_id: string };
-      if (!map.has(record.change_order_id)) map.set(record.change_order_id, row);
-    });
-    return map;
-  },
-  listInvoiceStatusByChangeOrder: (...args: unknown[]) => listInvoiceStatusByChangeOrder(...args),
-}));
+vi.mock('../../lib/db/invoices', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/db/invoices')>();
+  return {
+    ...actual,
+    listInvoiceStatusByChangeOrder: (...args: unknown[]) => mockFns.listInvoiceStatusByChangeOrder(...args),
+    getBlocksNewChangeOrdersForJob: (...args: unknown[]) => mockFns.getBlocksNewChangeOrdersForJob(...args),
+  };
+});
 
 function minimalJob(): Job {
   return {
@@ -120,10 +133,16 @@ function makeCO(n: number, description: string): ChangeOrder {
 }
 
 describe('WorkOrderDetailPage', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
-    vi.clearAllMocks();
-    listInvoiceStatusByChangeOrder.mockResolvedValue({ data: [], error: null, warning: null });
-    listChangeOrders.mockResolvedValue([makeCO(1, 'First'), makeCO(2, 'Second')]);
+    mockFns.listInvoiceStatusByChangeOrder.mockClear();
+    mockFns.listChangeOrders.mockClear();
+    mockFns.listInvoiceStatusByChangeOrder.mockResolvedValue({ data: [], error: null, warning: null });
+    mockFns.listChangeOrders.mockResolvedValue([makeCO(1, 'First'), makeCO(2, 'Second')]);
+    mockFns.setCoBlockResult({ blocks: false, error: null });
   });
 
   it('shows one invoice control per change-order row and no job-level invoice strip', async () => {
@@ -152,5 +171,57 @@ describe('WorkOrderDetailPage', () => {
       expect(within(coList as HTMLElement).getAllByRole('listitem')).toHaveLength(2);
     });
     expect(within(coList as HTMLElement).getAllByRole('button', { name: /^Invoice$/i })).toHaveLength(2);
+  });
+
+  it('disables Create Change Order when a downloaded job-level invoice blocks', async () => {
+    mockFns.setCoBlockResult({ blocks: true, error: null });
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockFns.getBlocksNewChangeOrdersForJob).toHaveBeenCalledWith('u1', 'job-1');
+      const btns = screen.getAllByTestId('wo-detail-create-change-order');
+      expect(btns.length).toBeGreaterThan(0);
+      expect(btns.at(-1) as HTMLButtonElement).toBeDisabled();
+    });
+    expect(
+      screen.getByText(/Work order invoice has been finalized\. New change orders cannot be added\./i)
+    ).toBeInTheDocument();
+  });
+
+  it('disables Create Change Order and shows error when block query fails (fail-closed)', async () => {
+    mockFns.setCoBlockResult({
+      blocks: true,
+      error: new Error('network'),
+    });
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+
+    await waitFor(() => {
+      const btns = screen.getAllByTestId('wo-detail-create-change-order');
+      expect(btns.length).toBeGreaterThan(0);
+      expect(btns.at(-1) as HTMLButtonElement).toBeDisabled();
+    });
+    expect(
+      screen.getByText(/Could not verify whether new change orders are allowed \(network\)/i)
+    ).toBeInTheDocument();
   });
 });

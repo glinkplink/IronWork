@@ -251,6 +251,59 @@ function parseWorkOrderInvoiceStatusRow(
   return base;
 }
 
+/**
+ * True when the row is a finalized job-level invoice (no line item has change_order_id).
+ * Aligns with `parseWorkOrderInvoiceStatusRow` job-level semantics and `create_change_order` in the DB.
+ */
+export function isDownloadedJobLevelInvoiceRow(row: {
+  status: unknown;
+  line_items: unknown;
+}): boolean {
+  if (row.status !== 'downloaded') return false;
+  const lineItems = Array.isArray(row.line_items) ? row.line_items : [];
+  for (const item of lineItems) {
+    if (typeof item !== 'object' || item === null) continue;
+    const coId = (item as Record<string, unknown>).change_order_id;
+    if (typeof coId === 'string' && coId.trim()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export type GetBlocksNewChangeOrdersForJobResult = {
+  /** When true, new change orders must be disabled (business rule or fail-closed load error). */
+  blocks: boolean;
+  error: Error | null;
+};
+
+/**
+ * Whether new change orders are blocked for this job (downloaded job-level invoice exists).
+ * On query failure, returns `{ blocks: true, error }` (fail-closed).
+ */
+export async function getBlocksNewChangeOrdersForJob(
+  userId: string,
+  jobId: string
+): Promise<GetBlocksNewChangeOrdersForJobResult> {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('status, line_items')
+    .eq('user_id', userId)
+    .eq('job_id', jobId);
+
+  if (error) {
+    console.error('getBlocksNewChangeOrdersForJob:', error);
+    return { blocks: true, error: new Error(error.message) };
+  }
+
+  for (const row of data ?? []) {
+    if (isDownloadedJobLevelInvoiceRow(row as Record<string, unknown>)) {
+      return { blocks: true, error: null };
+    }
+  }
+  return { blocks: false, error: null };
+}
+
 function parseChangeOrderInvoiceStatusRow(
   row: Record<string, unknown>
 ): ChangeOrderInvoiceStatus | null | 'ignore' {
