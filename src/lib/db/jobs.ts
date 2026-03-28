@@ -70,6 +70,28 @@ export const listInFlightEsignJobs = async (userId: string): Promise<WorkOrderLi
   return (data ?? []).map((row) => mapWorkOrderListRow(row as Record<string, unknown>));
 };
 
+export const refreshEsignStatuses = async (
+  jobIds: string[],
+  userId: string
+): Promise<WorkOrderListJob[]> => {
+  if (jobIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('jobs')
+    .select(
+      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price, esign_status'
+    )
+    .eq('user_id', userId)
+    .in('id', jobIds);
+
+  if (error) {
+    console.error('Error refreshing esign statuses:', error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => mapWorkOrderListRow(row as Record<string, unknown>));
+};
+
 export const getJobById = async (id: string): Promise<Job | null> => {
   const { data, error } = await supabase.from('jobs').select('*').eq('id', id).maybeSingle();
 

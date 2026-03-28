@@ -500,7 +500,13 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
     submissionId = data.id ?? null;
   }
 
+  console.log('[webhook] received', {
+    eventType,
+    submissionId: submissionId != null ? String(submissionId) : null,
+  });
+
   if (submissionId == null) {
+    console.log('[webhook] ignored: missing submission id', { eventType });
     sendJson(res, 200, { ok: true, ignored: true });
     return;
   }
@@ -514,14 +520,32 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
     return;
   }
 
+  console.log('[webhook] verified submission', {
+    submissionId: String(verified.id),
+    submissionStatus: verified.status ?? null,
+    submitterStatus: pickCustomerSubmitter(verified)?.status ?? null,
+  });
+
   const supabase = getServiceSupabase();
   const resolved = await resolveJobForWebhook(supabase, data, verified);
   if (!resolved) {
+    console.log('[webhook] ignored: no matching job', {
+      submissionId: String(verified.id),
+      eventType,
+    });
     sendJson(res, 200, { ok: true, ignored: true });
     return;
   }
 
   const { job, resolvedBy } = resolved;
+
+  console.log('[webhook] resolved job', {
+    submissionId: String(verified.id),
+    jobId: String(job.id),
+    resolvedBy,
+    currentSubmissionId: job.esign_submission_id ?? null,
+    currentStatus: job.esign_status ?? null,
+  });
 
   // When resolved by submission_id, the row is already anchored to the verified
   // submission id. External-id fallbacks need an explicit stale check before we
@@ -531,22 +555,52 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
     job.esign_submission_id &&
     String(verified.id) !== String(job.esign_submission_id)
   ) {
+    console.log('[webhook] ignored: stale submission', {
+      submissionId: String(verified.id),
+      jobId: String(job.id),
+      jobSubmissionId: String(job.esign_submission_id),
+      resolvedBy,
+    });
     sendJson(res, 200, { ok: true, ignored: true, reason: 'stale_submission' });
     return;
   }
 
   const patch = buildEsignRowFromSubmission(verified);
   if (!patch) {
+    console.log('[webhook] ignored: could not derive esign patch', {
+      submissionId: String(verified.id),
+      jobId: String(job.id),
+    });
     sendJson(res, 200, { ok: true });
     return;
   }
 
+  console.log('[webhook] derived patch', {
+    submissionId: String(verified.id),
+    jobId: String(job.id),
+    esign_status: patch.esign_status,
+    esign_submission_state: patch.esign_submission_state,
+    esign_submitter_state: patch.esign_submitter_state,
+  });
+
   const { error: upErr } = await supabase.from('jobs').update(patch).eq('id', job.id);
   if (upErr) {
     console.error('Webhook job update failed:', upErr);
+    console.log('[webhook] update failed', {
+      submissionId: String(verified.id),
+      jobId: String(job.id),
+      esign_status: patch.esign_status,
+      error: upErr.message,
+    });
     sendJson(res, 500, { error: 'Database update failed.' });
     return;
   }
+
+  console.log('[webhook] update applied', {
+    submissionId: String(verified.id),
+    jobId: String(job.id),
+    esign_status: patch.esign_status,
+  });
 
   sendJson(res, 200, { ok: true });
 }

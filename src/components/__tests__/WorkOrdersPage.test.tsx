@@ -10,12 +10,14 @@ import { ESIGN_POLL_INTERVAL_MS } from '../../lib/esign-live';
 
 const listJobsForWorkOrders = vi.fn();
 const listInFlightEsignJobs = vi.fn();
+const refreshEsignStatuses = vi.fn();
 const getJobById = vi.fn();
 const listInvoiceStatusByJob = vi.fn();
 
 vi.mock('../../lib/db/jobs', () => ({
   listJobsForWorkOrders: (...args: unknown[]) => listJobsForWorkOrders(...args),
   listInFlightEsignJobs: (...args: unknown[]) => listInFlightEsignJobs(...args),
+  refreshEsignStatuses: (...args: unknown[]) => refreshEsignStatuses(...args),
   getJobById: (...args: unknown[]) => getJobById(...args),
 }));
 
@@ -156,9 +158,11 @@ describe('WorkOrdersPage', () => {
   beforeEach(() => {
     listJobsForWorkOrders.mockReset();
     listInFlightEsignJobs.mockReset();
+    refreshEsignStatuses.mockReset();
     getJobById.mockReset();
     listInvoiceStatusByJob.mockReset();
     listInFlightEsignJobs.mockResolvedValue([]);
+    refreshEsignStatuses.mockResolvedValue([]);
     listJobsForWorkOrders.mockResolvedValue([listJobA]);
     listInvoiceStatusByJob.mockResolvedValue({
       data: [],
@@ -189,7 +193,8 @@ describe('WorkOrdersPage', () => {
   it('polls the jobs list while an e-sign is in flight and updates the row strip', async () => {
     vi.useFakeTimers();
     listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
-    listInFlightEsignJobs.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+    listInFlightEsignJobs.mockResolvedValueOnce([]);
+    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
 
     renderPage();
     await flushAsync();
@@ -204,6 +209,7 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
     expect(listJobsForWorkOrders).toHaveBeenCalledTimes(1);
     expect(listInFlightEsignJobs).toHaveBeenCalledTimes(1);
+    expect(refreshEsignStatuses).toHaveBeenCalledWith(['job-b'], 'u1');
   });
 
   it('does not start polling when no e-sign rows are in flight', async () => {
@@ -225,7 +231,8 @@ describe('WorkOrdersPage', () => {
   it('stops polling after the refreshed list reaches a terminal e-sign state', async () => {
     vi.useFakeTimers();
     listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
-    listInFlightEsignJobs.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+    listInFlightEsignJobs.mockResolvedValueOnce([]);
+    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
 
     renderPage();
     await flushAsync();
@@ -245,6 +252,27 @@ describe('WorkOrdersPage', () => {
 
     expect(listJobsForWorkOrders).toHaveBeenCalledTimes(1);
     expect(listInFlightEsignJobs).toHaveBeenCalledTimes(1);
+    expect(refreshEsignStatuses).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes disappeared in-flight rows so terminal statuses appear without a page reload', async () => {
+    vi.useFakeTimers();
+    listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
+    listInFlightEsignJobs.mockResolvedValueOnce([]);
+    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+
+    renderPage();
+    await flushAsync();
+
+    expect(screen.getByLabelText('E-signature status: Sent')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    });
+    await flushAsync();
+
+    expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
+    expect(refreshEsignStatuses).toHaveBeenCalledWith(['job-b'], 'u1');
   });
 
   it('shows date on first meta line and capitalized job type on second', async () => {

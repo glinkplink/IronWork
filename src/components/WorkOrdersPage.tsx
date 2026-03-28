@@ -7,7 +7,12 @@ import type {
   WorkOrderListJob,
   WorkOrderInvoiceStatus,
 } from '../types/db';
-import { listJobsForWorkOrders, listInFlightEsignJobs, getJobById } from '../lib/db/jobs';
+import {
+  listJobsForWorkOrders,
+  listInFlightEsignJobs,
+  refreshEsignStatuses,
+  getJobById,
+} from '../lib/db/jobs';
 import { listInvoiceStatusByJob, getInvoice, invoiceStatusMapFromRows } from '../lib/db/invoices';
 import { useEsignPoller } from '../hooks/useEsignPoller';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
@@ -163,8 +168,19 @@ export function WorkOrdersPage({
     pollOnce: async () => {
       const updatedRows = await listInFlightEsignJobs(userId);
       const updatedById = new Map(updatedRows.map((r) => [r.id, r]));
-      setJobs((prev) => prev.map((job) => updatedById.get(job.id) ?? job));
-      return updatedRows.some((job) => shouldPollEsignStatus(job.esign_status));
+      const missingInFlightIds = jobs
+        .filter((job) => shouldPollEsignStatus(job.esign_status) && !updatedById.has(job.id))
+        .map((job) => job.id);
+      const refreshedTerminalRows =
+        missingInFlightIds.length > 0 ? await refreshEsignStatuses(missingInFlightIds, userId) : [];
+      const mergedById = new Map([
+        ...updatedRows.map((row) => [row.id, row] as const),
+        ...refreshedTerminalRows.map((row) => [row.id, row] as const),
+      ]);
+      setJobs((prev) => prev.map((job) => mergedById.get(job.id) ?? job));
+      return [...updatedRows, ...refreshedTerminalRows].some((job) =>
+        shouldPollEsignStatus(job.esign_status)
+      );
     },
   });
 
