@@ -101,44 +101,6 @@
   font-size: 0.9375rem;
 }
 
-.co-line-items-header {
-  display: none;
-  gap: 8px;
-  align-items: flex-end;
-  margin-bottom: 6px;
-  padding: 0 2px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.co-line-items-header-desc {
-  flex: 1;
-  min-width: 0;
-}
-
-.co-line-items-header-qty {
-  width: 56px;
-  text-align: center;
-}
-
-.co-line-items-header-rate {
-  width: 88px;
-  text-align: right;
-}
-
-.co-line-items-header-total {
-  width: 72px;
-  text-align: right;
-}
-
-.co-line-items-header-remove {
-  width: 28px;
-  flex-shrink: 0;
-}
-
 .co-line-items-stack {
   margin-bottom: 0;
 }
@@ -154,12 +116,16 @@
   font-weight: 700;
 }
 
+.co-total-row--stack .co-total-label {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
 .co-line-row {
   display: flex;
   gap: 8px;
   align-items: flex-end;
   margin-bottom: 10px;
-  flex-wrap: wrap;
 }
 
 .co-field {
@@ -206,14 +172,22 @@
 }
 
 .co-field-rate {
-  width: 88px;
+  width: 118px;
+}
+
+.co-rate-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .co-rate-wrap {
   position: relative;
+  flex: 1;
 }
 
 .co-rate-wrap input {
+  width: 100%;
   padding-left: 22px;
   text-align: right;
 }
@@ -240,23 +214,31 @@
 }
 
 .co-remove-btn {
-  width: 28px;
-  height: 36px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: none;
-  color: var(--text-muted);
+  color: #dc2626;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
   flex-shrink: 0;
   border-radius: var(--radius);
 }
 
 .co-remove-btn:hover {
   background: #fef2f2;
-  color: #dc2626;
+  color: #b91c1c;
+}
+
+.co-remove-slot {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
 .co-add-btn {
@@ -405,12 +387,6 @@
   margin-top: 3px;
 }
 
-@media (min-width: 600px) {
-  .co-line-items-header {
-    display: flex;
-  }
-}
-
 @media (max-width: 599px) {
   .co-line-row {
     flex-wrap: wrap;
@@ -421,11 +397,15 @@
   }
 
   .co-field-qty,
-  .co-field-rate,
   .co-field-total {
     flex: 1;
     width: auto;
     min-width: 0;
+  }
+
+  .co-field-rate {
+    flex: 1 1 100%;
+    width: 100%;
   }
 
   .co-wizard-footer .btn-primary.btn-large,
