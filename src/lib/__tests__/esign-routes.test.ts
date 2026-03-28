@@ -155,8 +155,11 @@ function baseCORow(overrides: Record<string, unknown> = {}) {
 }
 
 /** Jobs lookups return null so webhook falls through to change_orders resolution. */
-function mockWebhookSupabaseChangeOrderOnly(findCo: (column: string, value: string) => unknown) {
-  const updateEqMock = vi.fn(async () => ({ error: null }));
+function mockWebhookSupabaseChangeOrderOnly(
+  findCo: (column: string, value: string) => unknown,
+  updateResult: { error: { message: string } | null } = { error: null }
+) {
+  const updateEqMock = vi.fn(async () => updateResult);
   const updateMock = vi.fn(() => ({
     eq: updateEqMock,
   }));
@@ -1242,9 +1245,10 @@ describe('tryHandleEsignRoute', () => {
 
   it('webhook updates change order opened state from form.viewed via external_id', async () => {
     const res = captureRes();
-    const { updateEqMock } = mockWebhookSupabaseChangeOrderOnly((column, value) => {
+    const { updateMock, updateEqMock } = mockWebhookSupabaseChangeOrderOnly((column, value) => {
       if (column === 'id' && value === CO_UUID) {
         return baseCORow({
+          status: 'pending_approval',
           esign_submission_id: '900',
           esign_submitter_id: '77',
           esign_status: 'sent',
@@ -1279,7 +1283,244 @@ describe('tryHandleEsignRoute', () => {
 
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ ok: true });
+    const patch = firstMockCallArg(updateMock) as { esign_status?: string; status?: string };
+    expect(patch).toMatchObject({ esign_status: 'opened', status: 'pending_approval' });
     expect(updateEqMock).toHaveBeenCalledWith('id', CO_UUID);
+  });
+
+  it('webhook ignores stale change-order submission when verified id differs from payload submission id', async () => {
+    const res = captureRes();
+    const { updateMock } = mockWebhookSupabaseChangeOrderOnly((column, value) => {
+      if (column === 'id' && value === CO_UUID) {
+        return baseCORow({
+          status: 'pending_approval',
+          esign_submission_id: '900',
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      return null;
+    });
+
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(docusealSubmissionResponse(901)), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'form.completed',
+        data: { id: 77, external_id: CO_UUID, submission: { id: 900, status: 'completed' } },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({
+      ok: true,
+      ignored: true,
+      reason: 'stale_submission',
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('webhook ignores stale change-order submission when external-id fallback resolves to a different stored submission', async () => {
+    const res = captureRes();
+    const { updateMock } = mockWebhookSupabaseChangeOrderOnly((column, value) => {
+      if (column === 'esign_submission_id' && value === '222') return null;
+      if (column === 'id' && value === CO_UUID) {
+        return baseCORow({
+          status: 'pending_approval',
+          esign_submission_id: '111',
+          esign_submitter_id: '1',
+          esign_status: 'sent',
+        });
+      }
+      return null;
+    });
+
+    const submission = docusealSubmissionResponse(222);
+    submission.status = 'completed';
+    submission.submitters[0].external_id = CO_UUID;
+    submission.submitters[0].status = 'completed';
+    submission.submitters[0].completed_at = '2026-03-28T13:00:00Z';
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(submission), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'submission.completed',
+        data: { id: 222, external_id: CO_UUID },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({
+      ok: true,
+      ignored: true,
+      reason: 'stale_submission',
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('webhook updates change order completed state from submission.completed', async () => {
+    const res = captureRes();
+    const { updateMock, updateEqMock } = mockWebhookSupabaseChangeOrderOnly((column, value) => {
+      if (column === 'esign_submission_id' && value === '900') {
+        return baseCORow({
+          status: 'pending_approval',
+          esign_submission_id: '900',
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      return null;
+    });
+
+    const submission = docusealSubmissionResponse(900);
+    submission.status = 'completed';
+    submission.completed_at = '2026-03-28T13:20:00Z';
+    submission.submitters[0].external_id = CO_UUID;
+    submission.submitters[0].status = 'completed';
+    submission.submitters[0].completed_at = '2026-03-28T13:20:00Z';
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(submission), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'submission.completed',
+        data: { id: 900, external_id: CO_UUID },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true });
+    const patch = firstMockCallArg(updateMock) as {
+      esign_status?: string;
+      status?: string;
+      esign_completed_at?: string | null;
+    };
+    expect(patch).toMatchObject({
+      esign_status: 'completed',
+      status: 'approved',
+      esign_completed_at: '2026-03-28T13:20:00Z',
+    });
+    expect(updateEqMock).toHaveBeenCalledWith('id', CO_UUID);
+  });
+
+  it('webhook returns 500 when change-order webhook update fails', async () => {
+    const res = captureRes();
+    mockWebhookSupabaseChangeOrderOnly(
+      (column, value) => {
+        if (column === 'esign_submission_id' && value === '900') {
+          return baseCORow({
+            status: 'pending_approval',
+            esign_submission_id: '900',
+            esign_submitter_id: '77',
+            esign_status: 'sent',
+          });
+        }
+        return null;
+      },
+      { error: { message: 'co update failed' } }
+    );
+
+    const submission = docusealSubmissionResponse(900);
+    submission.submitters[0].external_id = CO_UUID;
+    submission.submitters[0].status = 'opened';
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(submission), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'submission.opened',
+        data: { id: 900, external_id: CO_UUID },
+      }))
+    );
+
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body)).toEqual({ error: 'Database update failed.' });
+  });
+
+  it('webhook ignores change-order form event when submitter lookup has no submission id', async () => {
+    const res = captureRes();
+    const { updateMock } = mockWebhookSupabaseChangeOrderOnly((column, value) => {
+      if (column === 'id' && value === CO_UUID) {
+        return baseCORow({
+          status: 'pending_approval',
+          esign_submission_id: null,
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      return null;
+    });
+
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify({ id: 77 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'form.viewed',
+        data: { id: 77, external_id: CO_UUID },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true, ignored: true });
+    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it('change-order send stores pending approval status and submitter external_id = co id', async () => {

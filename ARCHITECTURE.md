@@ -48,14 +48,14 @@ A contractor can **start a work order without signing in**. They fill the job fo
   The frontend sends the rendered agreement HTML to the app's `/api/pdf` route so Chrome can
   render the file with much closer parity to the on-screen preview.
 
-### Work order e-sign (DocuSeal)
+### E-sign (DocuSeal)
 
 - **Routes (same app server as PDFs):** `POST /api/esign/work-orders/:jobId/send`, `POST /api/esign/work-orders/:jobId/resend`, `POST /api/webhooks/docuseal`, and `GET /api/webhooks/docuseal` (connectivity probe → `{ ok: true }`). DocuSeal must call the **public** webhook URL on the same host as the app.
-- **Auth:** Send/resend require `Authorization: Bearer <Supabase access_token>`; the server verifies the JWT and ensures the job row belongs to that user before calling DocuSeal or writing with the **service role**. The webhook uses **`DOCUSEAL_WEBHOOK_HEADER_NAME`** + **`DOCUSEAL_WEBHOOK_HEADER_VALUE`** only (no Supabase session). The server compares those values using **SHA-256 digests** and `timingSafeEqual` (fixed-length compare; operators still configure the **raw** shared secret in env). After header checks, the handler **verify-on-receive**s via DocuSeal `GET /submissions/:id`, ignores stale submissions when `jobs.esign_submission_id` does not match, then updates **`jobs.esign_*`**.
+- **Auth:** Send/resend require `Authorization: Bearer <Supabase access_token>`; the server verifies the JWT and ensures the target row belongs to that user before calling DocuSeal or writing with the **service role**. The webhook uses **`DOCUSEAL_WEBHOOK_HEADER_NAME`** + **`DOCUSEAL_WEBHOOK_HEADER_VALUE`** only (no Supabase session). The server compares those values using **SHA-256 digests** and `timingSafeEqual` (fixed-length compare; operators still configure the **raw** shared secret in env). After header checks, the handler **verify-on-receive**s via DocuSeal `GET /submissions/:id`, rejects stale correlations, then updates the matching **work order or change order `esign_*` fields**.
 - **Send payload:** `POST .../send` accepts **exactly one** document entry; every `documents[i].html` (and optional `html_header` / `html_footer`) must be a string. Total UTF-8 size of those HTML fields is capped (**2 MiB**) before the DocuSeal request. Misconfigured server env for e-sign surfaces as **503** with a generic JSON body; unexpected handler failures return **500** with a generic message (details stay in server logs).
 - **Resend:** V1 uses **`PUT /submitters/{esign_submitter_id}`** on the submitter id returned from the first send — not a second HTML submission for the same job. If DocuSeal replies that the submitter already completed, the server reconciles local `jobs.esign_*` from `GET /submissions/{esign_submission_id}` so the UI can self-heal from missed completion webhooks.
 - **HTML:** The client builds DocuSeal-specific HTML in **`src/lib/docuseal-agreement-html.ts`** (embedded styles + `esc()`; customer fields use DocuSeal HTML field tags). The server forwards that payload to DocuSeal; it does not re-derive sections from raw rows.
-- **DB:** Migration **`0010_jobs_esign.sql`** adds **`jobs.esign_*`** columns. **`WorkOrderListJob.esign_status`** powers the work-orders list progress strip; detail shows a signature status timeline card. The client does short polling against existing job reads while `esign_status` is in-flight so webhook-written row updates appear without navigation.
+- **DB:** Migration **`0010_jobs_esign.sql`** adds **`jobs.esign_*`** columns and **`0013_change_orders_esign.sql`** adds matching **`change_orders.esign_*`** columns. **`WorkOrderListJob.esign_status`** powers the work-orders list progress strip; detail shows a signature status timeline card. The client does short polling against existing job and change-order reads while `esign_status` is in-flight so webhook-written row updates appear without navigation.
 
 ### PDF vs preview (`server/app-server.mjs` + `AgreementPreview.tsx`)
 - **Web fonts**: PDF HTML includes the same Google Fonts `<link>`s as `index.html` (Barlow + **Dancing
@@ -167,8 +167,8 @@ scope-lock/
 │   └── main.tsx                      # Entry point
 ├── server/
 │   ├── app-server.mjs               # App server + /api/pdf + e-sign + DocuSeal webhook
-│   ├── esign-routes.mjs             # JWT send/resend; webhook + service-role job updates
-│   └── docuseal-esign-state.mjs     # DocuSeal submission → jobs.esign_* patch fields
+│   ├── esign-routes.mjs             # JWT send/resend; webhook + service-role e-sign updates
+│   └── docuseal-esign-state.mjs     # DocuSeal submission → shared esign_* patch fields
 ├── supabase/
 │   ├── config.toml                   # Supabase CLI config
 │   └── migrations/

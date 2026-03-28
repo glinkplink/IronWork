@@ -1098,7 +1098,14 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
           sendJson(res, 200, { ok: true, ignored: true });
           return;
         }
-        await handleChangeOrderWebhookUpdate(supabase, coResolved.co, verifiedInfo, sendJson, res);
+        await handleChangeOrderWebhookUpdate(
+          supabase,
+          coResolved.co,
+          verifiedInfo,
+          coResolved.resolvedBy,
+          sendJson,
+          res
+        );
         return;
       }
       console.log('[webhook] ignored: missing correlation', {
@@ -1164,7 +1171,14 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
       // Try CO resolution as fallback
       const coResolved = await resolveChangeOrderForVerifiedSubmissionWebhook(supabase, data, verifiedInfo.verified);
       if (coResolved) {
-        await handleChangeOrderWebhookUpdate(supabase, coResolved.co, verifiedInfo, sendJson, res);
+        await handleChangeOrderWebhookUpdate(
+          supabase,
+          coResolved.co,
+          verifiedInfo,
+          coResolved.resolvedBy,
+          sendJson,
+          res
+        );
         return;
       }
       console.log('[webhook] ignored: no matching job', {
@@ -1289,7 +1303,7 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
 }
 
 /** Handle webhook update for a change order (simplified form-webhook path). */
-async function handleChangeOrderWebhookUpdate(supabase, co, verifiedInfo, sendJson, res) {
+async function handleChangeOrderWebhookUpdate(supabase, co, verifiedInfo, resolvedBy, sendJson, res) {
   if (!verifiedInfo || !verifiedInfo.verified) {
     console.log('[webhook] CO ignored: could not verify submission');
     sendJson(res, 200, { ok: true, ignored: true });
@@ -1297,6 +1311,35 @@ async function handleChangeOrderWebhookUpdate(supabase, co, verifiedInfo, sendJs
   }
 
   const verified = verifiedInfo.verified;
+  if (
+    verifiedInfo.payloadSubmissionId &&
+    String(verified.id) !== String(verifiedInfo.payloadSubmissionId)
+  ) {
+    console.log('[webhook] CO ignored: stale submission', {
+      submissionId: String(verified.id),
+      payloadSubmissionId: String(verifiedInfo.payloadSubmissionId),
+      coId: String(co.id),
+      resolvedBy,
+    });
+    sendJson(res, 200, { ok: true, ignored: true, reason: 'stale_submission' });
+    return;
+  }
+
+  if (
+    resolvedBy !== 'submission_id' &&
+    co.esign_submission_id &&
+    String(verified.id) !== String(co.esign_submission_id)
+  ) {
+    console.log('[webhook] CO ignored: stale submission', {
+      submissionId: String(verified.id),
+      coId: String(co.id),
+      coSubmissionId: String(co.esign_submission_id),
+      resolvedBy,
+    });
+    sendJson(res, 200, { ok: true, ignored: true, reason: 'stale_submission' });
+    return;
+  }
+
   const patch = buildChangeOrderPatchFromSubmission(verified, co.status);
   if (!patch) {
     console.log('[webhook] CO ignored: no patch from submission');

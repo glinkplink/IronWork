@@ -28,7 +28,7 @@ Work agreement generator for contractors (initially welders). Contractors fill o
 | Auth + DB | Supabase (email/password auth, Postgres, RLS) |
 | App Server | Node **`server/app-server.mjs`**: Vite **middleware** (dev) or static **`dist/`** when `NODE_ENV=production`; loads **`.env`** then **`.env.local`** (`dotenv`) for server-only secrets |
 | PDF | Puppeteer Core + **system Chrome**; all document PDFs via **same-origin** `POST /api/pdf` |
-| E-sign | DocuSeal **HTML submissions** from the client; **`POST /api/esign/work-orders/:jobId/send`**, **`POST …/resend`**, **`POST /api/webhooks/docuseal`** (see **ARCHITECTURE.md**) |
+| E-sign | DocuSeal **HTML submissions** from the client; work-order and change-order send/resend routes plus **`POST /api/webhooks/docuseal`** (see **ARCHITECTURE.md**) |
 | Styling | Plain CSS (`index.css`, global `App.css`, and co-located component/page CSS files) — no Tailwind |
 | Font | Barlow (+ Dancing Script for agreement signature) — field notebook aesthetic |
 
@@ -150,8 +150,8 @@ src/
     sample-job.json          # Default/placeholder values for new agreements
 server/
   app-server.mjs             # App server + /api/pdf + e-sign + DocuSeal webhook routes
-  esign-routes.mjs           # JWT send/resend; webhook verify + service-role job updates
-  docuseal-esign-state.mjs   # Map DocuSeal submission/submitter → jobs.esign_* patch (shared w/ tests via @scope-server alias)
+  esign-routes.mjs           # JWT send/resend; webhook verify + service-role e-sign updates
+  docuseal-esign-state.mjs   # Map DocuSeal submission/submitter → shared esign_* patch (shared w/ tests via @scope-server alias)
 ```
 
 ---
@@ -181,7 +181,7 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 - If invoice-status rows are partially malformed, the page shows a warning banner but keeps valid invoice actions enabled.
 - `WorkOrderDetailPage` has a single **job-level** invoice strip; invoice actions are not rendered per change-order row.
 - `ChangeOrderWizard` now saves the CO, sends the DocuSeal request immediately, then routes to `ChangeOrderDetailPage`; CO business `status` tracks approval lifecycle (`pending_approval` after send/open, `approved` on completed signature, `rejected` on decline).
-- **`jobs.esign_*`:** list shows a compact e-sign progress strip when `esign_status !== 'not_sent'`; detail has a centered 3-step signature timeline plus **Send / Resend**, signing link, and signed PDF when available. Both surfaces poll existing DB reads while e-sign is in-flight so DocuSeal webhook updates show up without a manual reload.
+- **`jobs.esign_*` and `change_orders.esign_*`:** list/detail surfaces show e-sign progress, signing actions, and signed artifacts from the same DocuSeal state model. Both surfaces poll existing DB reads while e-sign is in-flight so DocuSeal webhook updates show up without a manual reload.
 
 **`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).
 

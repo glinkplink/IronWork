@@ -41,7 +41,7 @@ curl -s http://127.0.0.1:3000/api/pdf/health
 
 | Command | What runs |
 |--------|-----------|
-| `npm run dev` | **`node server/app-server.mjs`** with `NODE_ENV` ≠ `production`: Vite in **middleware mode** (hot reload) + **`POST /api/pdf`** + **`POST /api/esign/work-orders/:jobId/send|resend`** + **`POST /api/webhooks/docuseal`** |
+| `npm run dev` | **`node server/app-server.mjs`** with `NODE_ENV` ≠ `production`: Vite in **middleware mode** (hot reload) + **`POST /api/pdf`** + work-order/change-order e-sign send-resend routes + **`POST /api/webhooks/docuseal`** |
 | `npm run build` | TypeScript project references + Vite production bundle → `dist/` |
 | `npm run preview` | **`NODE_ENV=production node server/app-server.mjs`**: serves **`dist/`** as static files + **`POST /api/pdf`** and the same e-sign/webhook routes. **Run `npm run build` first** or the app shell will be missing/outdated. |
 | `npm run lint` | ESLint |
@@ -77,7 +77,7 @@ The server loads **`.env`** then **`.env.local`** (override) via `dotenv` so Doc
 | `DOCUSEAL_WEBHOOK_HEADER_NAME` | **Exact** header name configured in DocuSeal for inbound webhooks (copy from their UI). |
 | `DOCUSEAL_WEBHOOK_HEADER_VALUE` | Secret value paired with that header. |
 | `SUPABASE_URL` | Same project URL as `VITE_SUPABASE_URL`; used by the server with the service role. |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Server only.** Used to update `jobs.esign_*` after send/resend and on webhooks. Send/resend still require a valid user **JWT**; each update checks `jobs.user_id` matches the caller (webhooks use submission correlation, not Supabase JWT). |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Server only.** Used to update work-order and change-order `esign_*` fields after send/resend and on webhooks. Send/resend still require a valid user **JWT**; each update checks the owned row before writing (webhooks use DocuSeal submission correlation, not Supabase JWT). |
 
 ---
 
