@@ -47,6 +47,16 @@ function mapChangeOrderRow(data: Record<string, unknown>): ChangeOrder {
       )
     : [];
 
+  const esignRaw = data.esign_status;
+  const esign_status: ChangeOrder['esign_status'] =
+    esignRaw === 'sent' ||
+    esignRaw === 'opened' ||
+    esignRaw === 'completed' ||
+    esignRaw === 'declined' ||
+    esignRaw === 'expired'
+      ? esignRaw
+      : 'not_sent';
+
   return {
     id: data.id as string,
     user_id: data.user_id as string,
@@ -62,6 +72,18 @@ function mapChangeOrderRow(data: Record<string, unknown>): ChangeOrder {
     time_note: String(data.time_note ?? ''),
     created_at: String(data.created_at ?? ''),
     updated_at: String(data.updated_at ?? ''),
+    esign_submission_id: data.esign_submission_id ?? null,
+    esign_submitter_id: data.esign_submitter_id ?? null,
+    esign_embed_src: data.esign_embed_src ?? null,
+    esign_status,
+    esign_submission_state: data.esign_submission_state ?? null,
+    esign_submitter_state: data.esign_submitter_state ?? null,
+    esign_sent_at: data.esign_sent_at ?? null,
+    esign_opened_at: data.esign_opened_at ?? null,
+    esign_completed_at: data.esign_completed_at ?? null,
+    esign_declined_at: data.esign_declined_at ?? null,
+    esign_decline_reason: data.esign_decline_reason ?? null,
+    esign_signed_document_url: data.esign_signed_document_url ?? null,
   };
 }
 
@@ -176,4 +198,17 @@ export async function deleteChangeOrder(
     return { error: new Error(error.message) };
   }
   return { error: null };
+}
+
+export async function getChangeOrderById(id: string): Promise<ChangeOrder | null> {
+  const { data, error } = await supabase
+    .from('change_orders')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) {
+    console.error('getChangeOrderById:', error);
+    return null;
+  }
+  return data ? mapChangeOrderRow(data as Record<string, unknown>) : null;
 }

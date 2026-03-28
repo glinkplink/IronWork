@@ -108,6 +108,13 @@ export function useChangeOrderFlow(
     setChangeOrder(initialChangeOrder);
   }, []);
 
+  const handleCoEsignUpdated = useCallback(
+    (updatedCo: ChangeOrder) => {
+      setChangeOrder((c) => ({ ...c, coDetailCO: updatedCo }));
+    },
+    []
+  );
+
   return {
     state: changeOrder,
     actions: {
@@ -120,6 +127,7 @@ export function useChangeOrderFlow(
       handleChangeOrderWizardComplete,
       handleChangeOrderWizardCancel,
       resetChangeOrderFlow,
+      handleCoEsignUpdated,
     },
   };
 }

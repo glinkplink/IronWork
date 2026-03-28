@@ -18,6 +18,7 @@ export interface EsignSendDocumentsPayload {
 
 export interface EsignApiResponse {
   jobId: string;
+  coId?: string;
   esign_submission_id: string | null;
   esign_submitter_id: string | null;
   esign_embed_src: string | null;
@@ -81,6 +82,56 @@ export async function resendWorkOrderSignature(
   message?: { subject?: string; body?: string }
 ): Promise<EsignApiResponse> {
   const res = await fetchWithSupabaseAuth(`/api/esign/work-orders/${jobId}/resend`, {
+    method: 'POST',
+    body: JSON.stringify(message ? { message } : {}),
+  });
+  const text = await res.text();
+  let json: unknown = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (!res.ok) {
+    const msg =
+      json && typeof json === 'object' && json !== null && 'error' in json
+        ? String((json as { error: unknown }).error)
+        : text || res.statusText;
+    throw new Error(msg);
+  }
+  return json as EsignApiResponse;
+}
+
+export async function sendChangeOrderForSignature(
+  coId: string,
+  payload: EsignSendDocumentsPayload
+): Promise<EsignApiResponse> {
+  const res = await fetchWithSupabaseAuth(`/api/esign/change-orders/${coId}/send`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let json: unknown = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (!res.ok) {
+    const msg =
+      json && typeof json === 'object' && json !== null && 'error' in json
+        ? String((json as { error: unknown }).error)
+        : text || res.statusText;
+    throw new Error(msg);
+  }
+  return json as EsignApiResponse;
+}
+
+export async function resendChangeOrderSignature(
+  coId: string,
+  message?: { subject?: string; body?: string }
+): Promise<EsignApiResponse> {
+  const res = await fetchWithSupabaseAuth(`/api/esign/change-orders/${coId}/resend`, {
     method: 'POST',
     body: JSON.stringify(message ? { message } : {}),
   });

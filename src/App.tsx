@@ -262,6 +262,7 @@ function App() {
           onBack={changeOrderFlow.handleBackFromCODetail}
           onEdit={changeOrderFlow.handleEditCOFromDetail}
           onDelete={changeOrderFlow.handleDeleteCOFromDetail}
+          onCoUpdated={changeOrderFlow.handleCoEsignUpdated}
         />
       );
     }

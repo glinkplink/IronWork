@@ -239,6 +239,79 @@ async function resolveJobForVerifiedSubmissionWebhook(supabase, webhookData, ver
   return null;
 }
 
+/** Find a change order by a specific column value. */
+async function findChangeOrderForWebhook(supabase, column, value) {
+  if (value == null) return null;
+  const matchValue = String(value).trim();
+  if (!matchValue) return null;
+  const { data: row } = await supabase
+    .from('change_orders')
+    .select('*')
+    .eq(column, matchValue)
+    .maybeSingle();
+  return row || null;
+}
+
+/** Resolve a change order from webhook payload (form.* events). */
+async function resolveChangeOrderForFormWebhook(supabase, webhookData) {
+  const d = webhookData || {};
+  const payloadExternalId = d.external_id;
+  if (payloadExternalId && isUuid(payloadExternalId)) {
+    const row = await findChangeOrderForWebhook(supabase, 'id', payloadExternalId);
+    if (row) {
+      return { co: row, resolvedBy: 'external_id' };
+    }
+  }
+
+  const submitterId = d.id ?? null;
+  if (submitterId != null) {
+    const row = await findChangeOrderForWebhook(supabase, 'esign_submitter_id', submitterId);
+    if (row) {
+      return { co: row, resolvedBy: 'submitter_id' };
+    }
+  }
+
+  const payloadSubmissionId = d.submission?.id ?? null;
+  if (payloadSubmissionId != null) {
+    const row = await findChangeOrderForWebhook(supabase, 'esign_submission_id', payloadSubmissionId);
+    if (row) {
+      return { co: row, resolvedBy: 'submission_id' };
+    }
+  }
+
+  return null;
+}
+
+/** Resolve a change order after DocuSeal submission verification. */
+async function resolveChangeOrderForVerifiedSubmissionWebhook(supabase, webhookData, verifiedSubmission) {
+  const d = webhookData || {};
+  const verifiedSubmissionId = verifiedSubmission?.id;
+  if (verifiedSubmissionId != null) {
+    const row = await findChangeOrderForWebhook(supabase, 'esign_submission_id', verifiedSubmissionId);
+    if (row) {
+      return { co: row, resolvedBy: 'submission_id' };
+    }
+  }
+
+  const verifiedExternalId = pickCustomerSubmitter(verifiedSubmission)?.external_id;
+  if (verifiedExternalId && isUuid(verifiedExternalId)) {
+    const row = await findChangeOrderForWebhook(supabase, 'id', verifiedExternalId);
+    if (row) {
+      return { co: row, resolvedBy: 'verified_external_id' };
+    }
+  }
+
+  const payloadExternalId = d.external_id || d.submitters?.[0]?.external_id;
+  if (payloadExternalId && isUuid(payloadExternalId)) {
+    const row = await findChangeOrderForWebhook(supabase, 'id', payloadExternalId);
+    if (row) {
+      return { co: row, resolvedBy: 'payload_external_id' };
+    }
+  }
+
+  return null;
+}
+
 async function verifySubmissionForFormWebhook(job, webhookData) {
   const d = webhookData || {};
   const payloadSubmissionId = d.submission?.id ?? null;
@@ -298,9 +371,13 @@ function matchEsignPath(method, pathname) {
   if (method === 'POST' && pathname === '/api/webhooks/docuseal') {
     return { kind: 'webhook' };
   }
-  const m = pathname.match(/^\/api\/esign\/work-orders\/([0-9a-fA-F-]{36})\/(send|resend)$/);
-  if (method === 'POST' && m) {
-    return { kind: 'esign', jobId: m[1], action: m[2] };
+  const woMatch = pathname.match(/^\/api\/esign\/work-orders\/([0-9a-fA-F-]{36})\/(send|resend)$/);
+  if (method === 'POST' && woMatch) {
+    return { kind: 'esign', jobId: woMatch[1], action: woMatch[2] };
+  }
+  const coMatch = pathname.match(/^\/api\/esign\/change-orders\/([0-9a-fA-F-]{36})\/(send|resend)$/);
+  if (method === 'POST' && coMatch) {
+    return { kind: 'co-esign', coId: coMatch[1], action: coMatch[2] };
   }
   return null;
 }
@@ -562,6 +639,257 @@ async function handleResend(req, res, readJsonBody, sendJson, jobId) {
   });
 }
 
+function publicCoEsignPayload(row) {
+  return {
+    esign_submission_id: row.esign_submission_id,
+    esign_submitter_id: row.esign_submitter_id,
+    esign_embed_src: row.esign_embed_src,
+    esign_status: row.esign_status,
+    esign_submission_state: row.esign_submission_state,
+    esign_submitter_state: row.esign_submitter_state,
+    esign_sent_at: row.esign_sent_at,
+    esign_opened_at: row.esign_opened_at,
+    esign_completed_at: row.esign_completed_at,
+    esign_declined_at: row.esign_declined_at,
+    esign_decline_reason: row.esign_decline_reason,
+    esign_signed_document_url: row.esign_signed_document_url,
+  };
+}
+
+async function handleCoSend(req, res, readJsonBody, sendJson, sendText, coId) {
+  const token = getBearerToken(req);
+  if (!token) {
+    sendJson(res, 401, { error: 'Missing or invalid Authorization bearer token.' });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    sendJson(res, 400, { error: 'Invalid JSON body.' });
+    return;
+  }
+
+  const supabase = getServiceSupabase();
+  const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+  if (userErr || !userData?.user?.id) {
+    sendJson(res, 401, { error: 'Invalid or expired session.' });
+    return;
+  }
+  const userId = userData.user.id;
+
+  const { data: co, error: coErr } = await supabase
+    .from('change_orders')
+    .select('*')
+    .eq('id', coId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (coErr) {
+    sendJson(res, 500, { error: coErr.message });
+    return;
+  }
+  if (!co) {
+    sendJson(res, 404, { error: 'Change order not found.' });
+    return;
+  }
+
+  // Fetch parent job to get customer email
+  const { data: parentJob } = await supabase
+    .from('jobs')
+    .select('customer_email')
+    .eq('id', co.job_id)
+    .maybeSingle();
+
+  const email = (parentJob?.customer_email || '').trim();
+  if (!email) {
+    sendJson(res, 400, { error: 'Customer email is required to send for signature.' });
+    return;
+  }
+
+  const documents = body.documents;
+  const docErr = validateSendDocuments(documents);
+  if (docErr) {
+    sendJson(res, 400, { error: docErr });
+    return;
+  }
+
+  const htmlBytes = countEsignHtmlUtf8Bytes(documents);
+  if (htmlBytes > ESIGN_MAX_HTML_BYTES) {
+    sendJson(res, 413, {
+      error: `Document HTML exceeds maximum size (${ESIGN_MAX_HTML_BYTES} bytes).`,
+    });
+    return;
+  }
+
+  const payload = {
+    name: body.name || `Change Order #${String(co.co_number ?? '').padStart(4, '0')}`,
+    send_email: body.send_email !== false,
+    documents,
+    submitters: [
+      {
+        role: DOCUSEAL_CUSTOMER_ROLE,
+        email,
+        external_id: coId,
+      },
+    ],
+  };
+  if (body.message && typeof body.message === 'object') {
+    payload.message = body.message;
+  }
+  if (body.order) payload.order = body.order;
+  if (body.completed_redirect_url) payload.completed_redirect_url = body.completed_redirect_url;
+
+  let submission;
+  try {
+    submission = await docusealFetchJson('/submissions/html', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 502;
+    sendJson(res, status, { error: e instanceof Error ? e.message : 'DocuSeal request failed.' });
+    return;
+  }
+
+  const patch = buildEsignRowFromSubmission(submission);
+  if (!patch) {
+    sendJson(res, 502, { error: 'DocuSeal response missing submitters.' });
+    return;
+  }
+
+  const { data: updated, error: upErr } = await supabase
+    .from('change_orders')
+    .update(patch)
+    .eq('id', coId)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (upErr || !updated) {
+    sendJson(res, 500, { error: upErr?.message || 'Failed to update change order after DocuSeal send.' });
+    return;
+  }
+
+  const coJobId = co.job_id;
+  sendJson(res, 200, { coId, jobId: coJobId, ...publicCoEsignPayload(updated) });
+}
+
+async function handleCoResend(req, res, readJsonBody, sendJson, coId) {
+  const token = getBearerToken(req);
+  if (!token) {
+    sendJson(res, 401, { error: 'Missing or invalid Authorization bearer token.' });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    sendJson(res, 400, { error: 'Invalid JSON body.' });
+    return;
+  }
+
+  const supabase = getServiceSupabase();
+  const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+  if (userErr || !userData?.user?.id) {
+    sendJson(res, 401, { error: 'Invalid or expired session.' });
+    return;
+  }
+  const userId = userData.user.id;
+
+  const { data: co, error: coErr } = await supabase
+    .from('change_orders')
+    .select('*')
+    .eq('id', coId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (coErr) {
+    sendJson(res, 500, { error: coErr.message });
+    return;
+  }
+  if (!co) {
+    sendJson(res, 404, { error: 'Change order not found.' });
+    return;
+  }
+  if (!co.esign_submitter_id) {
+    sendJson(res, 400, { error: 'Change order has not been sent for signature yet.' });
+    return;
+  }
+
+  let submission;
+  try {
+    submission = await docusealFetchJson(`/submitters/${co.esign_submitter_id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...(body.message && typeof body.message === 'object'
+          ? { message: body.message }
+          : {}),
+      }),
+    });
+  } catch (e) {
+    const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 502;
+    sendJson(res, status, { error: e instanceof Error ? e.message : 'DocuSeal resend failed.' });
+    return;
+  }
+
+  const coJobId = co.job_id;
+
+  // Re-fetch from DocuSeal to get fresh status
+  let freshSubmission = null;
+  try {
+    freshSubmission = await docusealFetchJson(`/submissions/${co.esign_submission_id}`);
+  } catch {
+    // Fallback: use response from PUT /submitters
+    freshSubmission = submission;
+  }
+
+  const patch = freshSubmission ? buildEsignRowFromSubmission(freshSubmission) : null;
+
+  // Fallback: preserve timestamps if no new state available
+  const resendFallbackPatch = {
+    esign_status: 'sent',
+    esign_submitter_state: submission.status,
+    esign_sent_at: co.esign_sent_at || new Date().toISOString(),
+  };
+
+  if (patch) {
+    const { data: updated, error: upErr } = await supabase
+      .from('change_orders')
+      .update(patch)
+      .eq('id', coId)
+      .eq('user_id', userId)
+      .select('*')
+      .single();
+    if (!upErr && updated) {
+      sendJson(res, 200, { coId, jobId: coJobId, ...publicCoEsignPayload(updated) });
+      return;
+    }
+  }
+
+  // Fallback
+  if (resendFallbackPatch) {
+    const { data: fallbackUpdated, error: fbErr } = await supabase
+      .from('change_orders')
+      .update(resendFallbackPatch)
+      .eq('id', coId)
+      .eq('user_id', userId)
+      .select('*')
+      .single();
+    if (!fbErr && fallbackUpdated) {
+      sendJson(res, 200, { coId, jobId: coJobId, ...publicCoEsignPayload(fallbackUpdated) });
+      return;
+    }
+  }
+
+  sendJson(res, 500, {
+    error: 'Resend succeeded, but local state could not be refreshed. Reload to see current status.',
+    coId,
+  });
+}
+
 async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
   const headerName = env('DOCUSEAL_WEBHOOK_HEADER_NAME');
   const headerSecret = env('DOCUSEAL_WEBHOOK_HEADER_VALUE');
@@ -620,6 +948,20 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
   if (formEvent) {
     resolved = await resolveJobForFormWebhook(supabase, data);
     if (!resolved) {
+      // Try CO resolution as fallback
+      const coResolved = await resolveChangeOrderForFormWebhook(supabase, data);
+      if (coResolved) {
+        // Verify submission for CO
+        try {
+          verifiedInfo = await verifySubmissionForFormWebhook({ esign_submission_id: coResolved.co.esign_submission_id }, data);
+        } catch (e) {
+          console.error('DocuSeal verify submission failed for CO:', e);
+          sendJson(res, 502, { error: 'Could not verify submission with DocuSeal.' });
+          return;
+        }
+        await handleChangeOrderWebhookUpdate(supabase, coResolved.co, verifiedInfo, sendJson);
+        return;
+      }
       console.log('[webhook] ignored: missing correlation', {
         eventType,
         submissionId: submissionId != null ? String(submissionId) : null,
@@ -680,6 +1022,12 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
 
     resolved = await resolveJobForVerifiedSubmissionWebhook(supabase, data, verifiedInfo.verified);
     if (!resolved) {
+      // Try CO resolution as fallback
+      const coResolved = await resolveChangeOrderForVerifiedSubmissionWebhook(supabase, data, verifiedInfo.verified);
+      if (coResolved) {
+        await handleChangeOrderWebhookUpdate(supabase, coResolved.co, verifiedInfo, sendJson);
+        return;
+      }
       console.log('[webhook] ignored: no matching job', {
         submissionId: String(verifiedInfo.verified.id),
         eventType,
@@ -801,6 +1149,52 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
   sendJson(res, 200, { ok: true });
 }
 
+/** Handle webhook update for a change order (simplified form-webhook path). */
+async function handleChangeOrderWebhookUpdate(supabase, co, verifiedInfo, sendJson) {
+  if (!verifiedInfo || !verifiedInfo.verified) {
+    console.log('[webhook] CO ignored: could not verify submission');
+    sendJson(res, 200, { ok: true, ignored: true });
+    return;
+  }
+
+  const verified = verifiedInfo.verified;
+  const patch = buildEsignRowFromSubmission(verified);
+  if (!patch) {
+    console.log('[webhook] CO ignored: no patch from submission');
+    sendJson(res, 200, { ok: true, ignored: true });
+    return;
+  }
+
+  console.log('[webhook] CO derived patch', {
+    coId: co.id,
+    esign_status: patch.esign_status,
+    esign_submission_state: patch.esign_submission_state,
+  });
+
+  const { error: upErr } = await supabase
+    .from('change_orders')
+    .update(patch)
+    .eq('id', co.id);
+
+  if (upErr) {
+    console.error('Webhook CO update failed:', upErr);
+    console.log('[webhook] CO update failed', {
+      coId: co.id,
+      esign_status: patch.esign_status,
+      error: upErr.message,
+    });
+    sendJson(res, 500, { error: 'Database update failed.' });
+    return;
+  }
+
+  console.log('[webhook] CO update applied', {
+    coId: co.id,
+    esign_status: patch.esign_status,
+  });
+
+  sendJson(res, 200, { ok: true });
+}
+
 /**
  * @returns {boolean} true if this request was handled (caller should not fall through)
  */
@@ -829,6 +1223,14 @@ export async function tryHandleEsignRoute(req, res, helpers) {
     }
     if (route.kind === 'esign' && route.action === 'resend') {
       await handleResend(req, res, readJsonBody, sendJson, route.jobId);
+      return true;
+    }
+    if (route.kind === 'co-esign' && route.action === 'send') {
+      await handleCoSend(req, res, readJsonBody, sendJson, sendText, route.coId);
+      return true;
+    }
+    if (route.kind === 'co-esign' && route.action === 'resend') {
+      await handleCoResend(req, res, readJsonBody, sendJson, route.coId);
       return true;
     }
   } catch (e) {
