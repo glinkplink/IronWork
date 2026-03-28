@@ -1,5 +1,19 @@
 # ScopeLock Architecture
 
+## Agent documentation & living documents
+
+**Canonical short rules for all agents:** **[AGENTS.md](./AGENTS.md)**.
+
+**Detailed project context:** **[CLAUDE.md](./CLAUDE.md)**.
+
+**Cursor enforcement:** **[.cursor/rules/ScopeLock-Project-Rules.mdc](./.cursor/rules/ScopeLock-Project-Rules.mdc)** and **[.cursor/rules/high-priority.mdc](./.cursor/rules/high-priority.mdc)**.
+
+`AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, and those Cursor rule files are **living documents** and should stay aligned.
+
+- **After each substantive code change** that affects architecture, deployment, system boundaries, routes, patterns, stack/dependencies, or cross-cutting implementation conventions, update whichever of these files are affected.
+- **When editing any of these agent-facing files**, compare the same topic across the others and keep them aligned, especially for architecture/deployment constraints, CSS co-location, HTML/`esc()` rules, and minimal-diff/file-discipline guidance.
+- `AGENTS.md` remains the first-stop rules file; this document is the deeper system and deployment reference.
+
 ## Product Purpose
 
 ScopeLock helps independent welders quickly generate short, professional job agreements for small jobs. The goal is to prevent disputes, clarify scope, and protect the welder from being blamed for issues outside their work.
@@ -78,7 +92,9 @@ A contractor can **start a work order without signing in**. They fill the job fo
   **`next_wo_number`** bump on new inserts only).
 - **Clients:** Before the job row is written, the app **upserts** a **`clients`** row keyed by
   **`name_normalized`** (`lower(trim(name))`) with display **`name`** trimmed; **`jobs.client_id`**
-  is set to that client’s id. Requires migration **`0004_clients_name_normalized.sql`**.
+  is set to that client’s id. This behavior is part of the current schema; see the applied
+  migrations in `supabase/migrations/` rather than a standalone `0004_clients_name_normalized.sql`
+  file.
 - **WO number:** **`wo_number`** is included only on **insert**; **updates** omit it so the stored
   WO# cannot be overwritten from the client. New drafts get it from **`next_wo_number`**. It is
   **not** on the edit form. **Preview** has no document title; Puppeteer **`headerTemplate`** prints
@@ -96,7 +112,8 @@ scope-lock/
 │   │   ├── EditProfilePage.tsx       # Edit profile + agreement defaults
 │   │   ├── HomePage.tsx              # Landing; Create Work Order
 │   │   ├── WorkOrdersPage.tsx        # List jobs + invoice actions; row opens detail
-│   │   ├── WorkOrderDetailPage.tsx   # Saved job → agreement HTML + Download PDF
+│   │   ├── WorkOrderDetailPage.tsx   # Saved job → agreement + job-level invoice strip + change orders + PDFs
+│   │   ├── ChangeOrderWizard.tsx     # Create/edit change order (3 steps)
 │   │   ├── AgreementDocumentSections.tsx # Renders AgreementSection[] (preview + detail + PDF body)
 │   │   ├── InvoiceWizard.tsx         # Invoice steps (pricing, due date, payment methods)
 │   │   ├── InvoiceFinalPage.tsx      # Preview, download, edit, notes
@@ -106,11 +123,21 @@ scope-lock/
 │   ├── data/
 │   │   └── sample-job.json           # Fallback defaults for new agreements
 │   ├── hooks/
-│   │   └── useAuth.ts                # Auth state hook (Supabase session)
+│   │   ├── useAppNavigation.ts       # URL/history-backed view state
+│   │   ├── useAuth.ts                # Auth state hook (Supabase session)
+│   │   ├── useAuthProfile.ts         # Profile loading + capture redirect handling
+│   │   ├── useChangeOrderFlow.ts     # Detail/wizard/detail navigation for COs
+│   │   ├── useInvoiceFlow.ts         # Invoice wizard/final page flow state
+│   │   ├── useScaledPreview.ts       # 816px preview scaling for WO/invoice mini previews
+│   │   ├── useWorkOrderDraft.ts      # New/edit draft state + next_wo_number refresh path
+│   │   └── useWorkOrderRowActions.ts # Work Orders row hydration/open/invoice helpers
 │   ├── lib/
 │   │   ├── supabase.ts               # Supabase client singleton
 │   │   ├── auth.ts                   # signUp / signIn / signOut helpers
 │   │   ├── agreement-generator.ts    # Pure domain logic: agreement section model
+│   │   ├── agreement-sections-html.ts # Agreement body HTML string (combined WO+CO PDFs)
+│   │   ├── html-escape.ts            # esc() for generator HTML strings
+│   │   ├── change-order-generator.ts # Change order HTML + combined WO + listed COs
 │   │   ├── agreement-pdf.ts          # PDF HTML wrapper + fetch/download blob (Puppeteer)
 │   │   ├── job-site-address.ts       # Multiline job_location, parse for client autofill, single-line PDF
 │   │   ├── us-phone-input.ts         # US phone mask (JobForm + EditProfilePage)
@@ -121,6 +148,7 @@ scope-lock/
 │   │       ├── profile.ts            # getProfile, upsertProfile, updateNextWoNumber (counter patch)
 │   │       ├── clients.ts            # listClients / upsertClient / deleteClient (JobForm search when authed)
 │   │       ├── jobs.ts               # listJobs, saveWorkOrder, create/update/delete
+│   │       ├── change-orders.ts      # list/create/update/delete change orders; computeCOTotal
 │   │       └── invoices.ts           # createInvoice (RPC counter), updateInvoice, list, get, mark downloaded
 │   ├── types/
 │   │   ├── index.ts                  # WelderJob, AgreementSection, SignatureBlockData
@@ -132,8 +160,15 @@ scope-lock/
 ├── supabase/
 │   ├── config.toml                   # Supabase CLI config
 │   └── migrations/
-│       ├── 0001_initial_schema.sql   # Initial tables + indexes + triggers + RLS
-│       └── 0002_invoices.sql         # invoices table, next_invoice_number(), profile counter column
+│       ├── 0001_initial_schema.sql
+│       ├── 0002_invoices.sql
+│       ├── 0003_cash_app_normalization.sql
+│       ├── 0004_default_tax_rate.sql
+│       ├── 0005_change_orders.sql    # structured COs + backfill + legacy next_co_number helper
+│       ├── 0006_change_order_creation_lock.sql # atomic create_change_order RPC with advisory lock
+│       ├── 0007_structured_payment_terms.sql  # payment_terms_days + late_fee_rate on profiles & jobs
+│       ├── 0008_block_co_after_job_invoice.sql # RPC guard: no new COs after finalized WO invoice
+│       └── 0009_jobs_other_classification.sql  # persist "Specify" text when job type is Other
 ├── public/
 ├── index.html
 ├── package.json
@@ -156,8 +191,9 @@ First Download & Save → CaptureModal → signUp + upsertProfile + saveWorkOrde
       ↓
 [Signed in + profile] → HomePage; header: Work Orders, Edit profile (gear)
       ↓
-Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + PDF)
-                      → Invoice → InvoiceWizard → InvoiceFinalPage → Download → Work Orders + success banner
+Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + job-level invoice strip + change orders + PDFs)
+                      → Change Order → ChangeOrderWizard → detail (refresh list)
+                      → Invoice → InvoiceWizard (optional CO lines on **new** invoices) → InvoiceFinalPage → Download → Work Orders + success banner
       ↓
 Create Work Order → JobForm → Preview tab → AgreementPreview (Download & Save / PDF)
       ↓
@@ -165,6 +201,14 @@ Header Sign In → AuthPage (email + password only)
       ↓
 Edit profile (gear) → EditProfilePage
 ```
+
+### Auth and profile (behavior summary)
+
+- **Session:** Supabase email/password; session stored by the Supabase client (survives refresh).
+- **New contractors:** Primary signup path is **CaptureModal** on first **Download & Save** (`signUp` + minimal `upsertProfile` + `saveWorkOrder` + PDF). There is no separate self-serve “register” page in the header for anonymous visitors.
+- **Returning users:** **AuthPage** is sign-in only (email + password).
+- **Missing profile row** while signed in: **BusinessProfileForm** blocks the rest of the app until `business_profiles` exists.
+- **Profile data** (defaults, counters, payment methods, tax, etc.) lives in **`business_profiles`**; jobs, clients, invoices, and change orders are separate tables with RLS. See **What Is and Isn't Persisted** below.
 
 ## Domain Logic vs UI Logic
 
@@ -180,7 +224,8 @@ Edit profile (gear) → EditProfilePage
 - `db/profile.ts`: Profile CRUD; **`updateNextWoNumber`** uses `.update()` (partial `upsert` 400s on `business_profiles` because `business_name` is NOT NULL)
 - `db/clients.ts`: Client CRUD; **JobForm** searches/suggests clients when `userId` is set; **saveWorkOrder** upserts client by `name_normalized`
 - `db/jobs.ts`: Job CRUD + **saveWorkOrder** (insert/update, client upsert); UI lists jobs on **Work Orders**
-- `db/invoices.ts`: Invoice CRUD; **`createInvoice`** calls Postgres **`next_invoice_number(p_user_id)`** for atomic numbering (increments `business_profiles.next_invoice_number`); **`updateInvoice`** full-row overwrite; **`markInvoiceDownloaded`** sets `status = 'downloaded'`
+- `db/invoices.ts`: Invoice CRUD; **`createInvoice`** calls Postgres **`next_invoice_number(p_user_id)`** for atomic numbering (increments `business_profiles.next_invoice_number`); **`updateInvoice`** full-row overwrite; **`markInvoiceDownloaded`** sets `status = 'downloaded'`; **`mapInvoiceRow`** normalizes **`line_items[].source`**; **`listInvoiceStatusByJob`** skips malformed rows and returns a non-blocking warning instead of disabling all invoice actions
+- `db/change-orders.ts`: **`listChangeOrders`**, **`createChangeOrder`** (RPC to **`public.create_change_order`**: per-job advisory lock + `MAX(co_number)+1` in SQL; rejects when a **downloaded job-level** invoice exists for the job), **`updateChangeOrder`**, **`deleteChangeOrder`**, **`computeCOTotal`**
 - `invoice-generator.ts`: Invoice HTML (parties table pattern, line items, tax, payment methods, notes)
 
 ### UI Components (`src/components/`)
@@ -201,12 +246,35 @@ Four tables in Supabase Postgres, all with row-level security:
 | `business_profiles` | user_id (unique), business_name, owner_name, phone, email, address, google_business_profile_url, default_exclusions[], default_assumptions[], default_tax_rate, default_payment_methods[], next_wo_number, next_invoice_number, … |
 | `clients` | user_id, name, **name_normalized** (dedup key), phone, email, address, notes |
 | `jobs` | user_id, client_id, all WelderJob fields, status |
-| `change_orders` | user_id, job_id, description, price_delta, time_delta, approved |
-| `invoices` | user_id, job_id, invoice_number, invoice_date, due_date, status (`draft` \| `downloaded`), line_items (jsonb), tax fields, payment_methods (jsonb snapshot), notes |
+| `change_orders` | user_id, job_id, **co_number** (per-job sequence, UNIQUE with job_id), description, reason, status (`draft` \| `pending_approval` \| `approved` \| `rejected`), **line_items** (jsonb), time_amount / time_unit / time_note, requires_approval, … — legacy `price_delta` / `time_delta` / `approved` were migrated in **0005** |
+| `invoices` | user_id, job_id, invoice_number, invoice_date, due_date, status (`draft` \| `downloaded`), **line_items** (jsonb; each row may include **`source`**: `original_scope` \| `change_order` \| `labor` \| `material` \| `manual` \| `legacy`), tax fields, payment_methods (jsonb snapshot), notes |
 
 **Invoice numbering:** `public.next_invoice_number(uuid)` updates `business_profiles` in one statement and returns the allocated number (pre-increment value). No separate `updateNextInvoiceNumber` in app code.
 
 All tables use `auth.uid()` RLS policies: users can only read/write their own rows.
+
+### Change orders (`0005_change_orders.sql`)
+
+- Adds structured columns (`co_number`, `reason`, `status`, `line_items` jsonb, schedule fields, etc.).
+- **Backfills** existing rows from legacy `price_delta` / `time_delta` / `approved`, assigns **`co_number`** per `job_id` with `ROW_NUMBER()`, then drops the legacy columns.
+- **`UNIQUE (job_id, co_number)`**; numbering is allocated inside **`create_change_order`** (see **0006**), so a `23505` from the RPC is unexpected. The client may still show a generic “try again” if it occurs; there is **no** client-side insert retry loop.
+
+### Combined WO + change-order PDFs (v1)
+
+- Agreement body for PDF is built as an HTML **string** via **`agreementSectionsToHtml`** (mirrors **`AgreementDocumentSections`** markup), not from live DOM `outerHTML`.
+- **`buildCombinedWorkOrderAndChangeOrdersHtml`** appends **`page-break-before: always`** and HTML for **each** change order in the array (caller supplies the list; no status filter inside this helper).
+- Client uses **`fetchHtmlPdfBlob`** / **`downloadPdfBlobToFile`** in **`agreement-pdf.ts`** (same `/api/pdf` JSON shape as work orders and invoices).
+
+### Invoice `line_items[].source`
+
+- **`InvoiceLineItem.source`**: `original_scope` | `change_order` | `labor` | `material` | `manual` | `legacy`. **`mapInvoiceRow`** defaults missing/invalid to **`legacy`**.
+- **New invoice:** **`InvoiceWizard`** loads change orders for the job; **all** are **selected** by default (uncheck to omit); selected rows add **`change_order`** lines. All new built rows set **`source`**.
+- **Edit invoice:** Partition by **`source`**. **`change_order`** rows (and **`legacy`** rows whose description matches **`/^Change Order #/`**) are **preserved**. Rows **`original_scope`**, **`labor`**, **`material`**, **`manual`** are **replaced** from wizard state on save. **Order:** **fixed** → rebuilt original scope then preserved CO lines; **T&M** → preserved CO lines then all labor lines then all material lines. **T&M** editing round-trips **all** labor and material lines (not only the first).
+
+### Work Orders dashboard rollups (Option B)
+
+- **Invoiced** / **Pending Invoice** on **`WorkOrdersPage`** sum **`job.price`** only (original contract on the saved work order). They **do not** include change-order deltas or invoice totals. The summary strip is labeled **Contract value** so this is explicit. Using invoice totals for rollups (**Option A**) is deferred.
+- If **`listInvoiceStatusByJob`** encounters malformed invoice rows, the page shows a warning banner and continues rendering valid invoice actions for unaffected jobs. Query failures still disable invoice actions.
 
 ## What Is and Isn't Persisted
 
@@ -218,16 +286,21 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 | Work Agreement (current job) | In-memory while editing | **Download & Save** persists via `saveWorkOrder` |
 | Invoices | Yes | Created at wizard step 3; status `draft` until **Download Invoice** sets `downloaded`. The **first** download per final-page mount runs **`markInvoiceDownloaded`** and navigation callback; repeat clicks only regenerate the PDF (no duplicate status writes). |
 | Clients | Yes (rows) | Upsert on **Download & Save**; **JobForm** customer-name combobox searches when authenticated |
-| Change orders | No | Schema only |
+| Change orders | Yes | **ChangeOrderWizard** + detail page; **`create_change_order`** RPC allocates `co_number` under an advisory lock (see **0006**); no client-side retry loop |
 | Completion signoffs | No | Schema only |
 
 ## Portability Considerations
 
 ### Current (Web MVP)
-- Runs in browser
-- Auth + profile persistence via Supabase
-- **Work order drafts** are in-memory until **Download & Save**; saved jobs live in `jobs` and appear on **Work Orders**
-- Requires an app server for PDF generation
+
+- **Browser:** React UI; Supabase client talks to Supabase for auth, Postgres (RLS), and RPCs.
+- **Same host as UI:** PDF generation is **not** outsourced to a third-party API. The browser `POST`s rendered HTML + metadata to **`/api/pdf`** on the **same origin** as the SPA. Deployments must preserve that (single Node server, or reverse proxy routing both static assets and `/api/pdf` to the Node process).
+- **Server process:** `server/app-server.mjs` is the only supported entry for local and production runs:
+  - **Development:** `npm run dev` → Vite **middleware mode** inside the Node server + `POST /api/pdf`.
+  - **Production:** `npm run preview` (or `NODE_ENV=production node server/app-server.mjs`) serves **`dist/`** after `npm run build`, still with `POST /api/pdf`.
+- **Chrome/Chromium:** Puppeteer **Core** launches a **system** binary (`PUPPETEER_EXECUTABLE_PATH`, `CHROME_PATH`, or default `/usr/bin/google-chrome-stable`). The PDF route will not work without it.
+- **Work order drafts** are in-memory until **Download & Save**; saved jobs live in `jobs` and appear on **Work Orders**.
+- **Health:** `GET /api/pdf/health` returns `{ ok: true }` for simple readiness checks.
 
 ### Future (Capacitor iOS/Android)
 - Can be wrapped with Capacitor
@@ -242,6 +315,14 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 5. Add native plugins as needed
 
 ## Roadmap
+
+### Top priorities (current focus)
+
+1. **Change orders**
+2. **Client e-sign**
+3. **Stripe / ACH payments**
+
+The checkbox sections below track shipped work and the longer backlog; the three items above are the **near-term product focus** regardless of where they also appear.
 
 ### Completed
 - [x] Job input form (Work Agreement)
@@ -268,7 +349,8 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 
 ### Later
 - [ ] Multiple agreement templates
-- [ ] Change order flow (schema exists)
+- [x] Change order flow (persisted COs, wizard, PDFs, invoice integration)
+- [ ] Work Orders rollups from invoice totals (Option A)
 - [ ] Completion signoff (schema exists)
 - [ ] Capacitor iOS/Android packaging
 
@@ -289,6 +371,16 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 - Mobile-first CSS (start with mobile, add desktop styles)
 - All new tables must include RLS policies
 - DB helpers go in `src/lib/db/`
+
+### Frontend file conventions
+
+- Co-locate page/component styles with the page or component that owns them.
+- `src/App.css` is reserved for global design tokens, app shell/layout primitives, shared utility classes, and print/PDF-global rules.
+- Do not add new page-specific or feature-specific sections to `src/App.css`.
+- New pages and major components should import their own CSS file (for example `WorkOrdersPage.tsx` + `WorkOrdersPage.css`).
+- If a style is only used by one page/component, keep it with that page/component rather than promoting it to a global stylesheet.
+- Shared utility logic belongs in `src/lib/`; avoid duplicated helper functions across generators when one utility can keep behavior consistent.
+- HTML escaping for generated strings lives in `src/lib/html-escape.ts` (`esc`); agreement, change-order, and invoice generators import it—do not reintroduce parallel `escapeHtml` / local `esc` copies.
 
 ## Environment Variables
 
@@ -327,10 +419,21 @@ npx supabase db push
 
 ## Deployment
 
-This app now requires a Node app server for PDF generation, so deployment needs to run the server alongside Chrome/Chromium.
+ScopeLock is **not** deployable as a static export only. The product contract includes **Download PDF** for work orders, invoices, change orders, and combined documents; all of those use **`POST /api/pdf`** on the app server.
 
-Recommended deployment shape:
-- Run `npm run build`
-- Start the app with `npm run preview` or `node server/app-server.mjs`
-- Ensure `PUPPETEER_EXECUTABLE_PATH` or `CHROME_PATH` points to an installed Chrome/Chromium binary if the default path is not valid
-- Expose the same origin for both the frontend and `/api/pdf`
+### Runtime checklist
+
+1. **Build the client** with production env: set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (and optional `VITE_GEOAPIFY_API_KEY`) in the environment used by `npm run build`, then run **`npm run build`**.
+2. **Start the Node server** with **`NODE_ENV=production`** so it serves **`dist/`** instead of Vite dev middleware. **`npm run preview`** does this; alternatively `NODE_ENV=production node server/app-server.mjs`.
+3. **Install Chrome or Chromium** on the host (or container image) and set **`PUPPETEER_EXECUTABLE_PATH`** or **`CHROME_PATH`** if the default **`/usr/bin/google-chrome-stable`** is wrong (common on macOS, Windows, Alpine, or minimal CI images).
+4. **Bind address:** default **`HOST=127.0.0.1`** is fine locally; for containers and PaaS, set **`HOST=0.0.0.0`** and the platform’s **`PORT`**.
+5. **Reverse proxy:** Terminate TLS in front of this process if needed; route **both** static assets and **`/api/pdf`** to the same Node listener (or equivalent path-preserving upstream) so relative `/api/pdf` requests from the browser succeed.
+6. **Readiness:** Use **`GET /api/pdf/health`** to verify the HTTP server is up; a full PDF smoke test confirms Chrome launch and Puppeteer.
+
+### Common mistakes
+
+- Serving only **`dist/`** from nginx/S3/Netlify **without** a compatible **`POST /api/pdf`** implementation — PDF buttons will fail or return errors.
+- Building without **`VITE_*`** variables set — the bundle will have empty Supabase config.
+- Omitting Chrome in Docker — add a package such as Chromium and point **`PUPPETEER_EXECUTABLE_PATH`** at the installed binary (the server already passes `--no-sandbox` / `--disable-setuid-sandbox` for typical container use).
+
+See **[README.md](./README.md)** for a concise operator-facing summary and env var tables.

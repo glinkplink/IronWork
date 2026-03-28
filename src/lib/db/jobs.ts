@@ -1,6 +1,56 @@
 import { supabase } from '../supabase';
-import type { Job } from '../../types/db';
+import type { Job, WorkOrderListJob } from '../../types/db';
 import type { WelderJob } from '../../types';
+
+function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
+  const priceRaw = row.price;
+  const price =
+    typeof priceRaw === 'number' && Number.isFinite(priceRaw)
+      ? priceRaw
+      : Number(priceRaw) || 0;
+  const ocRaw = row.other_classification;
+  const other_classification =
+    ocRaw != null && String(ocRaw).trim() !== '' ? String(ocRaw).trim() : null;
+
+  return {
+    id: String(row.id),
+    wo_number: row.wo_number != null ? Number(row.wo_number) : null,
+    customer_name: String(row.customer_name ?? ''),
+    job_type: String(row.job_type ?? ''),
+    other_classification,
+    agreement_date: (row.agreement_date as string | null) ?? null,
+    created_at: String(row.created_at ?? ''),
+    price,
+  };
+}
+
+export const listJobsForWorkOrders = async (userId: string): Promise<WorkOrderListJob[]> => {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select(
+      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price'
+    )
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error listing jobs for work orders:', error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => mapWorkOrderListRow(row as Record<string, unknown>));
+};
+
+export const getJobById = async (id: string): Promise<Job | null> => {
+  const { data, error } = await supabase.from('jobs').select('*').eq('id', id).maybeSingle();
+
+  if (error) {
+    console.error('Error fetching job:', error);
+    return null;
+  }
+
+  return data as Job | null;
+};
 
 export const listJobs = async (userId: string): Promise<Job[]> => {
   const { data, error } = await supabase
@@ -122,6 +172,8 @@ export const saveWorkOrder = async (
     job_location: job.job_location,
     governing_state: job.governing_state?.trim() || null,
     job_type: job.job_type,
+    other_classification:
+      job.job_type === 'other' ? (job.other_classification?.trim() || null) : null,
     asset_or_item_description: job.asset_or_item_description,
     requested_work: job.requested_work,
     materials_provided_by: job.materials_provided_by,
@@ -141,7 +193,8 @@ export const saveWorkOrder = async (
     contractor_phone: job.contractor_phone || null,
     contractor_email: job.contractor_email || null,
     deposit_amount: job.deposit_amount,
-    late_payment_terms: job.late_payment_terms,
+    payment_terms_days: job.payment_terms_days,
+    late_fee_rate: job.late_fee_rate,
     negotiation_period: job.negotiation_period,
     customer_obligations: Array.isArray(job.customer_obligations) ? job.customer_obligations : [],
     client_id: clientId,

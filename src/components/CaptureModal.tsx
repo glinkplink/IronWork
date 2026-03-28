@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import './CaptureModal.css';
 
 interface CaptureModalProps {
   onSubmit: (businessName: string, email: string, password: string) => void | Promise<void>;

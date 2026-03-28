@@ -1,0 +1,161 @@
+.work-orders-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.work-orders-page .work-orders-row-main {
+  gap: 8px;
+}
+
+.work-orders-page .work-orders-customer {
+  color: var(--primary);
+}
+
+.work-orders-page .work-orders-row-detail-hit:hover .work-orders-customer {
+  color: var(--primary-hover);
+}
+
+.work-orders-toolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.work-orders-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+}
+
+.work-orders-profile-nudge {
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.work-orders-profile-nudge-helper {
+  margin: 0 0 var(--space-md);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.work-orders-profile-nudge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.work-orders-complete-profile-btn {
+  background: var(--primary);
+  color: white;
+  padding: 10px var(--space-xl);
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.work-orders-complete-profile-btn:hover {
+  background: var(--primary-hover);
+}
+
+.work-orders-nudge-not-now {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.work-orders-nudge-not-now:hover {
+  color: var(--text-primary);
+}
+
+.work-orders-success-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.work-orders-invoice-status-banner {
+  margin-bottom: var(--space-md);
+}
+
+.work-orders-invoice-warning-banner {
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-white);
+}
+
+.work-orders-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9375rem;
+}
+
+.work-orders-summary-item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.work-orders-summary-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.work-orders-summary-amount {
+  font-weight: 700;
+  font-size: 1.05em;
+}
+
+.work-orders-summary-invoiced .work-orders-summary-amount {
+  color: #2d6a2e;
+}
+
+.work-orders-summary-pending .work-orders-summary-amount {
+  color: #9a3412;
+}
+
+.work-orders-page .work-orders-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: calc(0.8125rem + 1px);
+}
+
+.work-orders-page .work-orders-meta-date,
+.work-orders-page .work-orders-meta-type {
+  font-size: inherit;
+  line-height: 1.35;
+}

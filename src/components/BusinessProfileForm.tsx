@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { upsertProfile } from '../lib/db/profile';
 import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defaults';
 import type { BusinessProfile } from '../types/db';
+import './BusinessProfileForm.css';
 
 interface BusinessProfileFormProps {
   userId?: string;

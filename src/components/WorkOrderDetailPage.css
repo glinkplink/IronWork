@@ -1,0 +1,72 @@
+.wo-detail-invoice-strip {
+  border-bottom: none;
+  padding-top: 0;
+}
+
+.wo-detail-invoice-meta {
+  display: block;
+  margin-top: 2px;
+}
+
+.co-list-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.co-list-item:last-child {
+  border-bottom: none;
+}
+
+.co-list-item .work-orders-row-detail-hit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.co-list-heading {
+  margin: var(--space-lg) 0 var(--space-sm);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+.co-list-heading span {
+  display: inline-block;
+  padding-bottom: 4px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-bottom: 2px solid var(--text-primary);
+}
+
+.co-list-number {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.co-list-desc {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+.co-list-amount {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2a7a3b;
+}
+
+.work-orders-empty.wo-co-finalized-block {
+  text-align: center;
+}

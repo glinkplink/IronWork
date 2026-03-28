@@ -1,16 +1,23 @@
-import { useMemo, useState } from 'react';
-import type { Job, BusinessProfile, Invoice, InvoiceLineItem } from '../types/db';
+import { useEffect, useMemo, useState } from 'react';
+import type {
+  Job,
+  BusinessProfile,
+  Invoice,
+  ChangeOrder,
+} from '../types/db';
 import { createInvoice, updateInvoice } from '../lib/db/invoices';
+import { listChangeOrders } from '../lib/db/change-orders';
+import {
+  buildInvoiceLineItems,
+  formatChangeOrderPickerAmount,
+  parseExistingIntoInvoiceState,
+} from '../lib/invoice-line-items';
+import type { MaterialRow, LaborRow } from '../lib/invoice-line-items';
 import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-methods';
 import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
+import './InvoiceWizard.css';
 
 type PricingSubStep = 'labor' | 'materials';
-
-interface MaterialRow {
-  description: string;
-  qty: string;
-  unit_price: string;
-}
 
 function defaultDueDateYmd(): string {
   const d = new Date();
@@ -24,98 +31,6 @@ function defaultPaymentSelection(profile: BusinessProfile): string[] {
   return [...PAYMENT_METHOD_OPTIONS];
 }
 
-function parseExistingIntoState(job: Job, existing: Invoice, profile: BusinessProfile) {
-  const laborItems = existing.line_items.filter((i) => i.kind === 'labor');
-  const matItems = existing.line_items.filter((i) => i.kind === 'material');
-
-  let fixedTotal = job.price;
-  let laborHours = '';
-  let laborRate = '';
-  const materialsYes = matItems.length > 0;
-  const materialRows: MaterialRow[] =
-    matItems.length > 0
-      ? matItems.map((m) => ({
-          description: m.description,
-          qty: String(m.qty),
-          unit_price: String(m.unit_price),
-        }))
-      : [{ description: '', qty: '1', unit_price: '' }];
-
-  if (job.price_type === 'fixed') {
-    const sum = laborItems.reduce((s, i) => s + i.total, 0);
-    fixedTotal = sum > 0 ? sum : job.price;
-  } else {
-    const first = laborItems[0];
-    if (first) {
-      laborHours = String(first.qty);
-      laborRate = String(first.unit_price);
-    }
-  }
-
-  return {
-    fixedTotal,
-    laborHours,
-    laborRate,
-    materialsYes,
-    materialRows,
-    due_date: existing.due_date,
-    taxPercent: taxRateToPercentValue(existing.tax_rate ?? profile.default_tax_rate ?? DEFAULT_TAX_RATE),
-    selectedPaymentMethods: defaultPaymentSelection(profile),
-  };
-}
-
-function buildLineItemsAndTotals(
-  job: Job,
-  fixedTotal: number,
-  laborHours: string,
-  laborRate: string,
-  materialsYes: boolean,
-  materialRows: MaterialRow[]
-): { line_items: InvoiceLineItem[]; subtotal: number } {
-  const items: InvoiceLineItem[] = [];
-
-  if (job.price_type === 'fixed') {
-    const t = Math.max(0, Number(fixedTotal) || 0);
-    items.push({
-      kind: 'labor',
-      description: 'Services (fixed price)',
-      qty: 1,
-      unit_price: t,
-      total: Math.round(t * 100) / 100,
-    });
-  } else {
-    const h = Number(laborHours);
-    const r = Number(laborRate);
-    if (Number.isFinite(h) && Number.isFinite(r) && h > 0 && r >= 0) {
-      const total = Math.round(h * r * 100) / 100;
-      items.push({
-        kind: 'labor',
-        description: 'Labor',
-        qty: h,
-        unit_price: r,
-        total,
-      });
-    }
-    if (materialsYes) {
-      for (const row of materialRows) {
-        const q = Number(row.qty);
-        const up = Number(row.unit_price);
-        if (!row.description.trim() || !Number.isFinite(q) || !Number.isFinite(up) || q <= 0) continue;
-        const total = Math.round(q * up * 100) / 100;
-        items.push({
-          kind: 'material',
-          description: row.description.trim(),
-          qty: q,
-          unit_price: up,
-          total,
-        });
-      }
-    }
-  }
-
-  const subtotal = Math.round(items.reduce((s, i) => s + i.total, 0) * 100) / 100;
-  return { line_items: items, subtotal };
-}
 
 function formatTaxPercent(rate: number): string {
   return `${(rate * 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
@@ -153,6 +68,7 @@ function InvoicePreviewSummary({
 interface InvoiceWizardProps {
   userId: string;
   job: Job;
+  changeOrder: ChangeOrder | null;
   profile: BusinessProfile;
   existingInvoice: Invoice | null;
   onCancel: () => void;
@@ -162,24 +78,29 @@ interface InvoiceWizardProps {
 export function InvoiceWizard({
   userId,
   job,
+  changeOrder,
   profile,
   existingInvoice,
   onCancel,
   onSuccess,
 }: InvoiceWizardProps) {
+  const isChangeOrderInvoice = changeOrder !== null;
   const initial = useMemo(() => {
     if (existingInvoice) {
-      return parseExistingIntoState(job, existingInvoice, profile);
+      return {
+        ...parseExistingIntoInvoiceState(job, existingInvoice, profile),
+        selectedPaymentMethods: defaultPaymentSelection(profile),
+      };
     }
     return {
       fixedTotal: job.price,
-      laborHours: '',
-      laborRate: '',
+      laborRows: [{ description: 'Labor', qty: '', rate: '' }] as LaborRow[],
       materialsYes: null as boolean | null,
       materialRows: [{ description: '', qty: '1', unit_price: '' }] as MaterialRow[],
       due_date: defaultDueDateYmd(),
       taxPercent: taxRateToPercentValue(profile.default_tax_rate ?? DEFAULT_TAX_RATE),
       selectedPaymentMethods: defaultPaymentSelection(profile),
+      structuredLineMetadata: false,
     };
   }, [job, existingInvoice, profile]);
 
@@ -190,8 +111,7 @@ export function InvoiceWizard({
   });
 
   const [fixedTotal, setFixedTotal] = useState(initial.fixedTotal);
-  const [laborHours, setLaborHours] = useState(initial.laborHours);
-  const [laborRate, setLaborRate] = useState(initial.laborRate);
+  const [laborRows, setLaborRows] = useState<LaborRow[]>(initial.laborRows);
   const [materialsYes, setMaterialsYes] = useState<boolean | null>(initial.materialsYes);
   const [materialRows, setMaterialRows] = useState<MaterialRow[]>(initial.materialRows);
   const [dueDate, setDueDate] = useState(initial.due_date);
@@ -200,13 +120,74 @@ export function InvoiceWizard({
     initial.selectedPaymentMethods
   );
 
+  const [changeOrdersOnJob, setChangeOrdersOnJob] = useState<ChangeOrder[]>([]);
+  const [selectedCoIds, setSelectedCoIds] = useState<Set<string>>(() => new Set());
+  /** Job id for which change orders were auto-selected once (avoids ref/effect ordering race; preserves manual edits). */
+  const [coInitJobId, setCoInitJobId] = useState<string | null>(null);
+
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const rows = await listChangeOrders(job.id);
+      if (!cancelled) setChangeOrdersOnJob(rows);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [job.id]);
+
+  useEffect(() => {
+    if (existingInvoice) return;
+    if (isChangeOrderInvoice && changeOrder) {
+      setSelectedCoIds(new Set([changeOrder.id]));
+      setCoInitJobId(job.id);
+      return;
+    }
+    const rowsForJob = changeOrdersOnJob.filter((c) => c.job_id === job.id);
+    if (rowsForJob.length === 0) return;
+    if (coInitJobId === job.id) return;
+    setSelectedCoIds(new Set(rowsForJob.map((c) => c.id)));
+    setCoInitJobId(job.id);
+  }, [changeOrdersOnJob, existingInvoice, isChangeOrderInvoice, changeOrder, job.id, coInitJobId]);
+
+  const selectedCOs = existingInvoice
+    ? []
+    : changeOrdersOnJob.filter((c) =>
+        isChangeOrderInvoice && changeOrder ? c.id === changeOrder.id : selectedCoIds.has(c.id)
+      );
+
+  const mergedLineItems = buildInvoiceLineItems({
+    job,
+    fixedTotal,
+    laborRows,
+    materialsYes: materialsYes === true,
+    materialRows,
+    selectedCOs,
+    includeBaseScope: !isChangeOrderInvoice,
+    existingLineItems: existingInvoice?.line_items,
+  });
+
+  const subtotal = Math.round(mergedLineItems.reduce((s, i) => s + i.total, 0) * 100) / 100;
+  const taxRate = normalizeTaxRate(percentValueToTaxRate(taxPercent));
+  const tax_amount = Math.round(subtotal * taxRate * 100) / 100;
+  const total = Math.round((subtotal + tax_amount) * 100) / 100;
 
   const togglePayment = (method: string) => {
     setSelectedPaymentMethods((prev) =>
       prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method]
     );
+  };
+
+  const toggleCoSelected = (id: string) => {
+    setSelectedCoIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const addMaterialRow = () => {
@@ -225,17 +206,21 @@ export function InvoiceWizard({
     setMaterialRows((rows) => rows.filter((_, i) => i !== index));
   };
 
-  const { subtotal } = buildLineItemsAndTotals(
-    job,
-    fixedTotal,
-    laborHours,
-    laborRate,
-    materialsYes === true,
-    materialRows
-  );
-  const taxRate = normalizeTaxRate(percentValueToTaxRate(taxPercent));
-  const tax_amount = Math.round(subtotal * taxRate * 100) / 100;
-  const total = Math.round((subtotal + tax_amount) * 100) / 100;
+  const addLaborRow = () => {
+    setLaborRows((rows) => [...rows, { description: 'Labor', qty: '', rate: '' }]);
+  };
+
+  const updateLaborRow = (index: number, patch: Partial<LaborRow>) => {
+    setLaborRows((rows) => {
+      const next = [...rows];
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  };
+
+  const removeLaborRow = (index: number) => {
+    setLaborRows((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
+  };
 
   const goStep2 = () => {
     if (subtotal <= 0) {
@@ -251,10 +236,19 @@ export function InvoiceWizard({
   };
 
   const handleLaborContinue = () => {
-    const h = Number(laborHours);
-    const r = Number(laborRate);
-    if (!Number.isFinite(h) || !Number.isFinite(r) || h <= 0 || r < 0) {
-      setError('Enter hours and rate.');
+    const hasValid = laborRows.some((row) => {
+      const h = Number(row.qty);
+      const r = Number(row.rate);
+      return (
+        row.description.trim() !== '' &&
+        Number.isFinite(h) &&
+        h > 0 &&
+        Number.isFinite(r) &&
+        r >= 0
+      );
+    });
+    if (!hasValid) {
+      setError('Enter at least one labor line with description, hours, and rate.');
       return;
     }
     setError('');
@@ -298,15 +292,7 @@ export function InvoiceWizard({
 
   const handleGenerate = async () => {
     setError('');
-    const built = buildLineItemsAndTotals(
-      job,
-      fixedTotal,
-      laborHours,
-      laborRate,
-      materialsYes === true,
-      materialRows
-    );
-    if (built.subtotal <= 0) {
+    if (mergedLineItems.length === 0 || subtotal <= 0) {
       setError('Subtotal must be greater than zero.');
       return;
     }
@@ -315,8 +301,8 @@ export function InvoiceWizard({
       return;
     }
     const normalizedTaxRate = normalizeTaxRate(percentValueToTaxRate(taxPercent));
-    const ta = Math.round(built.subtotal * normalizedTaxRate * 100) / 100;
-    const tot = Math.round((built.subtotal + ta) * 100) / 100;
+    const ta = Math.round(subtotal * normalizedTaxRate * 100) / 100;
+    const tot = Math.round((subtotal + ta) * 100) / 100;
     const invoice_date = new Date().toISOString().split('T')[0];
 
     setSubmitting(true);
@@ -326,8 +312,8 @@ export function InvoiceWizard({
           ...existingInvoice,
           invoice_date: existingInvoice.invoice_date,
           due_date: dueDate,
-          line_items: built.line_items,
-          subtotal: built.subtotal,
+          line_items: mergedLineItems,
+          subtotal,
           tax_rate: normalizedTaxRate,
           tax_amount: ta,
           total: tot,
@@ -345,12 +331,12 @@ export function InvoiceWizard({
           job_id: job.id,
           invoice_date,
           due_date: dueDate,
-          line_items: built.line_items,
-          subtotal: built.subtotal,
+          line_items: mergedLineItems,
+          subtotal,
           tax_rate: normalizedTaxRate,
           tax_amount: ta,
           total: tot,
-          payment_methods: selectedPaymentMethods,
+          payment_methods: normalizePaymentMethods(selectedPaymentMethods),
           notes: null,
         });
         if (cErr || !data) {
@@ -363,6 +349,46 @@ export function InvoiceWizard({
       setSubmitting(false);
     }
   };
+
+  const coPickerSection =
+    !existingInvoice && !isChangeOrderInvoice && changeOrdersOnJob.length > 0 ? (
+      <div className="invoice-co-picker">
+        <h3 className="invoice-flow-section-title" style={{ fontSize: '1rem' }}>
+          Change orders on this job
+        </h3>
+        <p className="content-note" style={{ marginBottom: 12 }}>
+          Include change orders as invoice lines. Uncheck any you do not bill on this invoice.
+        </p>
+        <ul className="invoice-co-picker-list">
+          {changeOrdersOnJob.map((co) => (
+            <li key={co.id} className="invoice-co-picker-row">
+              <label className="invoice-co-picker-label">
+                <input
+                  type="checkbox"
+                  checked={selectedCoIds.has(co.id)}
+                  onChange={() => toggleCoSelected(co.id)}
+                />
+                <span>
+                  CO #{String(co.co_number).padStart(4, '0')}: {co.description.slice(0, 56)}
+                  {co.description.length > 56 ? '…' : ''}
+                </span>
+              </label>
+              <span className="invoice-co-picker-amt">${formatChangeOrderPickerAmount(co)}</span>
+              <span className={`co-status-badge ${co.status === 'pending_approval' ? 'pending' : co.status}`}>
+                {co.status.replace(/_/g, ' ')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+
+  const editCoNote = existingInvoice ? (
+    <p className="content-note" style={{ marginBottom: 16 }}>
+      Change order lines on this invoice are fixed. Edit due date, tax, or other amounts below; original and
+      labor lines update from this screen.
+    </p>
+  ) : null;
 
   return (
     <div className="invoice-wizard">
@@ -380,11 +406,45 @@ export function InvoiceWizard({
         </div>
       ) : null}
 
-      {step === 1 && job.price_type === 'fixed' ? (
+      {step === 1 && isChangeOrderInvoice && changeOrder ? (
         <section className="invoice-wizard-step">
           <h2 className="invoice-flow-section-title">Pricing</h2>
+          {editCoNote}
+          <p className="content-note" style={{ marginBottom: 16 }}>
+            This invoice is for CO #{String(changeOrder.co_number).padStart(4, '0')} only.
+          </p>
           <div className="form-group">
-            <label htmlFor="fixed-total">Total amount</label>
+            <label htmlFor="fixed-tax">Tax (%)</label>
+            <input
+              id="fixed-tax"
+              type="number"
+              min={0}
+              step="0.01"
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(e.target.value)}
+            />
+          </div>
+          <InvoicePreviewSummary
+            subtotal={subtotal}
+            tax_amount={tax_amount}
+            total={total}
+            tax_rate={taxRate}
+          />
+          <div className="invoice-wizard-step-actions">
+            <button type="button" className="btn-primary btn-large" onClick={handleFixedConfirm}>
+              Confirm
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {step === 1 && !isChangeOrderInvoice && job.price_type === 'fixed' ? (
+        <section className="invoice-wizard-step">
+          <h2 className="invoice-flow-section-title">Pricing</h2>
+          {editCoNote}
+          {coPickerSection}
+          <div className="form-group">
+            <label htmlFor="fixed-total">Original scope total</label>
             <input
               id="fixed-total"
               type="number"
@@ -419,31 +479,60 @@ export function InvoiceWizard({
         </section>
       ) : null}
 
-      {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'labor' ? (
+      {step === 1 && !isChangeOrderInvoice && job.price_type !== 'fixed' && pricingSubStep === 'labor' ? (
         <section className="invoice-wizard-step">
           <h2 className="invoice-flow-section-title">Labor</h2>
-          <div className="form-group">
-            <label htmlFor="labor-hours">Hours</label>
-            <input
-              id="labor-hours"
-              type="number"
-              min={0}
-              step="0.25"
-              value={laborHours}
-              onChange={(e) => setLaborHours(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="labor-rate">Rate ($)</label>
-            <input
-              id="labor-rate"
-              type="number"
-              min={0}
-              step="0.01"
-              value={laborRate}
-              onChange={(e) => setLaborRate(e.target.value)}
-            />
-          </div>
+          {editCoNote}
+          {coPickerSection}
+          {laborRows.map((row, index) => (
+            <div key={index} className="invoice-material-row">
+              <div className="form-group">
+                <label htmlFor={`lab-desc-${index}`}>Description</label>
+                <input
+                  id={`lab-desc-${index}`}
+                  type="text"
+                  value={row.description}
+                  onChange={(e) => updateLaborRow(index, { description: e.target.value })}
+                />
+              </div>
+              <div className="form-group invoice-material-row-grid">
+                <div className="form-group">
+                  <label htmlFor={`lab-qty-${index}`}>Hours / qty</label>
+                  <input
+                    id={`lab-qty-${index}`}
+                    type="number"
+                    min={0}
+                    step="0.25"
+                    value={row.qty}
+                    onChange={(e) => updateLaborRow(index, { qty: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor={`lab-rate-${index}`}>Rate ($)</label>
+                  <input
+                    id={`lab-rate-${index}`}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={row.rate}
+                    onChange={(e) => updateLaborRow(index, { rate: e.target.value })}
+                  />
+                </div>
+              </div>
+              {laborRows.length > 1 ? (
+                <button
+                  type="button"
+                  className="btn-text invoice-material-remove"
+                  onClick={() => removeLaborRow(index)}
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          ))}
+          <button type="button" className="btn-text invoice-add-row-btn" onClick={addLaborRow}>
+            Add labor line
+          </button>
           <div className="form-group">
             <label htmlFor="labor-tax">Tax (%)</label>
             <input
@@ -469,7 +558,7 @@ export function InvoiceWizard({
         </section>
       ) : null}
 
-      {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'materials' ? (
+      {step === 1 && !isChangeOrderInvoice && job.price_type !== 'fixed' && pricingSubStep === 'materials' ? (
         <section className="invoice-wizard-step">
           <h2 className="invoice-flow-section-title">Materials</h2>
           <button
@@ -584,7 +673,7 @@ export function InvoiceWizard({
             onClick={() => {
               setError('');
               setStep(1);
-              if (job.price_type !== 'fixed') {
+              if (!isChangeOrderInvoice && job.price_type !== 'fixed') {
                 setPricingSubStep('materials');
               }
             }}
@@ -610,7 +699,9 @@ export function InvoiceWizard({
 
       {step === 3 ? (
         <section className="invoice-wizard-step">
-          <h2 className="invoice-flow-section-title">Payment methods</h2>
+          <h2 className="invoice-flow-section-title" id="invoice-wizard-payment-methods-heading">
+            Payment methods
+          </h2>
           <button
             type="button"
             className="invoice-flow-back-link"
@@ -621,7 +712,11 @@ export function InvoiceWizard({
           >
             Back
           </button>
-          <div className="invoice-payment-methods-group" role="group" aria-label="Payment methods">
+          <div
+            className="invoice-payment-methods-group"
+            role="group"
+            aria-labelledby="invoice-wizard-payment-methods-heading"
+          >
             <div className="payment-method-chip-grid">
               {PAYMENT_METHOD_OPTIONS.map((method) => (
                 <label key={method} className="payment-method-chip">

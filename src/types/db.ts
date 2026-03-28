@@ -18,6 +18,8 @@ export interface BusinessProfile {
   default_payment_methods: string[];
   default_tax_rate: number;
   default_late_payment_terms: string;
+  default_payment_terms_days: number;
+  default_late_fee_rate: number;
   default_card_fee_note: boolean;
   created_at: string;
   updated_at: string;
@@ -45,6 +47,8 @@ export interface Job {
   customer_phone: string | null;
   job_location: string;
   job_type: string;
+  /** Free-text when job_type is `other` (JobForm "Specify"). */
+  other_classification: string | null;
   asset_or_item_description: string;
   requested_work: string;
   materials_provided_by: 'welder' | 'customer' | 'mixed' | null;
@@ -73,18 +77,63 @@ export interface Job {
   target_start: string | null;
   deposit_amount: number | null;
   late_payment_terms: string | null;
+  payment_terms_days: number | null;
+  late_fee_rate: number | null;
   negotiation_period: number | null;
   customer_obligations: string[] | null;
   created_at: string;
   updated_at: string;
 }
 
+/** Narrow row for Work Orders list screen only (not full Job). */
+export interface WorkOrderListJob {
+  id: string;
+  wo_number: number | null;
+  customer_name: string;
+  job_type: string;
+  other_classification: string | null;
+  agreement_date: string | null;
+  created_at: string;
+  price: number;
+}
+
+/** Invoice fields needed for Work Orders list actions / summary (no line_items). */
+export interface WorkOrderInvoiceStatus {
+  id: string;
+  job_id: string;
+  status: 'draft' | 'downloaded';
+  invoice_number: number;
+  created_at: string;
+}
+
+export interface ChangeOrderInvoiceStatus {
+  id: string;
+  job_id: string;
+  change_order_id: string;
+  status: 'draft' | 'downloaded';
+  invoice_number: number;
+  created_at: string;
+}
+
+export type InvoiceLineItemSource =
+  | 'original_scope'
+  | 'change_order'
+  | 'labor'
+  | 'material'
+  | 'manual'
+  | 'legacy';
+
 export interface InvoiceLineItem {
+  id?: string;
   kind: 'labor' | 'material';
   description: string;
   qty: number;
   unit_price: number;
   total: number;
+  /** Partition for invoice edit: CO snapshot rows stay fixed; missing in DB JSON => legacy */
+  source?: InvoiceLineItemSource;
+  position?: number;
+  change_order_id?: string;
 }
 
 export interface Invoice {
@@ -106,15 +155,26 @@ export interface Invoice {
   updated_at: string;
 }
 
+export interface ChangeOrderLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_rate: number;
+}
+
 export interface ChangeOrder {
   id: string;
   user_id: string;
   job_id: string;
+  co_number: number;
   description: string;
-  price_delta: number | null;
-  time_delta: number | null;
-  approved: boolean | null;
+  reason: string;
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
+  requires_approval: boolean;
+  line_items: ChangeOrderLineItem[];
+  time_amount: number;
+  time_unit: 'hours' | 'days';
+  time_note: string;
   created_at: string;
   updated_at: string;
 }
-

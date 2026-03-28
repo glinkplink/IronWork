@@ -4,15 +4,31 @@ Work agreement generator for contractors (initially welders). Contractors fill o
 
 ---
 
+## Agent documentation & living documents
+
+**Canonical short rules for all agents:** **[AGENTS.md](./AGENTS.md)** (Codex and others should start there for shared repo rules).
+
+**Cursor:** **[.cursor/rules/ScopeLock-Project-Rules.mdc](./.cursor/rules/ScopeLock-Project-Rules.mdc)** (full rules, `alwaysApply`) and **[.cursor/rules/high-priority.mdc](./.cursor/rules/high-priority.mdc)** (terse guardrails, `alwaysApply`).
+
+**Architecture reference:** **[ARCHITECTURE.md](./ARCHITECTURE.md)** (system design, deployment constraints, portability, and roadmap detail).
+
+`AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, and those Cursor rule files are **living documents** and should describe the same project reality with different levels of detail.
+
+- **After each substantive code change** (new UI, routes, patterns, stack or dependencies, security or style conventions), **review and update** whichever files are affected.
+- **When editing any of these agent-facing files**, **compare the same topic across the others** and **align** them so guidance does not drift or contradict—especially **CSS co-location**, **HTML / `esc()`** (see below), **architecture / deployment constraints**, and **file-creation / minimal-diff discipline**.
+- If a rule is intended to be global, mirror it in every file that carries global rules or replace duplication with a single explicit pointer. Do not let one file silently become stricter than the others.
+
+---
+
 ## Stack
 
 | Layer | Tech |
 |---|---|
 | Framework | React 19 + TypeScript + Vite |
 | Auth + DB | Supabase (email/password auth, Postgres, RLS) |
-| App Server | Node + Vite middleware |
-| PDF | Puppeteer Core using system Chrome via `/api/pdf` |
-| Styling | Plain CSS (`App.css`, `index.css`) — no Tailwind |
+| App Server | Node **`server/app-server.mjs`**: Vite **middleware** (dev) or static **`dist/`** when `NODE_ENV=production` |
+| PDF | Puppeteer Core + **system Chrome**; all document PDFs via **same-origin** `POST /api/pdf` |
+| Styling | Plain CSS (`index.css`, global `App.css`, and co-located component/page CSS files) — no Tailwind |
 | Font | Barlow (+ Dancing Script for agreement signature) — field notebook aesthetic |
 
 ---
@@ -20,18 +36,29 @@ Work agreement generator for contractors (initially welders). Contractors fill o
 ## Running the app
 
 ```bash
-npm run dev       # app server + frontend + /api/pdf
-npm run build     # tsc + vite build
-npm run preview   # production app server serving dist/
+npm run dev       # one process: Vite (HMR) + SPA + POST /api/pdf  (default http://127.0.0.1:3000)
+npm run build     # tsc + vite bundle → dist/  (set VITE_* first for production builds)
+npm run preview   # NODE_ENV=production: serve dist/ + /api/pdf  — run build first
 npm run lint      # eslint
 ```
 
-Env vars go in `.env.local`:
+**Client env** (Vite, `.env.local` — see `.env.example`):
+
 ```
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
-VITE_GEOAPIFY_API_KEY=...   # optional; job site street autocomplete (Geoapify)
+VITE_GEOAPIFY_API_KEY=...   # optional — job site street autocomplete
 ```
+
+**Server env** (read by `app-server.mjs` at runtime, not `VITE_`): `PUPPETEER_EXECUTABLE_PATH` or `CHROME_PATH` if default Chrome path is wrong; `PORT`, `HOST`; `NODE_ENV=production` for static `dist/` mode. Quick check: `GET /api/pdf/health` → `{ "ok": true }`.
+
+---
+
+## Server, PDFs, deployment (reality check)
+
+- **Not static-only hosting:** Work order, invoice, and change-order PDFs all need the **Node server** and a **local Chrome/Chromium** binary. The browser posts HTML to **`/api/pdf`** on the **same origin** as the UI.
+- **Single entrypoint:** Use `npm run dev` or `npm run preview` / `NODE_ENV=production node server/app-server.mjs` — there is no supported “Vite-only” production path if you want working downloads.
+- **Operator detail:** Env tables, reverse-proxy notes, and common deployment mistakes → **[README.md](./README.md)** and **[ARCHITECTURE.md](./ARCHITECTURE.md)** (Deployment + Portability).
 
 ---
 
@@ -40,22 +67,37 @@ VITE_GEOAPIFY_API_KEY=...   # optional; job site street autocomplete (Geoapify)
 ```
 src/
   App.tsx                    # Root — view state machine, auth-aware shell
-  App.css                    # All app styles (field notebook design system)
+  App.css                    # Global design tokens, app shell/layout, shared utilities, print/PDF globals
   index.css                  # Base reset + font stack
   components/
     AuthPage.tsx             # Sign-in only (email + password); header “Sign In”
+    AuthPage.css             # AuthPage-only styles
     BusinessProfileForm.tsx  # Full-screen when signed in but no profile row (edge case)
+    BusinessProfileForm.css  # BusinessProfileForm-only styles
     CaptureModal.tsx         # Anonymous Download & Save: business name, email, password
+    CaptureModal.css         # CaptureModal-only styles
     HomePage.tsx             # Home after login; “Create Work Order”
+    HomePage.css             # HomePage-only styles
     JobForm.tsx              # Work agreement form (structured job site + Geoapify autocomplete)
+    JobForm.css              # JobForm-only styles
     AgreementPreview.tsx     # Preview + Download & Save / PDF; hosts CaptureModal when anonymous
     AgreementDocumentSections.tsx  # Renders agreement sections (preview, detail, PDF body)
     EditProfilePage.tsx      # Edit business profile + agreement defaults
+    EditProfilePage.css      # EditProfilePage-only styles
     WorkOrdersPage.tsx       # List jobs; invoice actions; opens detail
-    WorkOrderDetailPage.tsx  # Saved job → agreement view + Download PDF
-    InvoiceWizard.tsx        # Create/edit invoice (steps)
+    WorkOrdersPage.css       # WorkOrdersPage-only list/dashboard chrome + invoice warning banner
+    WorkOrderDetailPage.tsx  # Saved job → agreement + job-level invoice strip + change orders + PDFs
+    WorkOrderDetailPage.css  # WO detail invoice strip + CO sublist (e.g. `.co-list-*`)
+    ChangeOrderDetailPage.tsx # Saved change order → HTML/PDF + actions
+    ChangeOrderDetailPage.css # CO detail-only chrome (e.g. `.co-detail-*`)
+    ChangeOrderWizard.tsx    # Create/edit change order (3 steps)
+    ChangeOrderWizard.css    # Wizard-only `.co-*` blocks (shared badge/section labels stay in App.css)
+    InvoiceWizard.tsx        # Create/edit invoice; CO pickers + line `source` for merge on edit
+    InvoiceWizard.css        # Invoice wizard materials/CO picker/payment group (chips stay global)
     InvoiceFinalPage.tsx     # Invoice preview, download, notes
+    InvoiceFinalPage.css     # Invoice final page-only chrome (nav/headings shared in App.css)
     InvoicePreviewModal.tsx  # Full-screen invoice HTML preview
+    InvoicePreviewModal.css  # Invoice preview modal overlay/scroll/sheet
   lib/
     supabase.ts              # Supabase client singleton
     auth.ts                  # signUp, signIn, signOut
@@ -66,14 +108,28 @@ src/
     geoapify-autocomplete.ts # Job site address suggestions (optional API key)
     job-to-welder-job.ts     # Job row + profile → WelderJob
     invoice-generator.ts     # Invoice HTML string
+    agreement-sections-html.ts # Agreement sections → HTML string (combined PDFs)
+    html-escape.ts           # esc() for generated HTML (WO / CO / invoice strings)
+    change-order-generator.ts # Change order HTML + combined WO + listed COs
+    invoice-line-items.ts    # Invoice line item parsing, validation, source types
+    payment-terms.ts         # Payment terms presets + validators
+    work-order-list-label.ts # Job type display formatting for Work Orders list
     payment-methods.ts, tax.ts, defaults.ts
     db/
       profile.ts             # getProfile, upsertProfile, updateNextWoNumber
       clients.ts             # listClients, upsertClient, deleteClient
       jobs.ts                # listJobs, createJob, updateJob, deleteJob, saveWorkOrder
-      invoices.ts            # Invoice CRUD + mark downloaded
+      invoices.ts            # Invoice CRUD + mark downloaded; line item `source` in JSON
+      change-orders.ts       # Change order CRUD + totals
   hooks/
+    useAppNavigation.ts      # URL/history-backed view state
     useAuth.ts               # Supabase auth state listener
+    useAuthProfile.ts        # Profile loading + capture redirect handling
+    useChangeOrderFlow.ts    # Detail/wizard/detail navigation for change orders
+    useInvoiceFlow.ts        # Invoice wizard/final page flow state
+    useScaledPreview.ts      # 816px preview scaling helpers
+    useWorkOrderDraft.ts     # Draft state + next_wo_number refresh after first save
+    useWorkOrderRowActions.ts # Work Orders row hydration/open/invoice helpers
   types/
     db.ts                    # BusinessProfile, Client, Job, Invoice, …
     index.ts                 # WelderJob, AgreementSection, SignatureBlockData
@@ -85,20 +141,32 @@ server/
 
 ---
 
+## Generated HTML strings (security)
+
+All user- or client-supplied text interpolated into HTML string generators (`invoice-generator.ts`, `change-order-generator.ts`, `agreement-sections-html.ts`, and any combined PDF HTML builders) must go through `esc()` from `src/lib/html-escape.ts`. React text in components (e.g. `AgreementDocumentSections`) is escaped by default; do not add new `dangerouslySetInnerHTML` pipelines built from raw user input without `esc()`.
+
+---
+
 ## Auth and product flow
 
 **Anonymous (no session):**
 - Full app shell: **Home → Create Work Order → JobForm → Preview**.
 - Header shows **Sign In** only (no Work Orders / gear until logged in).
-- First **Download & Save** opens **CaptureModal**: business name, email, password → `signUp` + minimal `upsertProfile` → save work order → PDF download. Profile/session races are handled via `getSession`, upsert return row, and `loadProfile` where needed.
+- **Primary signup path:** first **Download & Save** → **CaptureModal** (business name, email, password) → `signUp` + minimal `upsertProfile` → `saveWorkOrder` → PDF. No separate “register” flow in the header for visitors.
 
 **Returning user:**
-- **Sign In** → `AuthPage` (email + password only; no “sign up” link — new accounts are created via capture on Download & Save).
-- After sign-in: **Home**, **Work Orders**, **gear (Edit profile)** as today.
+- **Sign In** → `AuthPage` (email + password only; new accounts still come from capture on first save, not from AuthPage).
 
 **Signed in but no `business_profiles` row** (edge case): full-screen **BusinessProfileForm** until a profile exists.
 
-**`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).
+**After sign-in (with profile):** **Home**, **Work Orders**, **gear (Edit profile)**; session persists via Supabase (refresh-safe).
+
+**Work Orders details worth remembering:**
+- `WorkOrdersPage` shows **Contract value** rollups from `job.price`, not invoice totals.
+- If invoice-status rows are partially malformed, the page shows a warning banner but keeps valid invoice actions enabled.
+- `WorkOrderDetailPage` has a single **job-level** invoice strip; invoice actions are not rendered per change-order row.
+
+**`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).
 
 ---
 
@@ -128,7 +196,7 @@ Migrations are in `supabase/migrations/` — apply via Supabase CLI (`npx supaba
 | Jobs | Yes — on **Download & Save** (`saveWorkOrder`); listed on **Work Orders** |
 | Clients | Yes — upserted on **Download & Save** keyed by `name_normalized`; **JobForm** can search/suggest when `userId` is set |
 | Invoices | Yes — wizard + final page; status `draft` / `downloaded` |
-| Change orders | No — schema only |
+| Change orders | Yes — wizard + detail; `create_change_order` RPC + migration **0006_change_order_creation_lock.sql** for atomic numbering |
 
 ---
 
@@ -152,7 +220,19 @@ The UI should feel like a contractor's work log, not a SaaS product.
 - `--text-primary`, `--text-secondary`, `--text-muted`
 - `--radius` (4px), `--radius-lg` (6px)
 
-The PDF renderer uses the same agreement HTML/CSS as the preview through the app server's `/api/pdf` route, so preview/PDF parity is intentional. **Job site address** in the agreement is rendered as a **single line** for PDF/display (`jobLocationSingleLine`).
+**CSS co-location (mandatory — keep in sync with [AGENTS.md](./AGENTS.md) and [.cursor/rules/ScopeLock-Project-Rules.mdc](./.cursor/rules/ScopeLock-Project-Rules.mdc)):**
+
+1. **Own your styles:** Co-locate with the owning page or component; `ComponentName.tsx` imports `./ComponentName.css` (or the repo’s established pairing).
+2. **`App.css` scope only:** `src/App.css` holds design tokens (`:root`), app shell/layout, **shared** utility classes, print/PDF globals, and **truly cross-cutting** rules—not styles that mainly serve one screen, wizard, modal, or feature.
+3. **No new feature CSS in `App.css`:** Do not add page-specific or feature-specific rules there; use the owner’s co-located CSS file.
+4. **New UI surfaces:** New pages and major components **must** ship with a paired CSS file (e.g. `FooPage.tsx` + `FooPage.css`).
+5. **Single owner:** Styles used by only one page or component belong in **that** CSS file, not `App.css` or an unrelated sibling.
+6. **Global exceptions:** Intentionally shared primitives (e.g. reused badges, header chrome) may stay in `App.css`; follow comments in the structure tree above.
+
+**Other frontend file rules:**
+- New shared HTML helpers belong in `src/lib/`; if multiple generators need the same escaping logic, extract a shared helper there instead of copy-pasting `esc()` helpers.
+
+The app server **`POST /api/pdf`** renders HTML built in the client (agreement, invoice, change order, combined WO+CO) with Puppeteer; preview and PDF are designed to match. **Job site address** in the agreement is a **single line** in output (`jobLocationSingleLine`).
 
 ---
 
@@ -160,3 +240,4 @@ The PDF renderer uses the same agreement HTML/CSS as the preview through the app
 
 - Main branch: `main`
 - Feature development may use branches such as `output` or `auth` before merging to `main`
+- **Product priorities** (see **ARCHITECTURE.md → Roadmap**): change orders, client e-sign, Stripe / ACH payments

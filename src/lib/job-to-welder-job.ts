@@ -1,6 +1,7 @@
 import type { Job } from '../types/db';
 import type { BusinessProfile } from '../types/db';
 import type { JobType, MaterialsProvider, WelderJob } from '../types';
+import { DEFAULT_LATE_FEE_RATE, DEFAULT_PAYMENT_TERMS_DAYS } from './payment-terms';
 
 const JOB_TYPES: readonly JobType[] = [
   'repair',
@@ -36,7 +37,8 @@ export function jobRowToWelderJob(job: Job, profile: BusinessProfile | null): We
     job_site_zip: '',
     governing_state: job.governing_state ?? '',
     job_type: jobType,
-    other_classification: jobType === 'other' ? job.job_type : undefined,
+    other_classification:
+      jobType === 'other' ? (job.other_classification?.trim() || undefined) : undefined,
     asset_or_item_description: job.asset_or_item_description,
     requested_work: job.requested_work,
     materials_provided_by: materialsProviderFromRow(job.materials_provided_by),
@@ -50,7 +52,9 @@ export function jobRowToWelderJob(job: Job, profile: BusinessProfile | null): We
     price_type: job.price_type,
     price: Number(job.price) || 0,
     deposit_amount: job.deposit_amount ?? 0,
-    late_payment_terms: job.late_payment_terms ?? '',
+    payment_terms_days:
+      job.payment_terms_days ?? profile?.default_payment_terms_days ?? DEFAULT_PAYMENT_TERMS_DAYS,
+    late_fee_rate: job.late_fee_rate ?? profile?.default_late_fee_rate ?? DEFAULT_LATE_FEE_RATE,
     exclusions: job.exclusions ?? [],
     customer_obligations: job.customer_obligations ?? [],
     change_order_required: job.change_order_required ?? false,

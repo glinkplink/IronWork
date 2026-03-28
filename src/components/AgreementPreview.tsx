@@ -10,12 +10,7 @@ import {
 } from '../lib/agreement-pdf';
 import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { CaptureModal } from './CaptureModal';
-
-/** Letter width at 96dpi — preview layout matches PDF viewport. */
-const PREVIEW_LETTER_WIDTH_PX = 816;
-
-/** Preview upscale only applies at this breakpoint and when measure width > 816px. */
-const PREVIEW_DESKTOP_UPSCALE_MQ = '(min-width: 1024px)';
+import { useScaledPreview } from '../hooks/useScaledPreview';
 
 const VALID_PRICE_TYPES: readonly PriceType[] = ['fixed', 'estimate', 'time_and_materials'];
 
@@ -27,6 +22,9 @@ function getRequiredFieldIssues(job: WelderJob): string[] {
   if (!job.asset_or_item_description?.trim()) issues.push('Item / structure');
   if (!job.requested_work?.trim()) issues.push('Work requested');
   if (!job.job_type?.trim()) issues.push('Job type');
+  if (job.job_type === 'other' && !job.other_classification?.trim()) {
+    issues.push('Specify (job type Other)');
+  }
   if (typeof job.price !== 'number' || !Number.isFinite(job.price) || job.price <= 0) {
     issues.push('Total contract price (must be greater than 0)');
   }
@@ -57,6 +55,8 @@ function buildCapturedProfileStub(
     default_payment_methods: [],
     default_tax_rate: 0,
     default_late_payment_terms: '',
+    default_payment_terms_days: 14,
+    default_late_fee_rate: 1.5,
     default_card_fee_note: false,
     created_at: '',
     updated_at: '',
@@ -73,8 +73,8 @@ interface AgreementPreviewProps {
     email: string;
     password: string;
   }) => Promise<{ userId: string; businessName: string; email: string }>;
-  /** Called after capture modal flow completes (account + save + PDF). */
-  onCaptureFlowFinished?: () => void;
+  /** Called after PDF attempt (account + save already done). Parent may redirect. */
+  onCaptureFlowFinished?: (opts: { pdfOk: boolean }) => void;
 }
 
 export function AgreementPreview({
@@ -91,14 +91,6 @@ export function AgreementPreview({
   /** True after the user has completed one successful Download & Save (or Download PDF) this mount — further clicks skip DB. */
   const [hasPersistedViaDownloadOnce, setHasPersistedViaDownloadOnce] = useState(false);
   const documentRef = useRef<HTMLDivElement | null>(null);
-  const previewViewportRef = useRef<HTMLDivElement | null>(null);
-  const previewSheetRef = useRef<HTMLDivElement | null>(null);
-  const [previewContentHeight, setPreviewContentHeight] = useState(0);
-  /**
-   * Screen preview only: scales the native 816px sheet to fit smaller containers,
-   * and may upscale modestly on desktop. PDF markup stays 816px.
-   */
-  const [previewScale, setPreviewScale] = useState(1);
 
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureError, setCaptureError] = useState('');
@@ -109,6 +101,15 @@ export function AgreementPreview({
   const displayProfile = postCaptureProfile ?? profile;
   const sections = generateAgreement(job, displayProfile);
 
+  const {
+    viewportRef: previewViewportRef,
+    sheetRef: previewSheetRef,
+    scale: previewScale,
+    spacerHeight,
+    spacerWidth,
+    letterWidthPx,
+  } = useScaledPreview(job, displayProfile);
+
   useEffect(() => {
     if (profile) setPostCaptureProfile(null);
   }, [profile]);
@@ -116,50 +117,6 @@ export function AgreementPreview({
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
   }, []);
-
-  useLayoutEffect(() => {
-    const viewport = previewViewportRef.current;
-    if (!viewport) return;
-
-    const computeScale = () => {
-      const w = viewport.getBoundingClientRect().width;
-      if (w <= 0) return 1;
-
-      const maxScale = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ).matches ? 1.5 : 1;
-      return Math.min(w / PREVIEW_LETTER_WIDTH_PX, maxScale);
-    };
-
-    const updateScale = () => {
-      setPreviewScale(computeScale());
-    };
-
-    updateScale();
-    const ro = new ResizeObserver(updateScale);
-    ro.observe(viewport);
-    const mq = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ);
-    mq.addEventListener('change', updateScale);
-    window.addEventListener('resize', updateScale);
-    return () => {
-      ro.disconnect();
-      mq.removeEventListener('change', updateScale);
-      window.removeEventListener('resize', updateScale);
-    };
-  }, []);
-
-  /* Spacer height: sheet content only — ResizeObserver here does not track scroll container size. */
-  useLayoutEffect(() => {
-    const sheet = previewSheetRef.current;
-    if (!sheet) return;
-
-    const updateHeight = () => {
-      setPreviewContentHeight(sheet.scrollHeight);
-    };
-
-    updateHeight();
-    const ro = new ResizeObserver(updateHeight);
-    ro.observe(sheet);
-    return () => ro.disconnect();
-  }, [job, displayProfile]);
 
   const handleCaptureSubmit = async (businessName: string, email: string, password: string) => {
     if (!onCaptureAndSave) return;
@@ -181,7 +138,6 @@ export function AgreementPreview({
 
       setHasPersistedViaDownloadOnce(true);
       await Promise.resolve(onSaveSuccess(data.id, true));
-      onCaptureFlowFinished?.();
 
       let pdfOk = false;
       if (documentRef.current) {
@@ -197,6 +153,8 @@ export function AgreementPreview({
           );
         }
       }
+
+      onCaptureFlowFinished?.({ pdfOk });
 
       setShowCaptureModal(false);
       setCaptureSubmitting(false);
@@ -323,17 +281,18 @@ export function AgreementPreview({
         <div
           className="agreement-preview-scale-spacer"
           style={{
-            width: PREVIEW_LETTER_WIDTH_PX * previewScale,
-            height: previewContentHeight * previewScale,
+            width: spacerWidth,
+            height: spacerHeight,
           }}
         >
           <div
             ref={previewSheetRef}
             className="agreement-preview-scale-sheet"
             style={{
-              width: PREVIEW_LETTER_WIDTH_PX,
+              width: letterWidthPx,
               transform: previewScale !== 1 ? `scale(${previewScale})` : undefined,
               transformOrigin: 'top left',
+              willChange: previewScale !== 1 ? 'transform' : undefined,
             }}
           >
             <div ref={documentRef} className="agreement-document">

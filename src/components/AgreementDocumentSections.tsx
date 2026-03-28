@@ -8,9 +8,9 @@ interface AgreementDocumentSectionsProps {
 export function AgreementDocumentSections({ sections }: AgreementDocumentSectionsProps) {
   return (
     <>
-      {sections.map((section, si) => (
+      {sections.map((section) => (
         <div
-          key={si}
+          key={String(section.number)}
           className={`agreement-section ${section.signatureData ? 'signature-section' : ''}`}
         >
           <h3 className="section-title">
@@ -20,23 +20,23 @@ export function AgreementDocumentSections({ sections }: AgreementDocumentSection
             {section.blocks.map((block, bi) => {
               if (block.type === 'paragraph') {
                 return (
-                  <p key={bi} className="content-paragraph">
+                  <p key={`${block.type}-${bi}`} className="content-paragraph">
                     {block.text}
                   </p>
                 );
               }
               if (block.type === 'note') {
                 return (
-                  <p key={bi} className="content-note">
+                  <p key={`${block.type}-${bi}`} className="content-note">
                     {block.text}
                   </p>
                 );
               }
               if (block.type === 'bullets') {
                 return (
-                  <ul key={bi} className="content-bullets">
+                  <ul key={`${block.type}-${bi}`} className="content-bullets">
                     {block.items.map((item, ii) => (
-                      <li key={ii}>{item}</li>
+                      <li key={`${item}-${ii}`}>{item}</li>
                     ))}
                   </ul>
                 );
@@ -44,7 +44,7 @@ export function AgreementDocumentSections({ sections }: AgreementDocumentSection
               if (block.type === 'partiesLayout') {
                 const { agreementDate, serviceProvider: sp, customer: cu, jobSiteAddress } = block;
                 return (
-                  <div key={bi} className="parties-layout">
+                  <div key={`${block.type}-${bi}`} className="parties-layout">
                     <div className="parties-plain">
                       <div className="parties-plain-row">
                         <span className="parties-plain-label">Agreement Date:</span>
@@ -96,10 +96,10 @@ export function AgreementDocumentSections({ sections }: AgreementDocumentSection
               }
               if (block.type === 'table') {
                 return (
-                  <table key={bi} className="content-table">
+                  <table key={`${block.type}-${bi}`} className="content-table">
                     <tbody>
                       {block.rows.map(([label, value], ri) => (
-                        <tr key={ri}>
+                        <tr key={`${label}-${ri}`}>
                           <td className="table-label">{label}</td>
                           <td className="table-value">{value}</td>
                         </tr>
@@ -112,7 +112,7 @@ export function AgreementDocumentSections({ sections }: AgreementDocumentSection
                 const sig = section.signatureData;
                 if (!sig) return null;
                 return (
-                  <div key={bi} className="signature-blocks">
+                  <div key={`${block.type}-${bi}`} className="signature-blocks">
                     <div className="signature-block">
                       <div className="signature-block-identifier">Customer</div>
                       <div className="signature-field">

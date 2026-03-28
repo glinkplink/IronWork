@@ -1,160 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { markInvoiceDownloaded, updateInvoice } from '../lib/db/invoices';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
-import appCss from '../App.css?raw';
-
-const PREVIEW_LETTER_WIDTH_PX = 816;
-const PREVIEW_DESKTOP_UPSCALE_MQ = '(min-width: 1024px)';
-
-function getInvoicePdfFilename(invoiceNumber: number, customerName: string): string {
-  const sanitized = (customerName || 'customer').replace(/\s+/g, '_');
-  return `Invoice_${String(invoiceNumber).padStart(4, '0')}_${sanitized}.pdf`;
-}
-
-function getMarginHeaderLeft(invoiceNumber: number): string {
-  return `Invoice #${String(invoiceNumber).padStart(4, '0')}`;
-}
-
-function getPdfFooterBusinessName(profile: BusinessProfile | null): string {
-  return profile?.business_name?.trim() ?? '';
-}
-
-function getPdfFooterPhone(profile: BusinessProfile | null): string {
-  return profile?.phone ?? '';
-}
-
-function buildPdfHtml(previewMarkup: string): string {
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&amp;family=Dancing+Script:wght@400;700&amp;display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      ${appCss}
-
-      :root {
-        color-scheme: light;
-      }
-
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        background: #ffffff;
-      }
-
-      body {
-        font-family: 'Barlow', 'DIN 2014', 'Bahnschrift', 'D-DIN', system-ui, sans-serif;
-        letter-spacing: normal;
-        word-spacing: normal;
-        -webkit-font-smoothing: antialiased;
-      }
-
-      p {
-        text-align: left;
-        line-height: 1.4;
-        word-break: normal;
-        overflow-wrap: break-word;
-      }
-
-      .pdf-render-root {
-        padding: 0;
-        background: #ffffff;
-      }
-
-      .agreement-document {
-        border: none;
-        border-radius: 0;
-        box-shadow: none;
-        padding: 0;
-      }
-
-      .content-table {
-        border: 1px solid #cccccc;
-        border-collapse: collapse;
-      }
-
-      .content-table td {
-        border: 1px solid #cccccc;
-        padding: 0.7rem 0.8rem;
-      }
-
-      .content-table.parties-party-table th.party-header-cell {
-        border: 1px solid #cccccc;
-        padding: 0.7rem 0.8rem;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-
-      .table-label {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-
-      .content-bullets:not(.invoice-payment-list) {
-        list-style-type: disc;
-        list-style-position: outside;
-        padding-left: 1.35rem;
-        margin-left: 0;
-      }
-
-      .content-bullets:not(.invoice-payment-list) li {
-        display: list-item;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="pdf-render-root">${previewMarkup}</div>
-  </body>
-</html>`;
-}
-
-async function fetchInvoicePdfBlob(
-  invoice: Invoice,
-  job: Job,
-  profile: BusinessProfile | null,
-  previewRoot: HTMLElement
-): Promise<Blob> {
-  const response = await fetch('/api/pdf', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      filename: getInvoicePdfFilename(invoice.invoice_number, job.customer_name),
-      html: buildPdfHtml(previewRoot.outerHTML),
-      marginHeaderLeft: getMarginHeaderLeft(invoice.invoice_number),
-      providerName: getPdfFooterBusinessName(profile),
-      providerPhone: getPdfFooterPhone(profile),
-    }),
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Failed to generate PDF.');
-  }
-
-  return response.blob();
-}
-
-function downloadInvoicePdfBlob(blob: Blob, invoice: Invoice, job: Job): void {
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = objectUrl;
-  link.download = getInvoicePdfFilename(invoice.invoice_number, job.customer_name);
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(objectUrl);
-}
+import { useScaledPreview } from '../hooks/useScaledPreview';
+import {
+  downloadPdfBlobToFile,
+  fetchInvoicePdfBlob,
+  getInvoicePdfFilename,
+} from '../lib/agreement-pdf';
+import './InvoiceFinalPage.css';
 
 interface InvoiceFinalPageProps {
   invoice: Invoice;
@@ -175,10 +30,9 @@ export function InvoiceFinalPage({
   onAfterDownload,
   onInvoiceUpdated,
 }: InvoiceFinalPageProps) {
-  const [invoice, setInvoice] = useState(invoiceProp);
   const [modalOpen, setModalOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
-  const [notesDraft, setNotesDraft] = useState(invoiceProp.notes ?? '');
+  const [notesDraft, setNotesDraft] = useState(() => invoiceProp.notes ?? '');
   const [downloadError, setDownloadError] = useState('');
   const [notesError, setNotesError] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -189,59 +43,28 @@ export function InvoiceFinalPage({
   );
 
   const documentRef = useRef<HTMLDivElement | null>(null);
-  const previewViewportRef = useRef<HTMLDivElement | null>(null);
-  const previewSheetRef = useRef<HTMLDivElement | null>(null);
-  const [previewContentHeight, setPreviewContentHeight] = useState(0);
-  const [previewScale, setPreviewScale] = useState(1);
 
-  const previewHtml = generateInvoiceHtml(invoice, job, profile);
-  const isReadOnly = invoice.status === 'downloaded';
+  const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
+  const isReadOnly = invoiceProp.status === 'downloaded';
   const customerTitle = job.customer_name.trim() || 'Customer';
-  const invoiceSubline = `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`;
+  const invoiceSubline = `Invoice #${String(invoiceProp.invoice_number).padStart(4, '0')}`;
 
-  useLayoutEffect(() => {
-    setInvoice(invoiceProp);
+  const {
+    viewportRef: previewViewportRef,
+    sheetRef: previewSheetRef,
+    scale: previewScale,
+    spacerHeight,
+    spacerWidth,
+    letterWidthPx,
+  } = useScaledPreview(invoiceProp, job, profile);
+
+  useEffect(() => {
     setNotesDraft(invoiceProp.notes ?? '');
-  }, [invoiceProp]);
+  }, [invoiceProp.id, invoiceProp.notes]);
 
   useEffect(() => {
     if (invoiceProp.status === 'downloaded') setHasPersistedDownloadOnce(true);
   }, [invoiceProp.status]);
-
-  useLayoutEffect(() => {
-    const viewport = previewViewportRef.current;
-    if (!viewport) return;
-
-    const computeScale = () => {
-      const w = viewport.getBoundingClientRect().width;
-      if (w <= 0) return 1;
-      const maxScale = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ).matches ? 1.5 : 1;
-      return Math.min(w / PREVIEW_LETTER_WIDTH_PX, maxScale);
-    };
-
-    const updateScale = () => setPreviewScale(computeScale());
-    updateScale();
-    const ro = new ResizeObserver(updateScale);
-    ro.observe(viewport);
-    const mq = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ);
-    mq.addEventListener('change', updateScale);
-    window.addEventListener('resize', updateScale);
-    return () => {
-      ro.disconnect();
-      mq.removeEventListener('change', updateScale);
-      window.removeEventListener('resize', updateScale);
-    };
-  }, []);
-
-  useLayoutEffect(() => {
-    const sheet = previewSheetRef.current;
-    if (!sheet) return;
-    const updateHeight = () => setPreviewContentHeight(sheet.scrollHeight);
-    updateHeight();
-    const ro = new ResizeObserver(updateHeight);
-    ro.observe(sheet);
-    return () => ro.disconnect();
-  }, [invoice, job, profile]);
 
   const handleDownload = async () => {
     setDownloadError('');
@@ -251,18 +74,20 @@ export function InvoiceFinalPage({
     }
     setDownloading(true);
     try {
-      const blob = await fetchInvoicePdfBlob(invoice, job, profile, documentRef.current);
-      downloadInvoicePdfBlob(blob, invoice, job);
+      const blob = await fetchInvoicePdfBlob(invoiceProp, job, profile, documentRef.current);
+      downloadPdfBlobToFile(
+        blob,
+        getInvoicePdfFilename(invoiceProp.invoice_number, job.customer_name)
+      );
 
       if (!hasPersistedDownloadOnce) {
-        const { error } = await markInvoiceDownloaded(invoice.id);
+        const { error } = await markInvoiceDownloaded(invoiceProp.id);
         if (error) {
           setDownloadError(`PDF downloaded, but status could not be updated: ${error.message}`);
           return;
         }
         setHasPersistedDownloadOnce(true);
-        const nextInv = { ...invoice, status: 'downloaded' as const };
-        setInvoice(nextInv);
+        const nextInv = { ...invoiceProp, status: 'downloaded' as const };
         onInvoiceUpdated(nextInv);
         onAfterDownload(nextInv);
       }
@@ -278,7 +103,7 @@ export function InvoiceFinalPage({
     setSavingNotes(true);
     try {
       const next: Invoice = {
-        ...invoice,
+        ...invoiceProp,
         notes: notesDraft.trim() || null,
       };
       const { data, error } = await updateInvoice(next);
@@ -286,7 +111,6 @@ export function InvoiceFinalPage({
         setNotesError(error?.message || 'Could not save notes.');
         return;
       }
-      setInvoice(data);
       onInvoiceUpdated(data);
     } finally {
       setSavingNotes(false);
@@ -316,10 +140,10 @@ export function InvoiceFinalPage({
             <div className="invoice-final-notes-panel">
               <div className="form-group">
                 <label htmlFor="invoice-notes">Notes</label>
-                <input
+                <textarea
                   id="invoice-notes"
-                  type="text"
                   className="invoice-final-notes-input"
+                  rows={3}
                   value={notesDraft}
                   onChange={(e) => setNotesDraft(e.target.value)}
                   autoComplete="off"
@@ -349,26 +173,34 @@ export function InvoiceFinalPage({
         ref={previewViewportRef}
         className="agreement-preview-scale-viewport invoice-final-mini-viewport"
       >
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           className="invoice-final-mini-preview-hitbox"
-          onClick={() => setModalOpen(true)}
           aria-label="Open full invoice preview"
+          onClick={() => setModalOpen(true)}
+          onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setModalOpen(true);
+            }
+          }}
         >
           <div
             className="agreement-preview-scale-spacer"
             style={{
-              width: PREVIEW_LETTER_WIDTH_PX * previewScale,
-              height: previewContentHeight * previewScale,
+              width: spacerWidth,
+              height: spacerHeight,
             }}
           >
             <div
               ref={previewSheetRef}
               className="agreement-preview-scale-sheet"
               style={{
-                width: PREVIEW_LETTER_WIDTH_PX,
+                width: letterWidthPx,
                 transform: previewScale !== 1 ? `scale(${previewScale})` : undefined,
                 transformOrigin: 'top left',
+                willChange: previewScale !== 1 ? 'transform' : undefined,
               }}
             >
               <div
@@ -377,7 +209,7 @@ export function InvoiceFinalPage({
               />
             </div>
           </div>
-        </button>
+        </div>
       </div>
 
       <div className="invoice-final-actions">

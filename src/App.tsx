@@ -1,165 +1,67 @@
-import { useState, useEffect } from 'react';
-import type { WelderJob } from './types';
+import { useState, type ReactNode } from 'react';
 import { JobForm } from './components/JobForm';
 import { AgreementPreview } from './components/AgreementPreview';
 import { AuthPage } from './components/AuthPage';
 import { BusinessProfileForm } from './components/BusinessProfileForm';
 import { HomePage } from './components/HomePage';
 import { EditProfilePage } from './components/EditProfilePage';
-import { useAuth } from './hooks/useAuth';
-import { supabase } from './lib/supabase';
-import { getProfile, updateNextWoNumber, upsertProfile } from './lib/db/profile';
+import { useAppNavigation } from './hooks/useAppNavigation';
+import { useAuthProfile } from './hooks/useAuthProfile';
+import { upsertProfile } from './lib/db/profile';
 import { signUp } from './lib/auth';
 import { getDefaultCustomerObligations, getDefaultExclusions } from './lib/defaults';
-import type { BusinessProfile, Job, Invoice } from './types/db';
-import sampleJob from './data/sample-job.json';
+import { getInvoice } from './lib/db/invoices';
+import type { BusinessProfile, Job } from './types/db';
 import { Settings } from 'lucide-react';
 import { WorkOrdersPage } from './components/WorkOrdersPage';
 import { InvoiceWizard } from './components/InvoiceWizard';
 import { InvoiceFinalPage } from './components/InvoiceFinalPage';
 import { WorkOrderDetailPage } from './components/WorkOrderDetailPage';
+import { ChangeOrderDetailPage } from './components/ChangeOrderDetailPage';
+import { ChangeOrderWizard } from './components/ChangeOrderWizard';
+import { useInvoiceFlow } from './hooks/useInvoiceFlow';
+import { useChangeOrderFlow } from './hooks/useChangeOrderFlow';
+import { useWorkOrderDraft } from './hooks/useWorkOrderDraft';
 import './App.css';
 
-type AppView =
-  | 'home'
-  | 'form'
-  | 'preview'
-  | 'profile'
-  | 'work-orders'
-  | 'work-order-detail'
-  | 'invoice-wizard'
-  | 'invoice-final'
-  | 'auth';
-
-type AppHistoryState = { view?: AppView };
-
-const APP_VIEWS: AppView[] = [
-  'home',
-  'form',
-  'preview',
-  'profile',
-  'work-orders',
-  'work-order-detail',
-  'invoice-wizard',
-  'invoice-final',
-  'auth',
-];
-
-function isAppView(v: unknown): v is AppView {
-  return typeof v === 'string' && (APP_VIEWS as readonly string[]).includes(v);
-}
-
-function buildNewAgreementDraft(currentProfile: BusinessProfile | null): WelderJob {
-  const today = new Date().toISOString().split('T')[0];
-  const p = currentProfile;
-  const defaults: Partial<WelderJob> = p
-    ? {
-        contractor_name: p.business_name,
-        contractor_phone: p.phone ?? '',
-        contractor_email: p.email ?? '',
-        wo_number: p.next_wo_number ?? 1,
-        agreement_date: today,
-        exclusions: getDefaultExclusions(p.default_exclusions),
-        customer_obligations: getDefaultCustomerObligations(p.default_assumptions),
-        late_payment_terms:
-          p.default_late_payment_terms ||
-          'Balances unpaid 7 days after completion accrue 1.5% per month.',
-        workmanship_warranty_days: p.default_warranty_period ?? 30,
-        negotiation_period: p.default_negotiation_period ?? 10,
-      }
-    : { agreement_date: today };
-
-  return {
-    ...(sampleJob as WelderJob),
-    contractor_name: '',
-    exclusions: getDefaultExclusions(),
-    customer_obligations: getDefaultCustomerObligations(),
-    ...defaults,
-  };
-}
-
 function App() {
-  const { user, loading: authLoading } = useAuth();
-  const [profile, setProfile] = useState<BusinessProfile | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [view, setView] = useState<AppView>('home');
-  const [workOrderDetailJob, setWorkOrderDetailJob] = useState<Job | null>(null);
-  const [invoiceFlowJob, setInvoiceFlowJob] = useState<Job | null>(null);
-  const [wizardExistingInvoice, setWizardExistingInvoice] = useState<Invoice | null>(null);
-  const [activeInvoice, setActiveInvoice] = useState<Invoice | null>(null);
   const [workOrdersSuccessBanner, setWorkOrdersSuccessBanner] = useState<string | null>(null);
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [woIsOpen, setWoIsOpen] = useState(false);
-  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
-  /** Shown when job save succeeded but persisting next_wo_number failed */
-  const [woCounterPersistError, setWoCounterPersistError] = useState<string | null>(null);
-  const [job, setJob] = useState<WelderJob>(() => ({
-    ...(sampleJob as WelderJob),
-    contractor_name: '',
-  }));
-  const [draftBaseline, setDraftBaseline] = useState<WelderJob | null>(null);
+  const { view, navigateTo, replaceView } = useAppNavigation();
+  const {
+    user,
+    authLoading,
+    profile,
+    profileLoading,
+    setProfile,
+    loadProfile,
+    handleCaptureFlowFinished,
+  } = useAuthProfile({
+    replaceView,
+    setWorkOrdersSuccessBanner,
+  });
 
-  const navigateTo = (newView: AppView) => {
-    window.history.pushState({ view: newView }, '');
-    setView(newView);
-  };
+  const [workOrderDetailJob, setWorkOrderDetailJob] = useState<import('./types/db').Job | null>(null);
+  const [changeOrderListVersion, setChangeOrderListVersion] = useState(0);
+  const [profileEntrySource, setProfileEntrySource] = useState<'work-orders' | null>(null);
 
-  const doCreateNewAgreement = (currentProfile: BusinessProfile | null) => {
-    const nextDraft = buildNewAgreementDraft(currentProfile);
-    setJob(nextDraft);
-    setDraftBaseline(nextDraft);
-    setCurrentJobId(null);
-    setWoIsOpen(true);
-    navigateTo('form');
-  };
+  const { state: invoice, actions: invoiceFlow } = useInvoiceFlow(
+    navigateTo,
+    (msg) => setWorkOrdersSuccessBanner(msg),
+    loadProfile
+  );
 
-  const createNewAgreement = () => {
-    const hasUnsavedChanges =
-      woIsOpen &&
-      currentJobId === null &&
-      draftBaseline !== null &&
-      JSON.stringify(job) !== JSON.stringify(draftBaseline);
+  const { state: changeOrder, actions: changeOrderFlow } = useChangeOrderFlow(
+    workOrderDetailJob,
+    navigateTo,
+    setChangeOrderListVersion
+  );
 
-    if (hasUnsavedChanges) {
-      setShowUnsavedModal(true);
-      return;
-    }
-    doCreateNewAgreement(profile);
-  };
-
-  const closeUnsavedModal = () => {
-    setShowUnsavedModal(false);
-  };
-
-  const continueEditingWorkOrder = () => {
-    navigateTo('form');
-    closeUnsavedModal();
-  };
-
-  const handleSaveSuccess = async (savedJobId: string, isNewSave: boolean) => {
-    setCurrentJobId(savedJobId);
-    setWoCounterPersistError(null);
-    if (!isNewSave) return;
-
-    // Use session, not `user` from closure — after capture, React may not have re-rendered yet.
-    const { data: { session } } = await supabase.auth.getSession();
-    const uid = session?.user?.id;
-    if (!uid) return;
-
-    const fresh = await getProfile(uid);
-    if (!fresh) return;
-
-    const newCount = (fresh.next_wo_number ?? 1) + 1;
-    const { error } = await updateNextWoNumber(uid, newCount);
-    if (error) {
-      console.error('Failed to persist next work order number:', error);
-      setWoCounterPersistError(
-        `Work order saved, but the next WO number could not be updated (${error.message}). Refresh the page before creating another work order, or the same number may be suggested again.`
-      );
-      return;
-    }
-    setProfile({ ...fresh, next_wo_number: newCount });
-  };
+  const { state: draft, actions: draftFlow } = useWorkOrderDraft(
+    profile,
+    user?.id ?? null,
+    navigateTo,
+    loadProfile
+  );
 
   const handleCaptureAndSave = async (capture: {
     businessName: string;
@@ -183,70 +85,22 @@ function App() {
       throw new Error(profileError?.message || 'Failed to save profile');
     }
 
-    // Session updates before this finishes; getProfile in useEffect can race and return null.
     setProfile(createdProfile);
 
     return { userId: authData.user.id, businessName: capture.businessName, email: capture.email };
   };
 
-  useEffect(() => {
-    const onPop = (e: PopStateEvent) => {
-      const st = e.state as AppHistoryState | null;
-      const v = st?.view;
-      if (isAppView(v)) setView(v);
-      else setView('home');
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-
-  useEffect(() => {
-    const uid = user?.id;
-    if (uid) {
-      const run = async () => {
-        setProfileLoading(true);
-        const data = await getProfile(uid);
-        if (data) {
-          setProfile(data);
-        } else {
-          // Keep profile from capture upsert if fetch raced before the row was visible.
-          setProfile((prev) => (prev?.user_id === uid ? prev : null));
-        }
-        setProfileLoading(false);
-      };
-      void run();
-    } else {
-      Promise.resolve().then(() => {
-        setProfile(null);
-        setProfileLoading(false);
-      });
-    }
-  }, [user?.id]);
-
-  const loadProfile = async (options?: { silent?: boolean }) => {
-    const silent = options?.silent === true;
-    const { data: { session } } = await supabase.auth.getSession();
-    const uid = session?.user?.id;
-    if (!uid) {
-      if (!silent) setProfileLoading(false);
-      return;
-    }
-    if (!silent) setProfileLoading(true);
-    const data = await getProfile(uid);
-    if (data) {
-      setProfile(data);
-    } else {
-      setProfile((prev) => (prev?.user_id === uid ? prev : null));
-    }
-    if (!silent) setProfileLoading(false);
-  };
-
   const handleEditProfileSaved = (savedProfile: BusinessProfile | null) => {
     if (savedProfile) setProfile(savedProfile);
     else void loadProfile({ silent: true });
+    if (profileEntrySource === 'work-orders') {
+      setProfileEntrySource(null);
+      navigateTo('work-orders');
+    }
   };
 
   const openWorkOrders = () => {
+    setProfileEntrySource(null);
     navigateTo('work-orders');
   };
 
@@ -257,65 +111,8 @@ function App() {
 
   const handleBackFromWorkOrderDetail = () => {
     setWorkOrderDetailJob(null);
+    changeOrderFlow.resetFlowForBackToList();
     navigateTo('work-orders');
-  };
-
-  const handleStartInvoice = (jobRow: Job) => {
-    setInvoiceFlowJob(jobRow);
-    setWizardExistingInvoice(null);
-    setActiveInvoice(null);
-    navigateTo('invoice-wizard');
-  };
-
-  const handleOpenPendingInvoice = (jobRow: Job, invoice: Invoice) => {
-    setInvoiceFlowJob(jobRow);
-    setActiveInvoice(invoice);
-    navigateTo('invoice-final');
-  };
-
-  const handleInvoiceWizardSuccess = (invoice: Invoice) => {
-    setActiveInvoice(invoice);
-    setWizardExistingInvoice(null);
-    navigateTo('invoice-final');
-    void loadProfile({ silent: true });
-  };
-
-  const handleInvoiceWizardCancel = () => {
-    if (wizardExistingInvoice) {
-      setWizardExistingInvoice(null);
-      navigateTo('invoice-final');
-    } else {
-      setInvoiceFlowJob(null);
-      setActiveInvoice(null);
-      navigateTo('work-orders');
-    }
-  };
-
-  const handleInvoiceFinalWorkOrders = () => {
-    navigateTo('work-orders');
-    setInvoiceFlowJob(null);
-    setActiveInvoice(null);
-    setWizardExistingInvoice(null);
-  };
-
-  const handleEditInvoice = () => {
-    if (!activeInvoice) return;
-    setWizardExistingInvoice(activeInvoice);
-    navigateTo('invoice-wizard');
-  };
-
-  const handleAfterInvoiceDownload = (inv: Invoice) => {
-    setWorkOrdersSuccessBanner(
-      `Invoice #${String(inv.invoice_number).padStart(4, '0')} downloaded and saved!`
-    );
-    navigateTo('work-orders');
-    setInvoiceFlowJob(null);
-    setActiveInvoice(null);
-    void loadProfile({ silent: true });
-  };
-
-  const handleInvoiceUpdated = (inv: Invoice) => {
-    setActiveInvoice(inv);
   };
 
   if (authLoading) {
@@ -350,26 +147,181 @@ function App() {
 
   const homePageEl = (
     <HomePage
-      onCreateAgreement={createNewAgreement}
+      onCreateAgreement={draftFlow.createNewAgreement}
       ownerName={profile?.owner_name || profile?.business_name}
     />
   );
 
+  function renderView(): ReactNode {
+    if (view === 'auth' && !user) {
+      return (
+        <AuthPage
+          onSignInSuccess={() => {
+            replaceView('home');
+          }}
+        />
+      );
+    }
+    if (view === 'auth' && user) {
+      return homePageEl;
+    }
+    if (view === 'home') {
+      return homePageEl;
+    }
+    if (view === 'profile' && profile) {
+      return (
+        <EditProfilePage
+          profile={profile}
+          onSave={handleEditProfileSaved}
+          onCancel={() => {
+            if (profileEntrySource === 'work-orders') {
+              setProfileEntrySource(null);
+              navigateTo('work-orders');
+            } else {
+              navigateTo('home');
+            }
+          }}
+        />
+      );
+    }
+    if (view === 'profile' && !profile) {
+      return homePageEl;
+    }
+    if (view === 'work-orders' && user) {
+      return (
+        <WorkOrdersPage
+          key={user.id}
+          userId={user.id}
+          profile={profile}
+          successBanner={workOrdersSuccessBanner}
+          onClearSuccessBanner={() => setWorkOrdersSuccessBanner(null)}
+          onCompleteProfileClick={() => {
+            setProfileEntrySource('work-orders');
+            navigateTo('profile');
+          }}
+          onStartInvoice={invoiceFlow.handleStartInvoice}
+          onOpenPendingInvoice={invoiceFlow.handleOpenPendingInvoice}
+          onOpenWorkOrderDetail={handleOpenWorkOrderDetail}
+        />
+      );
+    }
+    if (view === 'work-order-detail' && user && profile && workOrderDetailJob) {
+      return (
+        <WorkOrderDetailPage
+          key={`${workOrderDetailJob.id}-${changeOrderListVersion}`}
+          userId={user.id}
+          job={workOrderDetailJob}
+          profile={profile}
+          changeOrderListVersion={changeOrderListVersion}
+          onBack={handleBackFromWorkOrderDetail}
+          onStartChangeOrder={changeOrderFlow.handleStartChangeOrderFromDetail}
+          onStartChangeOrderInvoice={(co, invoiceId) => {
+            if (!invoiceId) {
+              invoiceFlow.handleStartChangeOrderInvoice(workOrderDetailJob, co);
+              return;
+            }
+            void getInvoice(invoiceId).then((inv) => {
+              if (!inv) return;
+              invoiceFlow.handleOpenPendingChangeOrderInvoice(workOrderDetailJob, co, inv);
+            });
+          }}
+          onOpenCODetail={changeOrderFlow.handleOpenCODetail}
+        />
+      );
+    }
+    if (view === 'co-detail' && user && profile && workOrderDetailJob && changeOrder.coDetailCO) {
+      return (
+        <ChangeOrderDetailPage
+          key={changeOrder.coDetailCO.id}
+          userId={user.id}
+          co={changeOrder.coDetailCO}
+          job={workOrderDetailJob}
+          profile={profile}
+          onBack={changeOrderFlow.handleBackFromCODetail}
+          onEdit={changeOrderFlow.handleEditCOFromDetail}
+          onDelete={changeOrderFlow.handleDeleteCOFromDetail}
+        />
+      );
+    }
+    if (view === 'change-order-wizard' && user && profile && changeOrder.changeOrderFlowJob) {
+      return (
+        <ChangeOrderWizard
+          key={changeOrder.wizardExistingCO?.id ?? 'new-co'}
+          userId={user.id}
+          job={changeOrder.changeOrderFlowJob}
+          profile={profile}
+          existingCO={changeOrder.wizardExistingCO}
+          onComplete={changeOrderFlow.handleChangeOrderWizardComplete}
+          onCancel={changeOrderFlow.handleChangeOrderWizardCancel}
+        />
+      );
+    }
+    if (view === 'invoice-wizard' && user && profile && invoice.invoiceFlowJob) {
+      return (
+        <InvoiceWizard
+          key={`${invoice.invoiceFlowJob.id}-${invoice.invoiceFlowChangeOrder?.id ?? 'job'}-${invoice.wizardExistingInvoice?.id ?? 'new'}`}
+          userId={user.id}
+          job={invoice.invoiceFlowJob}
+          changeOrder={invoice.invoiceFlowTarget === 'change_order' ? invoice.invoiceFlowChangeOrder : null}
+          profile={profile}
+          existingInvoice={invoice.wizardExistingInvoice}
+          onCancel={invoiceFlow.handleInvoiceWizardCancel}
+          onSuccess={invoiceFlow.handleInvoiceWizardSuccess}
+        />
+      );
+    }
+    if (view === 'invoice-final' && user && profile && invoice.invoiceFlowJob && invoice.activeInvoice) {
+      return (
+        <InvoiceFinalPage
+          invoice={invoice.activeInvoice}
+          job={invoice.invoiceFlowJob}
+          profile={profile}
+          onWorkOrders={invoiceFlow.handleInvoiceFinalWorkOrders}
+          onEditInvoice={invoiceFlow.handleEditInvoice}
+          onAfterDownload={invoiceFlow.handleAfterInvoiceDownload}
+          onInvoiceUpdated={invoiceFlow.handleInvoiceUpdated}
+        />
+      );
+    }
+    if (view === 'form') {
+      return (
+        <JobForm
+          userId={user?.id}
+          job={draft.job}
+          onChange={draftFlow.setJob}
+          businessName={profile?.business_name}
+          onGoToPreview={() => navigateTo('preview')}
+        />
+      );
+    }
+    return (
+      <AgreementPreview
+        job={draft.job}
+        profile={profile}
+        existingJobId={draft.currentJobId ?? undefined}
+        onSaveSuccess={draftFlow.handleSaveSuccess}
+        onCaptureAndSave={!user ? handleCaptureAndSave : undefined}
+        onCaptureFlowFinished={handleCaptureFlowFinished}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <header className="app-header">
-        <h1
+        <button
+          type="button"
           className="app-title"
+          aria-label="ScopeLock, go to home"
           onClick={() => {
             navigateTo('home');
-            setInvoiceFlowJob(null);
-            setActiveInvoice(null);
-            setWizardExistingInvoice(null);
+            invoiceFlow.resetInvoiceFlow();
             setWorkOrderDetailJob(null);
+            changeOrderFlow.resetChangeOrderFlow();
           }}
         >
           ScopeLock
-        </h1>
+        </button>
         <div className="header-actions">
           {!user && (
             <button
@@ -393,7 +345,10 @@ function App() {
             <button
               type="button"
               className="btn-header-settings"
-              onClick={() => navigateTo('profile')}
+              onClick={() => {
+                setProfileEntrySource(null);
+                navigateTo('profile');
+              }}
               aria-label="Edit profile"
             >
               <Settings className="btn-header-settings-icon" aria-hidden="true" />
@@ -402,13 +357,13 @@ function App() {
         </div>
       </header>
 
-      {woCounterPersistError && (
+      {draft.woCounterPersistError && (
         <div className="error-banner wo-counter-error-banner" role="alert">
-          <span>{woCounterPersistError}</span>
+          <span>{draft.woCounterPersistError}</span>
           <button
             type="button"
             className="btn-dismiss-banner"
-            onClick={() => setWoCounterPersistError(null)}
+            onClick={draftFlow.dismissWoCounterError}
             aria-label="Dismiss"
           >
             ×
@@ -433,104 +388,29 @@ function App() {
         </nav>
       )}
 
-      <main className="app-main">
-        {view === 'auth' && !user ? (
-          <AuthPage
-            onSignInSuccess={() => {
-              window.history.replaceState({ view: 'home' }, '');
-              setView('home');
-            }}
-          />
-        ) : view === 'auth' && user ? (
-          homePageEl
-        ) : view === 'home' ? (
-          homePageEl
-        ) : view === 'profile' && profile ? (
-          <EditProfilePage
-            profile={profile}
-            onSave={handleEditProfileSaved}
-            onCancel={() => navigateTo('home')}
-          />
-        ) : view === 'profile' && !profile ? (
-          homePageEl
-        ) : view === 'work-orders' && user ? (
-          <WorkOrdersPage
-            userId={user.id}
-            successBanner={workOrdersSuccessBanner}
-            onClearSuccessBanner={() => setWorkOrdersSuccessBanner(null)}
-            onStartInvoice={handleStartInvoice}
-            onOpenPendingInvoice={handleOpenPendingInvoice}
-            onOpenWorkOrderDetail={handleOpenWorkOrderDetail}
-          />
-        ) : view === 'work-order-detail' && profile && workOrderDetailJob ? (
-          <WorkOrderDetailPage
-            job={workOrderDetailJob}
-            profile={profile}
-            onBack={handleBackFromWorkOrderDetail}
-          />
-        ) : view === 'invoice-wizard' && user && profile && invoiceFlowJob ? (
-          <InvoiceWizard
-            key={`${invoiceFlowJob.id}-${wizardExistingInvoice?.id ?? 'new'}`}
-            userId={user.id}
-            job={invoiceFlowJob}
-            profile={profile}
-            existingInvoice={wizardExistingInvoice}
-            onCancel={handleInvoiceWizardCancel}
-            onSuccess={handleInvoiceWizardSuccess}
-          />
-        ) : view === 'invoice-final' && user && profile && invoiceFlowJob && activeInvoice ? (
-          <InvoiceFinalPage
-            invoice={activeInvoice}
-            job={invoiceFlowJob}
-            profile={profile}
-            onWorkOrders={handleInvoiceFinalWorkOrders}
-            onEditInvoice={handleEditInvoice}
-            onAfterDownload={handleAfterInvoiceDownload}
-            onInvoiceUpdated={handleInvoiceUpdated}
-          />
-        ) : view === 'form' ? (
-          <JobForm
-            userId={user?.id}
-            job={job}
-            onChange={setJob}
-            businessName={profile?.business_name}
-            onGoToPreview={() => navigateTo('preview')}
-          />
-        ) : (
-          <AgreementPreview
-            job={job}
-            profile={profile}
-            existingJobId={currentJobId ?? undefined}
-            onSaveSuccess={handleSaveSuccess}
-            onCaptureAndSave={!user ? handleCaptureAndSave : undefined}
-            onCaptureFlowFinished={() => {
-              void loadProfile({ silent: true });
-            }}
-          />
-        )}
-      </main>
+      <main className="app-main">{renderView()}</main>
 
       <footer className="app-footer">
         <p>ScopeLock - Protect Your Work</p>
       </footer>
 
-      {showUnsavedModal && (
-        <div className="modal-overlay" onClick={closeUnsavedModal}>
+      {draft.showUnsavedModal && (
+        <div className="modal-overlay" onClick={draftFlow.closeUnsavedModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Unsaved Work Order</h3>
             <p>You have an unsaved Work Order. Continue editing or discard it?</p>
             <div className="modal-actions">
               <button
                 className="btn-secondary"
-                onClick={continueEditingWorkOrder}
+                onClick={draftFlow.continueEditingWorkOrder}
               >
                 Continue Editing
               </button>
               <button
                 className="btn-danger"
                 onClick={() => {
-                  closeUnsavedModal();
-                  doCreateNewAgreement(profile);
+                  draftFlow.closeUnsavedModal();
+                  draftFlow.doCreateNewAgreement(profile);
                 }}
               >
                 Discard

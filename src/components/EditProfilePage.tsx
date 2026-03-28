@@ -6,17 +6,16 @@ import type { BusinessProfile } from '../types/db';
 import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-methods';
 import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
 import { formatUsPhoneInput } from '../lib/us-phone-input';
-
-const DEFAULT_LATE_PAYMENT_TERMS = 'Balances unpaid 7 days after completion accrue 1.5% per month.';
-
-function normalizeLatePaymentTerms(value: string | null | undefined): string {
-  const trimmed = value?.trim();
-  if (!trimmed) return DEFAULT_LATE_PAYMENT_TERMS;
-  if (trimmed === 'Balances unpaid 7 days after completion accrue 1.5% per month') {
-    return DEFAULT_LATE_PAYMENT_TERMS;
-  }
-  return trimmed;
-}
+import {
+  DEFAULT_LATE_FEE_RATE,
+  DEFAULT_PAYMENT_TERMS_DAYS,
+  daysToPreset,
+  presetToDays,
+  type PaymentTermsPreset,
+  validateLateFeeRate,
+  validatePaymentTermsDays,
+} from '../lib/payment-terms';
+import './EditProfilePage.css';
 
 interface EditProfilePageProps {
   profile: BusinessProfile;
@@ -50,8 +49,14 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
   const [defaultTaxRate, setDefaultTaxRate] = useState(
     taxRateToPercentValue(profile.default_tax_rate ?? DEFAULT_TAX_RATE)
   );
-  const [defaultLatePaymentTerms, setDefaultLatePaymentTerms] = useState(
-    normalizeLatePaymentTerms(profile.default_late_payment_terms)
+  const [defaultPaymentTermsDays, setDefaultPaymentTermsDays] = useState(
+    profile.default_payment_terms_days ?? DEFAULT_PAYMENT_TERMS_DAYS
+  );
+  const [defaultLateFeeRate, setDefaultLateFeeRate] = useState(
+    profile.default_late_fee_rate ?? DEFAULT_LATE_FEE_RATE
+  );
+  const [paymentTermsPreset, setPaymentTermsPreset] = useState<PaymentTermsPreset>(() =>
+    daysToPreset(profile.default_payment_terms_days ?? DEFAULT_PAYMENT_TERMS_DAYS)
   );
   const [defaultCardFeeNote, setDefaultCardFeeNote] = useState(
     profile.default_card_fee_note ?? false
@@ -94,6 +99,14 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
     const exclusionsArray = defaultExclusions.filter((s) => s.trim().length > 0);
     const obligationsArray = defaultCustomerObligations.filter((s) => s.trim().length > 0);
 
+    const paymentTermsErr = validatePaymentTermsDays(defaultPaymentTermsDays);
+    const lateFeeErr = validateLateFeeRate(defaultLateFeeRate);
+    if (paymentTermsErr || lateFeeErr) {
+      setError(paymentTermsErr || lateFeeErr || 'Invalid payment settings');
+      setLoading(false);
+      return;
+    }
+
     const { data: savedProfile, error } = await upsertProfile({
       user_id: profile.user_id,
       business_name: businessName,
@@ -108,7 +121,8 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
       default_negotiation_period: defaultNegotiationPeriod,
       default_payment_methods: normalizePaymentMethods(defaultPaymentMethods),
       default_tax_rate: normalizeTaxRate(percentValueToTaxRate(defaultTaxRate)),
-      default_late_payment_terms: defaultLatePaymentTerms,
+      default_payment_terms_days: defaultPaymentTermsDays,
+      default_late_fee_rate: defaultLateFeeRate,
       default_card_fee_note: defaultCardFeeNote,
     });
 
@@ -281,15 +295,52 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
                 </div>
               </div>
 
-              <div className="form-group">
-                <label htmlFor="defaultLatePaymentTerms">Late Payment Terms</label>
-                <textarea
-                  id="defaultLatePaymentTerms"
-                  value={defaultLatePaymentTerms}
-                  onChange={(e) => setDefaultLatePaymentTerms(e.target.value)}
-                  rows={2}
-                  placeholder={DEFAULT_LATE_PAYMENT_TERMS}
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="defaultPaymentTerms">Payment Terms</label>
+                  <select
+                    id="defaultPaymentTerms"
+                    value={paymentTermsPreset}
+                    onChange={(e) => {
+                      const preset = e.target.value as PaymentTermsPreset;
+                      setPaymentTermsPreset(preset);
+                      const days = presetToDays(preset);
+                      if (days != null) {
+                        setDefaultPaymentTermsDays(days);
+                      }
+                    }}
+                  >
+                    <option value="net_7">Net 7</option>
+                    <option value="net_14">Net 14</option>
+                    <option value="net_30">Net 30</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                {paymentTermsPreset === 'custom' && (
+                  <div className="form-group">
+                    <label htmlFor="defaultPaymentTermsDays">Days</label>
+                    <input
+                      id="defaultPaymentTermsDays"
+                      type="number"
+                      value={defaultPaymentTermsDays}
+                      onChange={(e) => setDefaultPaymentTermsDays(parseInt(e.target.value) || 0)}
+                      min="1"
+                      placeholder="14"
+                    />
+                  </div>
+                )}
+                <div className="form-group">
+                  <label htmlFor="defaultLateFeeRate">Late Fee (%/month)</label>
+                  <input
+                    id="defaultLateFeeRate"
+                    type="number"
+                    value={defaultLateFeeRate}
+                    onChange={(e) => setDefaultLateFeeRate(parseFloat(e.target.value) || 0)}
+                    min="0"
+                    step="0.1"
+                    placeholder="1.5"
+                  />
+                </div>
               </div>
             </section>
 

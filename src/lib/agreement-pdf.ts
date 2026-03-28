@@ -1,6 +1,7 @@
 import type { WelderJob } from '../types';
-import type { BusinessProfile } from '../types/db';
+import type { BusinessProfile, Invoice, Job } from '../types/db';
 import appCss from '../App.css?raw';
+import changeOrderDocumentCss from './change-order-document.css?raw';
 
 export function getPdfFilename(woNumber: number, customerName: string): string {
   const sanitized = (customerName || 'customer').replace(/\s+/g, '_');
@@ -35,6 +36,8 @@ export function buildPdfHtml(previewMarkup: string): string {
     />
     <style>
       ${appCss}
+
+      ${changeOrderDocumentCss}
 
       :root {
         color-scheme: light;
@@ -95,14 +98,14 @@ export function buildPdfHtml(previewMarkup: string): string {
         print-color-adjust: exact;
       }
 
-      .content-bullets {
+      .content-bullets:not(.invoice-payment-list) {
         list-style-type: disc;
         list-style-position: outside;
         padding-left: 1.35rem;
         margin-left: 0;
       }
 
-      .content-bullets li {
+      .content-bullets:not(.invoice-payment-list) li {
         display: list-item;
       }
 
@@ -151,6 +154,74 @@ export function downloadAgreementPdfBlob(blob: Blob, job: WelderJob): void {
   const link = document.createElement('a');
   link.href = objectUrl;
   link.download = getPdfFilename(job.wo_number, job.customer_name);
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+export function getCoPdfFilename(coNumber: number, customerName: string): string {
+  const sanitized = (customerName || 'customer').replace(/\s+/g, '_');
+  return `CO-${String(coNumber).padStart(4, '0')}_${sanitized}.pdf`;
+}
+
+export function getInvoicePdfFilename(invoiceNumber: number, customerName: string): string {
+  const sanitized = (customerName || 'customer').replace(/\s+/g, '_');
+  return `Invoice_${String(invoiceNumber).padStart(4, '0')}_${sanitized}.pdf`;
+}
+
+export async function fetchInvoicePdfBlob(
+  invoice: Invoice,
+  job: Job,
+  profile: BusinessProfile | null,
+  previewRoot: HTMLElement
+): Promise<Blob> {
+  return fetchHtmlPdfBlob({
+    filename: getInvoicePdfFilename(invoice.invoice_number, job.customer_name),
+    innerMarkup: previewRoot.outerHTML,
+    marginHeaderLeft: `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`,
+    providerName: profile?.business_name?.trim() ?? '',
+    providerPhone: profile?.phone ?? '',
+  });
+}
+
+export async function fetchHtmlPdfBlob(options: {
+  filename: string;
+  /** Inner markup passed to buildPdfHtml (e.g. one or more `.agreement-document` roots). */
+  innerMarkup: string;
+  workOrderNumber?: string;
+  marginHeaderLeft?: string;
+  providerName: string;
+  providerPhone: string;
+}): Promise<Blob> {
+  const response = await fetch('/api/pdf', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      filename: options.filename,
+      html: buildPdfHtml(options.innerMarkup),
+      workOrderNumber: options.workOrderNumber ?? '',
+      marginHeaderLeft: options.marginHeaderLeft,
+      providerName: options.providerName,
+      providerPhone: options.providerPhone,
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Failed to generate PDF.');
+  }
+
+  return response.blob();
+}
+
+export function downloadPdfBlobToFile(blob: Blob, filename: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();
