@@ -161,15 +161,60 @@ function publicEsignPayload(row) {
   };
 }
 
-async function resolveJobForWebhook(supabase, webhookData, verifiedSubmission) {
+function isFormWebhookEvent(eventType) {
+  return typeof eventType === 'string' && eventType.startsWith('form.');
+}
+
+function isSubmissionWebhookEvent(eventType) {
+  return typeof eventType === 'string' && eventType.startsWith('submission.');
+}
+
+async function findJobForWebhook(supabase, column, value) {
+  if (value == null) return null;
+  const matchValue = String(value).trim();
+  if (!matchValue) return null;
+  const { data: row } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq(column, matchValue)
+    .maybeSingle();
+  return row || null;
+}
+
+async function resolveJobForFormWebhook(supabase, webhookData) {
+  const d = webhookData || {};
+  const payloadExternalId = d.external_id;
+  if (payloadExternalId && isUuid(payloadExternalId)) {
+    const row = await findJobForWebhook(supabase, 'id', payloadExternalId);
+    if (row) {
+      return { job: row, resolvedBy: 'external_id' };
+    }
+  }
+
+  const submitterId = d.id ?? null;
+  if (submitterId != null) {
+    const row = await findJobForWebhook(supabase, 'esign_submitter_id', submitterId);
+    if (row) {
+      return { job: row, resolvedBy: 'submitter_id' };
+    }
+  }
+
+  const payloadSubmissionId = d.submission?.id ?? null;
+  if (payloadSubmissionId != null) {
+    const row = await findJobForWebhook(supabase, 'esign_submission_id', payloadSubmissionId);
+    if (row) {
+      return { job: row, resolvedBy: 'submission_id' };
+    }
+  }
+
+  return null;
+}
+
+async function resolveJobForVerifiedSubmissionWebhook(supabase, webhookData, verifiedSubmission) {
   const d = webhookData || {};
   const verifiedSubmissionId = verifiedSubmission?.id;
   if (verifiedSubmissionId != null) {
-    const { data: row } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('esign_submission_id', String(verifiedSubmissionId))
-      .maybeSingle();
+    const row = await findJobForWebhook(supabase, 'esign_submission_id', verifiedSubmissionId);
     if (row) {
       return { job: row, resolvedBy: 'submission_id' };
     }
@@ -177,11 +222,7 @@ async function resolveJobForWebhook(supabase, webhookData, verifiedSubmission) {
 
   const verifiedExternalId = pickCustomerSubmitter(verifiedSubmission)?.external_id;
   if (verifiedExternalId && isUuid(verifiedExternalId)) {
-    const { data: row } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('id', String(verifiedExternalId))
-      .maybeSingle();
+    const row = await findJobForWebhook(supabase, 'id', verifiedExternalId);
     if (row) {
       return { job: row, resolvedBy: 'verified_external_id' };
     }
@@ -189,17 +230,68 @@ async function resolveJobForWebhook(supabase, webhookData, verifiedSubmission) {
 
   const payloadExternalId = d.external_id || d.submitters?.[0]?.external_id;
   if (payloadExternalId && isUuid(payloadExternalId)) {
-    const { data: row } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('id', String(payloadExternalId))
-      .maybeSingle();
+    const row = await findJobForWebhook(supabase, 'id', payloadExternalId);
     if (row) {
       return { job: row, resolvedBy: 'payload_external_id' };
     }
   }
 
   return null;
+}
+
+async function verifySubmissionForFormWebhook(job, webhookData) {
+  const d = webhookData || {};
+  const payloadSubmissionId = d.submission?.id ?? null;
+
+  if (payloadSubmissionId != null) {
+    const verified = await docusealFetchJson(`/submissions/${payloadSubmissionId}`, {
+      method: 'GET',
+    });
+    return {
+      verified,
+      verifiedBy: 'payload_submission_id',
+      sourceSubmissionId: String(payloadSubmissionId),
+      payloadSubmissionId: String(payloadSubmissionId),
+    };
+  }
+
+  if (job?.esign_submission_id) {
+    const verified = await docusealFetchJson(`/submissions/${job.esign_submission_id}`, {
+      method: 'GET',
+    });
+    return {
+      verified,
+      verifiedBy: 'job_submission_id',
+      sourceSubmissionId: String(job.esign_submission_id),
+      payloadSubmissionId: null,
+    };
+  }
+
+  const submitterId = d.id ?? null;
+  if (submitterId == null) {
+    return null;
+  }
+
+  const submitter = await docusealFetchJson(`/submitters/${submitterId}`, { method: 'GET' });
+  const recoveredSubmissionId = submitter?.submission_id ?? submitter?.submission?.id ?? null;
+  if (recoveredSubmissionId == null) {
+    return {
+      verified: null,
+      verifiedBy: 'submitter_lookup_missing_submission',
+      sourceSubmissionId: null,
+      payloadSubmissionId: null,
+    };
+  }
+
+  const verified = await docusealFetchJson(`/submissions/${recoveredSubmissionId}`, {
+    method: 'GET',
+  });
+  return {
+    verified,
+    verifiedBy: 'submitter_lookup',
+    sourceSubmissionId: String(recoveredSubmissionId),
+    payloadSubmissionId: null,
+  };
 }
 
 function matchEsignPath(method, pathname) {
@@ -479,7 +571,15 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
   }
 
   const received = getWebhookHeader(req, headerName);
+  console.log('[webhook] request arrived', {
+    headerName,
+    hasHeader: Boolean(received),
+  });
   if (!timingSafeEqualString(headerSecret, received)) {
+    console.log('[webhook] header rejected', {
+      headerName,
+      hasHeader: Boolean(received),
+    });
     sendText(res, 401, 'Unauthorized');
     return;
   }
@@ -494,58 +594,154 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
 
   const eventType = payload.event_type || '';
   const data = payload.data || {};
+  const formEvent = isFormWebhookEvent(eventType);
+  const submissionEvent = isSubmissionWebhookEvent(eventType);
 
   let submissionId = data.submission?.id ?? null;
-  if (submissionId == null && typeof eventType === 'string' && eventType.startsWith('submission.')) {
+  if (submissionId == null && submissionEvent) {
     submissionId = data.id ?? null;
   }
 
+  const submitterId = formEvent ? (data.id ?? null) : null;
+  const payloadExternalId = data.external_id ?? null;
+
   console.log('[webhook] received', {
     eventType,
+    eventFamily: formEvent ? 'form' : submissionEvent ? 'submission' : 'other',
     submissionId: submissionId != null ? String(submissionId) : null,
+    submitterId: submitterId != null ? String(submitterId) : null,
+    externalId: payloadExternalId != null ? String(payloadExternalId) : null,
   });
 
-  if (submissionId == null) {
-    console.log('[webhook] ignored: missing submission id', { eventType });
-    sendJson(res, 200, { ok: true, ignored: true });
-    return;
+  const supabase = getServiceSupabase();
+  let resolved = null;
+  let verifiedInfo = null;
+
+  if (formEvent) {
+    resolved = await resolveJobForFormWebhook(supabase, data);
+    if (!resolved) {
+      console.log('[webhook] ignored: missing correlation', {
+        eventType,
+        submissionId: submissionId != null ? String(submissionId) : null,
+        submitterId: submitterId != null ? String(submitterId) : null,
+        externalId: payloadExternalId != null ? String(payloadExternalId) : null,
+      });
+      sendJson(res, 200, { ok: true, ignored: true });
+      return;
+    }
+
+    console.log('[webhook] resolved job', {
+      eventType,
+      submissionId: submissionId != null ? String(submissionId) : null,
+      submitterId: submitterId != null ? String(submitterId) : null,
+      jobId: String(resolved.job.id),
+      resolvedBy: resolved.resolvedBy,
+      currentSubmissionId: resolved.job.esign_submission_id ?? null,
+      currentStatus: resolved.job.esign_status ?? null,
+    });
+
+    try {
+      verifiedInfo = await verifySubmissionForFormWebhook(resolved.job, data);
+    } catch (e) {
+      console.error('DocuSeal verify submission failed:', e);
+      sendJson(res, 502, { error: 'Could not verify submission with DocuSeal.' });
+      return;
+    }
+
+    if (!verifiedInfo || !verifiedInfo.verified) {
+      console.log('[webhook] ignored: could not determine submission to verify', {
+        eventType,
+        jobId: String(resolved.job.id),
+        submitterId: submitterId != null ? String(submitterId) : null,
+      });
+      sendJson(res, 200, { ok: true, ignored: true });
+      return;
+    }
+  } else {
+    if (submissionId == null) {
+      console.log('[webhook] ignored: missing correlation', { eventType });
+      sendJson(res, 200, { ok: true, ignored: true });
+      return;
+    }
+
+    try {
+      const verified = await docusealFetchJson(`/submissions/${submissionId}`, { method: 'GET' });
+      verifiedInfo = {
+        verified,
+        verifiedBy: 'payload_submission_id',
+        sourceSubmissionId: String(submissionId),
+        payloadSubmissionId: String(submissionId),
+      };
+    } catch (e) {
+      console.error('DocuSeal verify submission failed:', e);
+      sendJson(res, 502, { error: 'Could not verify submission with DocuSeal.' });
+      return;
+    }
+
+    resolved = await resolveJobForVerifiedSubmissionWebhook(supabase, data, verifiedInfo.verified);
+    if (!resolved) {
+      console.log('[webhook] ignored: no matching job', {
+        submissionId: String(verifiedInfo.verified.id),
+        eventType,
+      });
+      sendJson(res, 200, { ok: true, ignored: true });
+      return;
+    }
   }
 
-  let verified;
-  try {
-    verified = await docusealFetchJson(`/submissions/${submissionId}`, { method: 'GET' });
-  } catch (e) {
-    console.error('DocuSeal verify submission failed:', e);
-    sendJson(res, 502, { error: 'Could not verify submission with DocuSeal.' });
-    return;
-  }
-
+  const verified = verifiedInfo.verified;
   console.log('[webhook] verified submission', {
     submissionId: String(verified.id),
     submissionStatus: verified.status ?? null,
     submitterStatus: pickCustomerSubmitter(verified)?.status ?? null,
+    verifiedBy: verifiedInfo.verifiedBy,
+    verifiedSourceSubmissionId: verifiedInfo.sourceSubmissionId,
   });
 
-  const supabase = getServiceSupabase();
-  const resolved = await resolveJobForWebhook(supabase, data, verified);
-  if (!resolved) {
-    console.log('[webhook] ignored: no matching job', {
+  if (!formEvent) {
+    console.log('[webhook] resolved job', {
       submissionId: String(verified.id),
-      eventType,
+      jobId: String(resolved.job.id),
+      resolvedBy: resolved.resolvedBy,
+      currentSubmissionId: resolved.job.esign_submission_id ?? null,
+      currentStatus: resolved.job.esign_status ?? null,
     });
-    sendJson(res, 200, { ok: true, ignored: true });
+  }
+
+  if (
+    verifiedInfo.payloadSubmissionId &&
+    String(verified.id) !== String(verifiedInfo.payloadSubmissionId)
+  ) {
+    console.log('[webhook] ignored: stale submission', {
+      submissionId: String(verified.id),
+      payloadSubmissionId: String(verifiedInfo.payloadSubmissionId),
+      jobId: String(resolved.job.id),
+      resolvedBy: resolved.resolvedBy,
+    });
+    sendJson(res, 200, { ok: true, ignored: true, reason: 'stale_submission' });
     return;
   }
 
-  const { job, resolvedBy } = resolved;
+  if (
+    formEvent &&
+    resolved.resolvedBy !== 'submission_id' &&
+    resolved.job.esign_submission_id &&
+    String(verified.id) !== String(resolved.job.esign_submission_id)
+  ) {
+    const rerouted = await resolveJobForVerifiedSubmissionWebhook(supabase, data, verified);
+    if (rerouted && String(rerouted.job.id) !== String(resolved.job.id)) {
+      console.log('[webhook] rerouted job after verification', {
+        submissionId: String(verified.id),
+        fromJobId: String(resolved.job.id),
+        toJobId: String(rerouted.job.id),
+        fromResolvedBy: resolved.resolvedBy,
+        toResolvedBy: rerouted.resolvedBy,
+      });
+      resolved = rerouted;
+    }
+  }
 
-  console.log('[webhook] resolved job', {
-    submissionId: String(verified.id),
-    jobId: String(job.id),
-    resolvedBy,
-    currentSubmissionId: job.esign_submission_id ?? null,
-    currentStatus: job.esign_status ?? null,
-  });
+  const { job, resolvedBy } = resolved;
 
   // When resolved by submission_id, the row is already anchored to the verified
   // submission id. External-id fallbacks need an explicit stale check before we

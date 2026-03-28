@@ -94,6 +94,29 @@ function docusealSubmissionResponse(submissionId: number | string) {
   };
 }
 
+function mockWebhookSupabase(findJob: (column: string, value: string) => unknown) {
+  const updateEqMock = vi.fn(async () => ({ error: null }));
+  const updateMock = vi.fn(() => ({
+    eq: updateEqMock,
+  }));
+
+  createClientMock.mockReturnValue({
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn((column: string, value: string) => ({
+          maybeSingle: vi.fn(async () => ({
+            data: findJob(column, value) ?? null,
+            error: null,
+          })),
+        })),
+      })),
+      update: updateMock,
+    })),
+  });
+
+  return { updateEqMock, updateMock };
+}
+
 describe('tryHandleEsignRoute', () => {
   const prevEnv: Record<string, string | undefined> = {};
 
@@ -121,6 +144,18 @@ describe('tryHandleEsignRoute', () => {
     env.DOCUSEAL_WEBHOOK_HEADER_NAME = 'X-Docuseal-Webhook-Secret';
     env.DOCUSEAL_WEBHOOK_HEADER_VALUE = 'correct-secret';
     createClientMock.mockReset();
+    createClientMock.mockReturnValue({
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+          })),
+        })),
+        update: vi.fn(() => ({
+          eq: vi.fn(async () => ({ error: null })),
+        })),
+      })),
+    });
     resetEsignServiceSupabaseSingleton();
   });
 
@@ -770,6 +805,14 @@ describe('tryHandleEsignRoute', () => {
 
   it('webhook returns 502 when DocuSeal verify GET fails', async () => {
     const res = captureRes();
+    mockWebhookSupabase((column, value) =>
+      column === 'id' && value === JOB_UUID
+        ? baseJobRow({
+            esign_submission_id: '123',
+            esign_submitter_id: '77',
+          })
+        : null
+    );
     vi.mocked(globalThis.fetch).mockResolvedValue(new Response('nope', { status: 500 }));
 
     const req = {
@@ -782,37 +825,212 @@ describe('tryHandleEsignRoute', () => {
       res as never,
       defaultHelpers(async () => ({
         event_type: 'form.completed',
-        data: { submission: { id: 123 } },
+        data: { id: 77, external_id: JOB_UUID, submission: { id: 123 } },
       }))
     );
     expect(res.status).toBe(502);
     expect(JSON.parse(res.body).error).toMatch(/verify/i);
   });
 
+  it('webhook updates opened state from form.viewed without payload submission id', async () => {
+    const res = captureRes();
+    const { updateEqMock } = mockWebhookSupabase((column, value) => {
+      if (column === 'id' && value === JOB_UUID) {
+        return baseJobRow({
+          esign_submission_id: '900',
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      return null;
+    });
+
+    const submission = docusealSubmissionResponse(900);
+    submission.submitters[0].status = 'opened';
+    submission.submitters[0].opened_at = '2026-03-28T12:00:00Z';
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(submission), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'form.viewed',
+        data: { id: 77, external_id: JOB_UUID },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true });
+    expect(updateEqMock).toHaveBeenCalledWith('id', JOB_UUID);
+    expect(updateEqMock.mock.calls[0]?.[0]).toBe('id');
+  });
+
+  it('webhook updates opened state from form.started without payload submission id', async () => {
+    const res = captureRes();
+    const { updateMock } = mockWebhookSupabase((column, value) => {
+      if (column === 'id' && value === JOB_UUID) {
+        return baseJobRow({
+          esign_submission_id: '900',
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      return null;
+    });
+
+    const submission = docusealSubmissionResponse(900);
+    submission.submitters[0].status = 'opened';
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(submission), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'form.started',
+        data: { id: 77, external_id: JOB_UUID },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    const patch = updateMock.mock.calls[0]?.[0] as { esign_status?: string };
+    expect(patch.esign_status).toBe('opened');
+  });
+
+  it('webhook updates completed state from form.completed payload submission id', async () => {
+    const res = captureRes();
+    const { updateMock, updateEqMock } = mockWebhookSupabase((column, value) => {
+      if (column === 'id' && value === JOB_UUID) {
+        return baseJobRow({
+          esign_submission_id: '900',
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      if (column === 'esign_submission_id' && value === '900') {
+        return baseJobRow({
+          esign_submission_id: '900',
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      return null;
+    });
+
+    const submission = docusealSubmissionResponse(900);
+    submission.status = 'completed';
+    submission.completed_at = '2026-03-28T13:00:00Z';
+    submission.submitters[0].status = 'completed';
+    submission.submitters[0].completed_at = '2026-03-28T13:00:00Z';
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(submission), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'form.completed',
+        data: { id: 77, external_id: JOB_UUID, submission: { id: 900, status: 'completed' } },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    const patch = updateMock.mock.calls[0]?.[0] as { esign_status?: string };
+    expect(patch.esign_status).toBe('completed');
+    expect(updateEqMock).toHaveBeenCalledWith('id', JOB_UUID);
+  });
+
+  it('webhook resolves form.completed by submitter id when external_id is missing', async () => {
+    const res = captureRes();
+    const { updateMock, updateEqMock } = mockWebhookSupabase((column, value) => {
+      if (column === 'esign_submitter_id' && value === '77') {
+        return baseJobRow({
+          esign_submission_id: '900',
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      if (column === 'esign_submission_id' && value === '900') {
+        return baseJobRow({
+          esign_submission_id: '900',
+          esign_submitter_id: '77',
+          esign_status: 'sent',
+        });
+      }
+      return null;
+    });
+
+    const submission = docusealSubmissionResponse(900);
+    submission.status = 'completed';
+    submission.submitters[0].external_id = undefined;
+    submission.submitters[0].status = 'completed';
+    submission.submitters[0].completed_at = '2026-03-28T13:10:00Z';
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(submission), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'form.completed',
+        data: { id: 77, submission: { id: 900, status: 'completed' } },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    const patch = updateMock.mock.calls[0]?.[0] as { esign_status?: string };
+    expect(patch.esign_status).toBe('completed');
+    expect(updateEqMock).toHaveBeenCalledWith('id', JOB_UUID);
+  });
+
   it('webhook ignores stale submission when external-id fallback resolves to a different stored submission', async () => {
     const res = captureRes();
-    const updateMock = vi.fn(() => ({
-      eq: vi.fn(async () => ({ error: null })),
-    }));
-
-    createClientMock.mockReturnValue({
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn((_column: string, value: string) => ({
-            maybeSingle: vi.fn(async () => ({
-              data:
-                value === '222'
-                  ? null
-                  : baseJobRow({
-                      esign_submission_id: '111',
-                      esign_submitter_id: '1',
-                    }),
-              error: null,
-            })),
-          })),
-        })),
-        update: updateMock,
-      })),
+    const { updateMock } = mockWebhookSupabase((column, value) => {
+      if (column === 'esign_submission_id' && value === '222') return null;
+      if (column === 'id' && value === JOB_UUID) {
+        return baseJobRow({
+          esign_submission_id: '111',
+          esign_submitter_id: '1',
+        });
+      }
+      return null;
     });
 
     const submission = docusealSubmissionResponse(222);
@@ -846,32 +1064,27 @@ describe('tryHandleEsignRoute', () => {
 
   it('webhook prefers verified submission id over conflicting payload external_id', async () => {
     const res = captureRes();
-    const updateMock = vi.fn(() => ({
-      eq: vi.fn(async () => ({ error: null })),
-    }));
-
-    createClientMock.mockReturnValue({
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn((_column: string, value: string) => ({
-            maybeSingle: vi.fn(async () => ({
-              data:
-                value === '333'
-                  ? baseJobRow({
-                      esign_submission_id: '333',
-                      esign_submitter_id: '77',
-                    })
-                  : baseJobRow({
-                      id: OTHER_JOB_UUID,
-                      esign_submission_id: '111',
-                      esign_submitter_id: '88',
-                    }),
-              error: null,
-            })),
-          })),
-        })),
-        update: updateMock,
-      })),
+    const { updateMock } = mockWebhookSupabase((column, value) => {
+      if (column === 'id' && value === OTHER_JOB_UUID) {
+        return baseJobRow({
+          id: OTHER_JOB_UUID,
+          esign_submission_id: '111',
+          esign_submitter_id: '88',
+        });
+      }
+      if (column === 'esign_submission_id' && value === '333') {
+        return baseJobRow({
+          esign_submission_id: '333',
+          esign_submitter_id: '77',
+        });
+      }
+      if (column === 'id' && value === JOB_UUID) {
+        return baseJobRow({
+          esign_submission_id: '333',
+          esign_submitter_id: '77',
+        });
+      }
+      return null;
     });
 
     vi.mocked(globalThis.fetch).mockResolvedValue(
@@ -904,29 +1117,15 @@ describe('tryHandleEsignRoute', () => {
 
   it('webhook falls back to verified submitter external_id when submission lookup misses', async () => {
     const res = captureRes();
-    const updateEqMock = vi.fn(async () => ({ error: null }));
-    const updateMock = vi.fn(() => ({
-      eq: updateEqMock,
-    }));
-
-    createClientMock.mockReturnValue({
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn((_column: string, value: string) => ({
-            maybeSingle: vi.fn(async () => ({
-              data:
-                value === '444'
-                  ? null
-                  : baseJobRow({
-                      esign_submission_id: null,
-                      esign_submitter_id: '77',
-                    }),
-              error: null,
-            })),
-          })),
-        })),
-        update: updateMock,
-      })),
+    const { updateEqMock } = mockWebhookSupabase((column, value) => {
+      if (column === 'esign_submission_id' && value === '444') return null;
+      if (column === 'id' && value === JOB_UUID) {
+        return baseJobRow({
+          esign_submission_id: null,
+          esign_submitter_id: '77',
+        });
+      }
+      return null;
     });
 
     vi.mocked(globalThis.fetch).mockResolvedValue(
