@@ -103,26 +103,43 @@ function publicEsignPayload(row) {
 
 async function resolveJobForWebhook(supabase, webhookData, verifiedSubmission) {
   const d = webhookData || {};
-  const ext =
-    d.external_id ||
-    pickCustomerSubmitter(verifiedSubmission)?.external_id ||
-    d.submitters?.[0]?.external_id;
-  if (ext && isUuid(ext)) {
+  const verifiedSubmissionId = verifiedSubmission?.id;
+  if (verifiedSubmissionId != null) {
     const { data: row } = await supabase
       .from('jobs')
       .select('*')
-      .eq('id', String(ext))
+      .eq('esign_submission_id', String(verifiedSubmissionId))
       .maybeSingle();
-    return row ? { job: row, resolvedBy: 'external_id' } : null;
+    if (row) {
+      return { job: row, resolvedBy: 'submission_id' };
+    }
   }
-  const sid = verifiedSubmission?.id ?? d.submission?.id;
-  if (sid == null) return null;
-  const { data: row } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('esign_submission_id', String(sid))
-    .maybeSingle();
-  return row ? { job: row, resolvedBy: 'submission_id' } : null;
+
+  const verifiedExternalId = pickCustomerSubmitter(verifiedSubmission)?.external_id;
+  if (verifiedExternalId && isUuid(verifiedExternalId)) {
+    const { data: row } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', String(verifiedExternalId))
+      .maybeSingle();
+    if (row) {
+      return { job: row, resolvedBy: 'verified_external_id' };
+    }
+  }
+
+  const payloadExternalId = d.external_id || d.submitters?.[0]?.external_id;
+  if (payloadExternalId && isUuid(payloadExternalId)) {
+    const { data: row } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', String(payloadExternalId))
+      .maybeSingle();
+    if (row) {
+      return { job: row, resolvedBy: 'payload_external_id' };
+    }
+  }
+
+  return null;
 }
 
 function matchEsignPath(method, pathname) {
@@ -437,10 +454,11 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
 
   const { job, resolvedBy } = resolved;
 
-  // Stale-submission check only applies when the job was found via external_id.
-  // When resolved by submission_id the match is guaranteed by the query itself.
+  // When resolved by submission_id, the row is already anchored to the verified
+  // submission id. External-id fallbacks need an explicit stale check before we
+  // let the verified DocuSeal state overwrite the job row.
   if (
-    resolvedBy === 'external_id' &&
+    resolvedBy !== 'submission_id' &&
     job.esign_submission_id &&
     String(verified.id) !== String(job.esign_submission_id)
   ) {

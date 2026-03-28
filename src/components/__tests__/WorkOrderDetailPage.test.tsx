@@ -420,7 +420,7 @@ describe('WorkOrderDetailPage', () => {
       expect(btns.at(-1) as HTMLButtonElement).toBeDisabled();
     });
     expect(
-      screen.getByText(/Work order invoice has been finalized\. New change orders cannot be added\./i)
+      await screen.findByText(/Work order invoice has been finalized\. New change orders cannot be added\./i)
     ).toBeInTheDocument();
   });
 

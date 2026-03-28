@@ -138,6 +138,7 @@ src/
     useAuth.ts               # Supabase auth state listener
     useAuthProfile.ts        # Profile loading + capture redirect handling
     useChangeOrderFlow.ts    # Detail/wizard/detail navigation for change orders
+    useEsignPoller.ts        # Shared timer + visibility wiring for short-lived e-sign polling
     useInvoiceFlow.ts        # Invoice wizard/final page flow state
     useScaledPreview.ts      # 816px preview scaling helpers
     useWorkOrderDraft.ts     # Draft state + next_wo_number refresh after first save; optional onNewDraft (e.g. clear App guest information fields)

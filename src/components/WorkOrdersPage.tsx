@@ -9,8 +9,9 @@ import type {
 } from '../types/db';
 import { listJobsForWorkOrders, listInFlightEsignJobs, getJobById } from '../lib/db/jobs';
 import { listInvoiceStatusByJob, getInvoice, invoiceStatusMapFromRows } from '../lib/db/invoices';
+import { useEsignPoller } from '../hooks/useEsignPoller';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
-import { ESIGN_POLL_INTERVAL_MS, shouldPollEsignStatus } from '../lib/esign-live';
+import { shouldPollEsignStatus } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
 import { formatWorkOrderListJobType } from '../lib/work-order-list-label';
 import './WorkOrdersPage.css';
@@ -157,62 +158,15 @@ export function WorkOrdersPage({
     };
   }, [userId]);
 
-  useEffect(() => {
-    if (!hasInFlightEsign) return;
-
-    let cancelled = false;
-    let timerId: ReturnType<typeof setTimeout> | null = null;
-
-    const clearTimer = () => {
-      if (timerId !== null) {
-        clearTimeout(timerId);
-        timerId = null;
-      }
-    };
-
-    const schedule = () => {
-      clearTimer();
-      timerId = setTimeout(() => {
-        void pollOnce();
-      }, ESIGN_POLL_INTERVAL_MS);
-    };
-
-    const pollOnce = async () => {
-      if (cancelled) return;
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        schedule();
-        return;
-      }
+  useEsignPoller({
+    enabled: hasInFlightEsign,
+    pollOnce: async () => {
       const updatedRows = await listInFlightEsignJobs(userId);
-      if (cancelled) return;
       const updatedById = new Map(updatedRows.map((r) => [r.id, r]));
       setJobs((prev) => prev.map((job) => updatedById.get(job.id) ?? job));
-      if (updatedRows.some((job) => shouldPollEsignStatus(job.esign_status))) {
-        schedule();
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (cancelled) return;
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        clearTimer();
-        void pollOnce();
-      }
-    };
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-    schedule();
-
-    return () => {
-      cancelled = true;
-      clearTimer();
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-    };
-  }, [hasInFlightEsign, userId]);
+      return updatedRows.some((job) => shouldPollEsignStatus(job.esign_status));
+    },
+  });
 
   useEffect(() => {
     if (!successBanner) return;

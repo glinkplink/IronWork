@@ -23,6 +23,7 @@ function nodeEnv(): ProcEnv {
 }
 
 const JOB_UUID = '550e8400-e29b-41d4-a716-446655440000';
+const OTHER_JOB_UUID = '550e8400-e29b-41d4-a716-446655440099';
 const USER_UUID = '660e8400-e29b-41d4-a716-446655440001';
 
 function captureRes() {
@@ -594,7 +595,7 @@ describe('tryHandleEsignRoute', () => {
     expect(JSON.parse(res.body).error).toMatch(/verify/i);
   });
 
-  it('webhook ignores stale submission when stored esign_submission_id differs from verified id', async () => {
+  it('webhook ignores stale submission when external-id fallback resolves to a different stored submission', async () => {
     const res = captureRes();
     const updateMock = vi.fn(() => ({
       eq: vi.fn(async () => ({ error: null })),
@@ -603,12 +604,15 @@ describe('tryHandleEsignRoute', () => {
     createClientMock.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
-          eq: vi.fn(() => ({
+          eq: vi.fn((_column: string, value: string) => ({
             maybeSingle: vi.fn(async () => ({
-              data: baseJobRow({
-                esign_submission_id: '111',
-                esign_submitter_id: '1',
-              }),
+              data:
+                value === '222'
+                  ? null
+                  : baseJobRow({
+                      esign_submission_id: '111',
+                      esign_submitter_id: '1',
+                    }),
               error: null,
             })),
           })),
@@ -617,8 +621,10 @@ describe('tryHandleEsignRoute', () => {
       })),
     });
 
+    const submission = docusealSubmissionResponse(222);
+    submission.submitters[0].external_id = undefined;
     vi.mocked(globalThis.fetch).mockResolvedValue(
-      new Response(JSON.stringify(docusealSubmissionResponse(222)), {
+      new Response(JSON.stringify(submission), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -644,7 +650,7 @@ describe('tryHandleEsignRoute', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it('webhook verify-on-receive updates job when submission matches', async () => {
+  it('webhook prefers verified submission id over conflicting payload external_id', async () => {
     const res = captureRes();
     const updateMock = vi.fn(() => ({
       eq: vi.fn(async () => ({ error: null })),
@@ -653,12 +659,19 @@ describe('tryHandleEsignRoute', () => {
     createClientMock.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
-          eq: vi.fn(() => ({
+          eq: vi.fn((_column: string, value: string) => ({
             maybeSingle: vi.fn(async () => ({
-              data: baseJobRow({
-                esign_submission_id: '333',
-                esign_submitter_id: '77',
-              }),
+              data:
+                value === '333'
+                  ? baseJobRow({
+                      esign_submission_id: '333',
+                      esign_submitter_id: '77',
+                    })
+                  : baseJobRow({
+                      id: OTHER_JOB_UUID,
+                      esign_submission_id: '111',
+                      esign_submitter_id: '88',
+                    }),
               error: null,
             })),
           })),
@@ -684,12 +697,67 @@ describe('tryHandleEsignRoute', () => {
       res as never,
       defaultHelpers(async () => ({
         event_type: 'form.completed',
-        data: { submission: { id: 333 }, external_id: JOB_UUID },
+        data: { submission: { id: 333 }, external_id: OTHER_JOB_UUID },
       }))
     );
 
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ ok: true });
-    expect(updateMock).toHaveBeenCalled();
+    expect(updateMock).toHaveBeenCalledWith(expect.any(Object));
+    const updateTarget = updateMock.mock.results[0]?.value;
+    expect(updateTarget.eq).toHaveBeenCalledWith('id', JOB_UUID);
+  });
+
+  it('webhook falls back to verified submitter external_id when submission lookup misses', async () => {
+    const res = captureRes();
+    const updateEqMock = vi.fn(async () => ({ error: null }));
+    const updateMock = vi.fn(() => ({
+      eq: updateEqMock,
+    }));
+
+    createClientMock.mockReturnValue({
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn((_column: string, value: string) => ({
+            maybeSingle: vi.fn(async () => ({
+              data:
+                value === '444'
+                  ? null
+                  : baseJobRow({
+                      esign_submission_id: null,
+                      esign_submitter_id: '77',
+                    }),
+              error: null,
+            })),
+          })),
+        })),
+        update: updateMock,
+      })),
+    });
+
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(docusealSubmissionResponse(444)), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'POST',
+      url: '/api/webhooks/docuseal',
+      headers: { 'x-docuseal-webhook-secret': 'correct-secret' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        event_type: 'submission.opened',
+        data: { id: 444 },
+      }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true });
+    expect(updateEqMock).toHaveBeenCalledWith('id', JOB_UUID);
   });
 });

@@ -29,7 +29,8 @@ import {
   sendWorkOrderForSignature,
 } from '../lib/esign-api';
 import { getJobById } from '../lib/db/jobs';
-import { ESIGN_POLL_INTERVAL_MS, formatEsignTimestamp, shouldPollEsignStatus } from '../lib/esign-live';
+import { formatEsignTimestamp, shouldPollEsignStatus } from '../lib/esign-live';
+import { useEsignPoller } from '../hooks/useEsignPoller';
 import { getEsignProgressModel } from '../lib/esign-progress';
 import { agreementSectionsToHtml } from '../lib/agreement-sections-html';
 import { buildCombinedWorkOrderAndChangeOrdersHtml } from '../lib/change-order-generator';
@@ -204,60 +205,13 @@ export function WorkOrderDetailPage({
     return row;
   }, [job.id, onJobUpdated]);
 
-  useEffect(() => {
-    if (!onJobUpdated || !shouldPollEsignStatus(job.esign_status)) return;
-
-    let cancelled = false;
-    let timerId: ReturnType<typeof setTimeout> | null = null;
-
-    const clearTimer = () => {
-      if (timerId !== null) {
-        clearTimeout(timerId);
-        timerId = null;
-      }
-    };
-
-    const schedule = () => {
-      clearTimer();
-      timerId = setTimeout(() => {
-        void pollOnce();
-      }, ESIGN_POLL_INTERVAL_MS);
-    };
-
-    const pollOnce = async () => {
-      if (cancelled) return;
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        schedule();
-        return;
-      }
+  useEsignPoller({
+    enabled: Boolean(onJobUpdated) && shouldPollEsignStatus(job.esign_status),
+    pollOnce: async () => {
       const row = await refreshJobRow();
-      if (cancelled) return;
-      if (row && shouldPollEsignStatus(row.esign_status)) {
-        schedule();
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (cancelled) return;
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        clearTimer();
-        void pollOnce();
-      }
-    };
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-    schedule();
-
-    return () => {
-      cancelled = true;
-      clearTimer();
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-    };
-  }, [job.esign_status, onJobUpdated, refreshJobRow]);
+      return Boolean(row) && shouldPollEsignStatus(row.esign_status);
+    },
+  });
 
   useEffect(() => {
     return () => {

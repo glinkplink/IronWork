@@ -135,6 +135,7 @@ scope-lock/
 │   │   ├── useAuth.ts                # Auth state hook (Supabase session)
 │   │   ├── useAuthProfile.ts         # Profile loading + capture redirect handling
 │   │   ├── useChangeOrderFlow.ts     # Detail/wizard/detail navigation for COs
+│   │   ├── useEsignPoller.ts         # Shared timer + visibility wiring for e-sign polling
 │   │   ├── useInvoiceFlow.ts         # Invoice wizard/final page flow state
 │   │   ├── useScaledPreview.ts       # 816px preview scaling for WO/invoice mini previews
 │   │   ├── useWorkOrderDraft.ts      # New/edit draft state + next_wo_number refresh path
