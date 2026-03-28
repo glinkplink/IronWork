@@ -6,6 +6,13 @@ import { DOCUSEAL_CUSTOMER_ROLE } from './docuseal-constants';
  * Embedded print-oriented CSS for DocuSeal HTML submissions (no App.css in their renderer).
  * Mirrors agreement-document rules from App.css with literal colors.
  */
+/** Same webfont loading as PDF HTML (`agreement-pdf.ts`) so Dancing Script resolves in DocuSeal’s isolated renderer. */
+export function docusealGoogleFontLinks(): string {
+  return `<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&amp;family=Dancing+Script:wght@400;700&amp;display=swap" rel="stylesheet" />`;
+}
+
 export function docusealAgreementEmbeddedStyles(): string {
   return `<style>
     /* DocuSeal (and similar paginated viewers) repeat the WO header on each page but do not repeat
@@ -196,6 +203,7 @@ export function buildDocusealWorkOrderHtmlDocument(sections: AgreementSection[])
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
+  ${docusealGoogleFontLinks()}
   ${docusealAgreementEmbeddedStyles()}
 </head>
 <body>
