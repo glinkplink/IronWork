@@ -111,11 +111,13 @@ src/
     job-to-welder-job.ts     # Job row + profile → WelderJob
     invoice-generator.ts     # Invoice HTML string
     agreement-sections-html.ts # Agreement sections → HTML string (combined PDFs)
-    docuseal-agreement-html.ts # DocuSeal HTML document (embedded CSS + field tags; uses esc())
+    docuseal-agreement-html.ts # DocuSeal HTML document for WO (embedded CSS + field tags; uses esc())
+    docuseal-change-order-html.ts # DocuSeal HTML document for CO (embedded CSS + field tags; uses esc())
     docuseal-header-footer.ts  # html_header / html_footer strings for DocuSeal submissions
     docuseal-constants.ts      # Shared DocuSeal role name(s)
+    docuseal-signature-image.ts # Render DocuSeal SP signature as image in signed documents
     fetch-with-supabase-auth.ts # Same-origin fetch with Bearer from Supabase session
-    esign-api.ts               # send/resend work order for signature (app server API)
+    esign-api.ts               # send/resend work order and change order for signature (app server API)
     esign-labels.ts            # E-sign status strings for UI
     esign-progress.ts          # Shared e-sign step/tone model for detail timeline + list strip
     esign-live.ts              # Shared e-sign polling cadence + in-flight status helpers + timestamp formatting
@@ -123,6 +125,7 @@ src/
     owner-name.ts            # normalize owner full name for profile + preview stubs
     guest-agreement-profile.ts # `BusinessProfile`-shaped stub from guest form fields for agreement preview when no DB profile
     change-order-generator.ts # Change order HTML + combined WO + listed COs
+    change-order-document.css # PDF/preview styles scoped to .change-order-document (imported ?raw by agreement-pdf.ts)
     invoice-line-items.ts    # Invoice line item parsing, validation, source types
     payment-terms.ts         # Payment terms presets + validators
     work-order-list-label.ts # Job type display formatting for Work Orders list
@@ -144,8 +147,9 @@ src/
     useWorkOrderDraft.ts     # Draft state + next_wo_number refresh after first save; optional onNewDraft (e.g. clear App guest information fields)
     useWorkOrderRowActions.ts # Work Orders row hydration/open/invoice helpers
   types/
-    db.ts                    # BusinessProfile, Client, Job, Invoice, …
+    db.ts                    # BusinessProfile, Client, Job, Invoice, … (+ esign_* fields on Job, ChangeOrder)
     index.ts                 # WelderJob, AgreementSection, SignatureBlockData
+    capture-flow.ts          # CaptureFlow type for anonymous capture modal
   data/
     sample-job.json          # Default/placeholder values for new agreements
 server/
@@ -158,7 +162,7 @@ server/
 
 ## Generated HTML strings (security)
 
-All user- or client-supplied text interpolated into HTML string generators (`invoice-generator.ts`, `change-order-generator.ts`, `agreement-sections-html.ts`, `docuseal-agreement-html.ts`, and any combined PDF HTML builders) must go through `esc()` from `src/lib/html-escape.ts`. React text in components (e.g. `AgreementDocumentSections`) is escaped by default; do not add new `dangerouslySetInnerHTML` pipelines built from raw user input without `esc()`.
+All user- or client-supplied text interpolated into HTML string generators (`invoice-generator.ts`, `change-order-generator.ts`, `agreement-sections-html.ts`, `docuseal-agreement-html.ts`, `docuseal-change-order-html.ts`, and any combined PDF HTML builders) must go through `esc()` from `src/lib/html-escape.ts`. React text in components (e.g. `AgreementDocumentSections`) is escaped by default; do not add new `dangerouslySetInnerHTML` pipelines built from raw user input without `esc()`.
 
 ---
 
