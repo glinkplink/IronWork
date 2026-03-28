@@ -25,6 +25,7 @@ import {
 } from '../lib/docuseal-header-footer';
 import {
   mergeEsignResponseIntoJob,
+  pollWorkOrderEsignStatus,
   resendWorkOrderSignature,
   sendWorkOrderForSignature,
 } from '../lib/esign-api';
@@ -199,12 +200,18 @@ export function WorkOrderDetailPage({
   }, [coInvoiceStatusRows]);
 
   const refreshJobRow = useCallback(async () => {
-    const row = await getJobById(job.id);
-    if (row && onJobUpdated) {
-      onJobUpdated(row);
+    try {
+      const r = await pollWorkOrderEsignStatus(job.id);
+      const updatedJob = mergeEsignResponseIntoJob(job, r);
+      onJobUpdated?.(updatedJob);
+      return updatedJob;
+    } catch {
+      // Fallback to passive DB read if active poll fails
+      const row = await getJobById(job.id);
+      if (row && onJobUpdated) onJobUpdated(row);
+      return row;
     }
-    return row;
-  }, [job.id, onJobUpdated]);
+  }, [job, onJobUpdated]);
 
   useEsignPoller({
     enabled: Boolean(onJobUpdated) && shouldPollEsignStatus(job.esign_status),

@@ -102,6 +102,27 @@ export async function resendWorkOrderSignature(
   return json as EsignApiResponse;
 }
 
+export async function pollWorkOrderEsignStatus(jobId: string): Promise<EsignApiResponse> {
+  const res = await fetchWithSupabaseAuth(`/api/esign/work-orders/${jobId}/status`, {
+    method: 'GET',
+  });
+  const text = await res.text();
+  let json: unknown = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (!res.ok) {
+    const msg =
+      json && typeof json === 'object' && json !== null && 'error' in json
+        ? String((json as { error: unknown }).error)
+        : text || res.statusText;
+    throw new Error(msg);
+  }
+  return json as EsignApiResponse;
+}
+
 export async function sendChangeOrderForSignature(
   coId: string,
   payload: EsignSendDocumentsPayload
