@@ -285,15 +285,20 @@ async function handleResend(req, res, readJsonBody, sendJson, jobId) {
     putBody.message = body.message;
   }
 
+  let reconcileFromSubmission = false;
   try {
     await docusealFetchJson(`/submitters/${submitterId}`, {
       method: 'PUT',
       body: JSON.stringify(putBody),
     });
   } catch (e) {
-    const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 502;
-    sendJson(res, status, { error: e instanceof Error ? e.message : 'DocuSeal resend failed.' });
-    return;
+    if (e?.status === 422 && job.esign_submission_id) {
+      reconcileFromSubmission = true;
+    } else {
+      const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 502;
+      sendJson(res, status, { error: e instanceof Error ? e.message : 'DocuSeal resend failed.' });
+      return;
+    }
   }
 
   let submission = null;
@@ -302,7 +307,20 @@ async function handleResend(req, res, readJsonBody, sendJson, jobId) {
       submission = await docusealFetchJson(`/submissions/${job.esign_submission_id}`, {
         method: 'GET',
       });
-    } catch {
+    } catch (submissionErr) {
+      if (reconcileFromSubmission) {
+        const status =
+          submissionErr?.status && submissionErr.status >= 400 && submissionErr.status < 600
+            ? submissionErr.status
+            : 502;
+        sendJson(res, status, {
+          error:
+            submissionErr instanceof Error
+              ? submissionErr.message
+              : 'DocuSeal refresh after resend failed.',
+        });
+        return;
+      }
       submission = null;
     }
   }
