@@ -78,6 +78,18 @@ const baseJob: Job = {
   customer_obligations: [],
   created_at: '2024-06-01T00:00:00Z',
   updated_at: '2024-06-01T00:00:00Z',
+  esign_submission_id: null,
+  esign_submitter_id: null,
+  esign_embed_src: null,
+  esign_status: 'not_sent',
+  esign_submission_state: null,
+  esign_submitter_state: null,
+  esign_sent_at: null,
+  esign_opened_at: null,
+  esign_completed_at: null,
+  esign_declined_at: null,
+  esign_decline_reason: null,
+  esign_signed_document_url: null,
 };
 
 const baseCo: ChangeOrder = {
@@ -96,6 +108,7 @@ const baseCo: ChangeOrder = {
   time_note: '',
   created_at: '2024-06-05T00:00:00Z',
   updated_at: '2024-06-05T00:00:00Z',
+  esign_status: 'not_sent',
 };
 
 function baseInvoice(line_items: Invoice['line_items']): Invoice {

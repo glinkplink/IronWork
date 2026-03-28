@@ -94,6 +94,23 @@
   justify-content: space-between;
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
+  padding: var(--space-xs) var(--space-md);
+}
+
+.work-orders-success-banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .work-orders-success-banner-text {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
 .work-orders-invoice-status-banner {
@@ -158,4 +175,48 @@
 .work-orders-page .work-orders-meta-type {
   font-size: inherit;
   line-height: 1.35;
+}
+
+.work-orders-page .work-orders-esign-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 2px;
+  max-width: 100%;
+  color: var(--text-secondary);
+}
+
+.work-orders-page .work-orders-esign-segment {
+  width: 0.9rem;
+  height: 0.34rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+}
+
+.work-orders-page .work-orders-esign-segment-active {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.work-orders-page .work-orders-esign-segment-success {
+  border-color: #2d6a2e;
+  background: #2d6a2e;
+}
+
+.work-orders-page .work-orders-esign-segment-danger {
+  border-color: #9f2d20;
+  background: #9f2d20;
+}
+
+.work-orders-page .work-orders-esign-segment-warning {
+  border-color: #9a5b16;
+  background: #9a5b16;
+}
+
+.work-orders-page .work-orders-esign-text {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }

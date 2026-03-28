@@ -37,4 +37,41 @@ describe('AgreementDocumentSections', () => {
     expect(screen.getByText('First body')).toBeInTheDocument();
     expect(screen.getByText('Second body')).toBeInTheDocument();
   });
+
+  const partiesSectionEmptySp: AgreementSection = {
+    title: 'Parties & Project Information',
+    number: 1,
+    blocks: [
+      {
+        type: 'partiesLayout',
+        agreementDate: 'January 1, 2026',
+        serviceProvider: { businessName: '', phone: '', email: '' },
+        customer: { name: 'Cust', phone: '555', email: 'c@test.com' },
+        jobSiteAddress: '123 Main',
+      },
+    ],
+  };
+
+  it('shows guest SP placeholders when showGuestServiceProviderPlaceholders', () => {
+    render(
+      <div className="agreement-document">
+        <AgreementDocumentSections
+          sections={[partiesSectionEmptySp]}
+          showGuestServiceProviderPlaceholders
+        />
+      </div>
+    );
+
+    expect(screen.getAllByText('(Will be filled in at final step)')).toHaveLength(2);
+  });
+
+  it('omits guest SP placeholders when showGuestServiceProviderPlaceholders is false', () => {
+    render(
+      <div className="agreement-document">
+        <AgreementDocumentSections sections={[partiesSectionEmptySp]} />
+      </div>
+    );
+
+    expect(screen.queryByText('(Will be filled in at final step)')).not.toBeInTheDocument();
+  });
 });

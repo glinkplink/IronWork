@@ -1,18 +1,23 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Job, WorkOrderListJob } from '../../types/db';
 import { WorkOrdersPage } from '../WorkOrdersPage';
 import type { ListInvoiceStatusByJobResult } from '../../lib/db/invoices';
+import { ESIGN_POLL_INTERVAL_MS } from '../../lib/esign-live';
 
 const listJobsForWorkOrders = vi.fn();
+const listInFlightEsignJobs = vi.fn();
+const refreshEsignStatuses = vi.fn();
 const getJobById = vi.fn();
 const listInvoiceStatusByJob = vi.fn();
 
 vi.mock('../../lib/db/jobs', () => ({
   listJobsForWorkOrders: (...args: unknown[]) => listJobsForWorkOrders(...args),
+  listInFlightEsignJobs: (...args: unknown[]) => listInFlightEsignJobs(...args),
+  refreshEsignStatuses: (...args: unknown[]) => refreshEsignStatuses(...args),
   getJobById: (...args: unknown[]) => getJobById(...args),
 }));
 
@@ -34,6 +39,7 @@ const listJobA: WorkOrderListJob = {
   agreement_date: '2025-01-01',
   created_at: '2025-01-01T12:00:00Z',
   price: 100,
+  esign_status: 'not_sent',
 };
 
 const listJobB: WorkOrderListJob = {
@@ -45,6 +51,7 @@ const listJobB: WorkOrderListJob = {
   agreement_date: '2025-01-02',
   created_at: '2025-01-02T12:00:00Z',
   price: 200,
+  esign_status: 'sent',
 };
 
 function minimalFullJob(id: string, customer: string): Job {
@@ -90,6 +97,18 @@ function minimalFullJob(id: string, customer: string): Job {
     customer_obligations: null,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
+    esign_submission_id: null,
+    esign_submitter_id: null,
+    esign_embed_src: null,
+    esign_status: 'not_sent',
+    esign_submission_state: null,
+    esign_submitter_state: null,
+    esign_sent_at: null,
+    esign_opened_at: null,
+    esign_completed_at: null,
+    esign_declined_at: null,
+    esign_decline_reason: null,
+    esign_signed_document_url: null,
   };
 }
 
@@ -108,28 +127,42 @@ function renderPage() {
   const onStartInvoice = vi.fn();
   const onOpenPendingInvoice = vi.fn();
   const onOpenWorkOrderDetail = vi.fn();
+  const onClearSuccessBanner = vi.fn();
   render(
     <WorkOrdersPage
       userId="u1"
       profile={null}
       successBanner={null}
-      onClearSuccessBanner={() => {}}
+      onClearSuccessBanner={onClearSuccessBanner}
       onCompleteProfileClick={() => {}}
       onStartInvoice={onStartInvoice}
       onOpenPendingInvoice={onOpenPendingInvoice}
       onOpenWorkOrderDetail={onOpenWorkOrderDetail}
     />
   );
-  return { onStartInvoice, onOpenPendingInvoice, onOpenWorkOrderDetail };
+  return { onStartInvoice, onOpenPendingInvoice, onOpenWorkOrderDetail, onClearSuccessBanner };
+}
+
+async function flushAsync() {
+  await act(async () => {
+    await Promise.resolve();
+  });
 }
 
 describe('WorkOrdersPage', () => {
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    listJobsForWorkOrders.mockReset();
+    listInFlightEsignJobs.mockReset();
+    refreshEsignStatuses.mockReset();
+    getJobById.mockReset();
+    listInvoiceStatusByJob.mockReset();
+    listInFlightEsignJobs.mockResolvedValue([]);
+    refreshEsignStatuses.mockResolvedValue([]);
     listJobsForWorkOrders.mockResolvedValue([listJobA]);
     listInvoiceStatusByJob.mockResolvedValue({
       data: [],
@@ -139,6 +172,109 @@ describe('WorkOrdersPage', () => {
     getJobById.mockImplementation((id: string) => Promise.resolve(minimalFullJob(id, id)));
   });
 
+  it('shows compact e-sign progress strip when esign_status is not not_sent', async () => {
+    listJobsForWorkOrders.mockResolvedValue([
+      listJobA,
+      listJobB,
+      { ...listJobA, id: 'job-c', customer_name: 'Customer C', esign_status: 'completed' },
+      { ...listJobA, id: 'job-d', customer_name: 'Customer D', esign_status: 'declined' },
+      { ...listJobA, id: 'job-e', customer_name: 'Customer E', esign_status: 'expired' },
+    ]);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByLabelText('E-signature status: Sent')).toBeInTheDocument();
+      expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
+      expect(screen.getByLabelText('E-signature status: Declined')).toBeInTheDocument();
+      expect(screen.getByLabelText('E-signature status: Expired')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Sign sent')).not.toBeInTheDocument();
+  });
+
+  it('polls the jobs list while an e-sign is in flight and updates the row strip', async () => {
+    vi.useFakeTimers();
+    listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
+    listInFlightEsignJobs.mockResolvedValueOnce([]);
+    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+
+    renderPage();
+    await flushAsync();
+
+    expect(screen.getByLabelText('E-signature status: Sent')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    });
+    await flushAsync();
+
+    expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
+    expect(listJobsForWorkOrders).toHaveBeenCalledTimes(1);
+    expect(listInFlightEsignJobs).toHaveBeenCalledTimes(1);
+    expect(refreshEsignStatuses).toHaveBeenCalledWith(['job-b'], 'u1');
+  });
+
+  it('does not start polling when no e-sign rows are in flight', async () => {
+    vi.useFakeTimers();
+    listJobsForWorkOrders.mockResolvedValue([listJobA]);
+
+    renderPage();
+    await flushAsync();
+    expect(screen.getByText('Customer A')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS * 2);
+    });
+
+    expect(listJobsForWorkOrders).toHaveBeenCalledTimes(1);
+    expect(listInFlightEsignJobs).not.toHaveBeenCalled();
+  });
+
+  it('stops polling after the refreshed list reaches a terminal e-sign state', async () => {
+    vi.useFakeTimers();
+    listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
+    listInFlightEsignJobs.mockResolvedValueOnce([]);
+    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+
+    renderPage();
+    await flushAsync();
+
+    expect(screen.getByLabelText('E-signature status: Sent')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    });
+    await flushAsync();
+
+    expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS * 2);
+    });
+
+    expect(listJobsForWorkOrders).toHaveBeenCalledTimes(1);
+    expect(listInFlightEsignJobs).toHaveBeenCalledTimes(1);
+    expect(refreshEsignStatuses).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes disappeared in-flight rows so terminal statuses appear without a page reload', async () => {
+    vi.useFakeTimers();
+    listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
+    listInFlightEsignJobs.mockResolvedValueOnce([]);
+    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+
+    renderPage();
+    await flushAsync();
+
+    expect(screen.getByLabelText('E-signature status: Sent')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    });
+    await flushAsync();
+
+    expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
+    expect(refreshEsignStatuses).toHaveBeenCalledWith(['job-b'], 'u1');
+  });
+
   it('shows date on first meta line and capitalized job type on second', async () => {
     renderPage();
     await waitFor(() => {
@@ -146,6 +282,57 @@ describe('WorkOrdersPage', () => {
     });
     expect(screen.getByText('Jan 1, 2025')).toBeInTheDocument();
     expect(screen.getByText('Repair')).toBeInTheDocument();
+  });
+
+  it('clears the success banner after 10 seconds and not before', async () => {
+    vi.useFakeTimers();
+    const onClearSuccessBanner = vi.fn();
+
+    render(
+      <WorkOrdersPage
+        userId="u1"
+        profile={null}
+        successBanner="Work order saved. PDF downloaded."
+        onClearSuccessBanner={onClearSuccessBanner}
+        onCompleteProfileClick={() => {}}
+        onStartInvoice={() => {}}
+        onOpenPendingInvoice={() => {}}
+        onOpenWorkOrderDetail={() => {}}
+      />
+    );
+
+    await flushAsync();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9999);
+    });
+    expect(onClearSuccessBanner).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(onClearSuccessBanner).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismisses the success banner when the dismiss button is clicked', async () => {
+    const onClearSuccessBanner = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <WorkOrdersPage
+        userId="u1"
+        profile={null}
+        successBanner="Work order saved. PDF downloaded."
+        onClearSuccessBanner={onClearSuccessBanner}
+        onCompleteProfileClick={() => {}}
+        onStartInvoice={() => {}}
+        onOpenPendingInvoice={() => {}}
+        onOpenWorkOrderDetail={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /dismiss/i }));
+    expect(onClearSuccessBanner).toHaveBeenCalledTimes(1);
   });
 
   it('shows Specify text for Other job type with first letter capitalized', async () => {

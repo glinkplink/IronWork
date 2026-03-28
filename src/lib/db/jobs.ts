@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import type { Job, WorkOrderListJob } from '../../types/db';
+import type { EsignJobStatus, Job, WorkOrderListJob } from '../../types/db';
 import type { WelderJob } from '../../types';
 
 function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
@@ -12,6 +12,16 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
   const other_classification =
     ocRaw != null && String(ocRaw).trim() !== '' ? String(ocRaw).trim() : null;
 
+  const esignRaw = row.esign_status;
+  const esign_status: EsignJobStatus =
+    esignRaw === 'sent' ||
+    esignRaw === 'opened' ||
+    esignRaw === 'completed' ||
+    esignRaw === 'declined' ||
+    esignRaw === 'expired'
+      ? esignRaw
+      : 'not_sent';
+
   return {
     id: String(row.id),
     wo_number: row.wo_number != null ? Number(row.wo_number) : null,
@@ -21,6 +31,7 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
     agreement_date: (row.agreement_date as string | null) ?? null,
     created_at: String(row.created_at ?? ''),
     price,
+    esign_status,
   };
 }
 
@@ -28,13 +39,53 @@ export const listJobsForWorkOrders = async (userId: string): Promise<WorkOrderLi
   const { data, error } = await supabase
     .from('jobs')
     .select(
-      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price'
+      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price, esign_status'
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error listing jobs for work orders:', error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => mapWorkOrderListRow(row as Record<string, unknown>));
+};
+
+export const listInFlightEsignJobs = async (userId: string): Promise<WorkOrderListJob[]> => {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select(
+      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price, esign_status'
+    )
+    .eq('user_id', userId)
+    .in('esign_status', ['sent', 'opened'])
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error listing in-flight esign jobs:', error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => mapWorkOrderListRow(row as Record<string, unknown>));
+};
+
+export const refreshEsignStatuses = async (
+  jobIds: string[],
+  userId: string
+): Promise<WorkOrderListJob[]> => {
+  if (jobIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('jobs')
+    .select(
+      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price, esign_status'
+    )
+    .eq('user_id', userId)
+    .in('id', jobIds);
+
+  if (error) {
+    console.error('Error refreshing esign statuses:', error);
     return [];
   }
 

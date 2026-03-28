@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { Job, BusinessProfile, ChangeOrder, ChangeOrderLineItem } from '../types/db';
 import { createChangeOrder, updateChangeOrder, computeCOTotal } from '../lib/db/change-orders';
+import { buildChangeOrderEsignSendPayload } from '../lib/docuseal-change-order-html';
+import { mergeEsignResponseIntoChangeOrder, sendChangeOrderForSignature } from '../lib/esign-api';
 import './ChangeOrderWizard.css';
 
 const REASON_PRESETS = [
@@ -33,6 +35,7 @@ export interface ChangeOrderWizardProps {
 export function ChangeOrderWizard({
   userId,
   job,
+  profile,
   existingCO,
   onComplete,
   onCancel,
@@ -94,10 +97,10 @@ export function ChangeOrderWizard({
   };
 
   const validateStep2 = () => {
-    const valid = lineItems.some((row) => {
+    const hasIncompleteRows = lineItems.some((row) => {
       const q = row.quantity;
       const ur = row.unit_rate;
-      return (
+      return !(
         row.description.trim() !== '' &&
         Number.isFinite(q) &&
         q > 0 &&
@@ -105,8 +108,8 @@ export function ChangeOrderWizard({
         ur > 0
       );
     });
-    if (!valid) {
-      setError('Add at least one line item with a description, quantity greater than 0, and a rate greater than 0.');
+    if (hasIncompleteRows) {
+      setError('Complete each line item or remove any blank ones before continuing.');
       return false;
     }
     if (timeAmount < 0) {
@@ -135,7 +138,7 @@ export function ChangeOrderWizard({
           Number.isFinite(q) &&
           q > 0 &&
           Number.isFinite(ur) &&
-          ur >= 0
+          ur > 0
         );
       }),
       time_amount: Math.max(0, timeAmount),
@@ -145,24 +148,39 @@ export function ChangeOrderWizard({
 
     setSubmitting(true);
     try {
+      let savedCo: ChangeOrder | null = null;
       if (existingCO) {
         const { data, error: upErr } = await updateChangeOrder(userId, existingCO.id, {
           ...fields,
-          status: 'approved',
+          status: fields.requires_approval ? 'pending_approval' : 'approved',
         });
         if (upErr || !data) {
           setError(upErr?.message || 'Could not save change order.');
           return;
         }
-        onComplete(data);
+        savedCo = data;
       } else {
         const { data, error: cErr } = await createChangeOrder(userId, job.id, fields);
         if (cErr || !data) {
           setError(cErr?.message || 'Could not save change order.');
           return;
         }
-        onComplete(data);
+        savedCo = data;
       }
+
+      if (!savedCo) {
+        setError('Could not save change order.');
+        return;
+      }
+
+      if (!(job.customer_email || '').trim()) {
+        setError('Customer email is missing on this work order. Edit the job to add it.');
+        return;
+      }
+
+      const payload = buildChangeOrderEsignSendPayload(savedCo, job, profile);
+      const response = await sendChangeOrderForSignature(savedCo.id, payload);
+      onComplete(mergeEsignResponseIntoChangeOrder(savedCo, response));
     } finally {
       setSubmitting(false);
     }
@@ -268,16 +286,8 @@ export function ChangeOrderWizard({
           </header>
 
           <p className="co-section-label">Line items</p>
-          <div className="co-line-items-header" aria-hidden="true">
-            <span className="co-line-items-header-desc">Description</span>
-            <span className="co-line-items-header-qty">Qty</span>
-            <span className="co-line-items-header-rate">Rate</span>
-            <span className="co-line-items-header-total" />
-            <span className="co-line-items-header-remove" />
-          </div>
-
           <div className="co-line-items-stack">
-            {lineItems.map((row) => (
+            {lineItems.map((row, index) => (
               <div key={row.id} className="co-line-row">
                 <div className="co-field co-field-desc">
                   <label htmlFor={`d-${row.id}`}>Description</label>
@@ -302,28 +312,34 @@ export function ChangeOrderWizard({
                 </div>
                 <div className="co-field co-field-rate">
                   <label htmlFor={`r-${row.id}`}>Rate</label>
-                  <div className="co-rate-wrap">
-                    <span className="co-rate-prefix" aria-hidden="true">
-                      $
-                    </span>
-                    <input
-                      id={`r-${row.id}`}
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={row.unit_rate || ''}
-                      onChange={(e) => updateLine(row.id, { unit_rate: Number(e.target.value) })}
-                    />
+                  <div className="co-rate-row">
+                    <div className="co-rate-wrap">
+                      <span className="co-rate-prefix" aria-hidden="true">
+                        $
+                      </span>
+                      <input
+                        id={`r-${row.id}`}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={row.unit_rate || ''}
+                        onChange={(e) => updateLine(row.id, { unit_rate: Number(e.target.value) })}
+                      />
+                    </div>
+                    {index > 0 ? (
+                      <button
+                        type="button"
+                        className="co-remove-btn"
+                        aria-label="Remove line"
+                        onClick={() => removeLine(row.id)}
+                      >
+                        x
+                      </button>
+                    ) : (
+                      <span className="co-remove-slot" aria-hidden="true" />
+                    )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="co-remove-btn"
-                  aria-label="Remove line"
-                  onClick={() => removeLine(row.id)}
-                >
-                  ×
-                </button>
               </div>
             ))}
             <button type="button" className="co-add-btn" onClick={addLine}>
@@ -450,7 +466,7 @@ export function ChangeOrderWizard({
               disabled={submitting}
               onClick={() => void handleSave()}
             >
-              {submitting ? 'Saving…' : 'Save Change Order'}
+              {submitting ? 'Saving and sending…' : 'Save and Send Change Order'}
             </button>
           </div>
         </section>

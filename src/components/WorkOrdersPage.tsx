@@ -3,12 +3,21 @@ import type {
   BusinessProfile,
   Job,
   Invoice,
+  EsignJobStatus,
   WorkOrderListJob,
   WorkOrderInvoiceStatus,
 } from '../types/db';
-import { listJobsForWorkOrders, getJobById } from '../lib/db/jobs';
+import {
+  listJobsForWorkOrders,
+  listInFlightEsignJobs,
+  refreshEsignStatuses,
+  getJobById,
+} from '../lib/db/jobs';
 import { listInvoiceStatusByJob, getInvoice, invoiceStatusMapFromRows } from '../lib/db/invoices';
+import { useEsignPoller } from '../hooks/useEsignPoller';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
+import { shouldPollEsignStatus } from '../lib/esign-live';
+import { getEsignProgressModel } from '../lib/esign-progress';
 import { formatWorkOrderListJobType } from '../lib/work-order-list-label';
 import './WorkOrdersPage.css';
 
@@ -38,6 +47,28 @@ function formatRowDate(job: WorkOrderListJob): string {
     month: 'short',
     day: 'numeric',
   });
+}
+
+function renderEsignStrip(status: EsignJobStatus) {
+  const progress = getEsignProgressModel(status);
+  if (status === 'not_sent') return null;
+
+  return (
+    <span
+      className="work-orders-esign-strip"
+      title={`E-signature: ${progress.title}`}
+      aria-label={`E-signature status: ${progress.title}`}
+    >
+      {progress.steps.map((step) => (
+        <span
+          key={step.key}
+          className={`work-orders-esign-segment work-orders-esign-segment-${step.tone}`}
+          aria-hidden="true"
+        />
+      ))}
+      <span className="work-orders-esign-text">{progress.title}</span>
+    </span>
+  );
 }
 
 interface WorkOrdersPageProps {
@@ -92,6 +123,8 @@ export function WorkOrdersPage({
     }
   });
 
+  const hasInFlightEsign = jobs.some((job) => shouldPollEsignStatus(job.esign_status));
+
   useEffect(() => {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset-before-fetch pattern; all calls batch in React 18
@@ -130,9 +163,30 @@ export function WorkOrdersPage({
     };
   }, [userId]);
 
+  useEsignPoller({
+    enabled: hasInFlightEsign,
+    pollOnce: async () => {
+      const updatedRows = await listInFlightEsignJobs(userId);
+      const updatedById = new Map(updatedRows.map((r) => [r.id, r]));
+      const missingInFlightIds = jobs
+        .filter((job) => shouldPollEsignStatus(job.esign_status) && !updatedById.has(job.id))
+        .map((job) => job.id);
+      const refreshedTerminalRows =
+        missingInFlightIds.length > 0 ? await refreshEsignStatuses(missingInFlightIds, userId) : [];
+      const mergedById = new Map([
+        ...updatedRows.map((row) => [row.id, row] as const),
+        ...refreshedTerminalRows.map((row) => [row.id, row] as const),
+      ]);
+      setJobs((prev) => prev.map((job) => mergedById.get(job.id) ?? job));
+      return [...updatedRows, ...refreshedTerminalRows].some((job) =>
+        shouldPollEsignStatus(job.esign_status)
+      );
+    },
+  });
+
   useEffect(() => {
     if (!successBanner) return;
-    const t = setTimeout(() => onClearSuccessBanner(), 5000);
+    const t = setTimeout(() => onClearSuccessBanner(), 10000);
     return () => clearTimeout(t);
   }, [successBanner, onClearSuccessBanner]);
 
@@ -213,7 +267,7 @@ export function WorkOrdersPage({
 
       {successBanner ? (
         <div className="success-banner work-orders-success-banner" role="status">
-          {successBanner}
+          <span className="work-orders-success-banner-text">{successBanner}</span>
           <button
             type="button"
             className="btn-dismiss-banner"
@@ -284,6 +338,7 @@ export function WorkOrdersPage({
                         <span className="work-orders-meta-type">
                           {formatWorkOrderListJobType(job)}
                         </span>
+                        {renderEsignStrip(job.esign_status)}
                       </span>
                     </div>
                     <div className="work-orders-row-actions">

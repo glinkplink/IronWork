@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import type { ChangeOrder, ChangeOrderLineItem } from '../../types/db';
+import type { ChangeOrder, ChangeOrderLineItem, EsignJobStatus } from '../../types/db';
 
 /** Same text as RAISE in migration `0008_block_co_after_job_invoice.sql`. */
 export const CHANGE_ORDER_BLOCKED_AFTER_FINALIZED_WO_INVOICE =
@@ -40,12 +40,28 @@ function parseStatus(raw: unknown): ChangeOrder['status'] {
     : 'draft';
 }
 
+function optStringCol(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  return String(v);
+}
+
 function mapChangeOrderRow(data: Record<string, unknown>): ChangeOrder {
   const li = Array.isArray(data.line_items)
     ? data.line_items.filter(
         (value): value is Record<string, unknown> => typeof value === 'object' && value !== null
       )
     : [];
+
+  const esignRaw = data.esign_status;
+  const esign_status: EsignJobStatus =
+    esignRaw === 'sent' ||
+    esignRaw === 'opened' ||
+    esignRaw === 'completed' ||
+    esignRaw === 'declined' ||
+    esignRaw === 'expired'
+      ? esignRaw
+      : 'not_sent';
 
   return {
     id: data.id as string,
@@ -62,6 +78,18 @@ function mapChangeOrderRow(data: Record<string, unknown>): ChangeOrder {
     time_note: String(data.time_note ?? ''),
     created_at: String(data.created_at ?? ''),
     updated_at: String(data.updated_at ?? ''),
+    esign_submission_id: optStringCol(data.esign_submission_id),
+    esign_submitter_id: optStringCol(data.esign_submitter_id),
+    esign_embed_src: optStringCol(data.esign_embed_src),
+    esign_status,
+    esign_submission_state: optStringCol(data.esign_submission_state),
+    esign_submitter_state: optStringCol(data.esign_submitter_state),
+    esign_sent_at: optStringCol(data.esign_sent_at),
+    esign_opened_at: optStringCol(data.esign_opened_at),
+    esign_completed_at: optStringCol(data.esign_completed_at),
+    esign_declined_at: optStringCol(data.esign_declined_at),
+    esign_decline_reason: optStringCol(data.esign_decline_reason),
+    esign_signed_document_url: optStringCol(data.esign_signed_document_url),
   };
 }
 
@@ -98,7 +126,7 @@ export async function createChangeOrder(
   jobId: string,
   fields: CreateChangeOrderFields
 ): Promise<{ data: ChangeOrder | null; error: Error | null }> {
-  const status: ChangeOrder['status'] = 'approved';
+  const status: ChangeOrder['status'] = fields.requires_approval ? 'pending_approval' : 'approved';
   const row = {
     p_user_id: userId,
     p_job_id: jobId,
@@ -176,4 +204,17 @@ export async function deleteChangeOrder(
     return { error: new Error(error.message) };
   }
   return { error: null };
+}
+
+export async function getChangeOrderById(id: string): Promise<ChangeOrder | null> {
+  const { data, error } = await supabase
+    .from('change_orders')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) {
+    console.error('getChangeOrderById:', error);
+    return null;
+  }
+  return data ? mapChangeOrderRow(data as Record<string, unknown>) : null;
 }

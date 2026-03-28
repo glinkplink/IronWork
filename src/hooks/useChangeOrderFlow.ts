@@ -76,16 +76,15 @@ export function useChangeOrderFlow(
     navigateTo('work-order-detail');
   }, [navigateTo, setChangeOrderListVersion]);
 
-  const handleChangeOrderWizardComplete = useCallback(() => {
-    const wasEditing = changeOrderRef.current.wizardExistingCO !== null;
+  const handleChangeOrderWizardComplete = useCallback((savedCo: ChangeOrder) => {
     setChangeOrder((c) => ({
       ...c,
       wizardExistingCO: null,
       changeOrderFlowJob: null,
-      ...(wasEditing ? { coDetailCO: null } : {}),
+      coDetailCO: savedCo,
     }));
     setChangeOrderListVersion((v) => v + 1);
-    navigateTo('work-order-detail');
+    navigateTo('co-detail');
   }, [navigateTo, setChangeOrderListVersion]);
 
   const handleChangeOrderWizardCancel = useCallback(() => {
@@ -108,6 +107,13 @@ export function useChangeOrderFlow(
     setChangeOrder(initialChangeOrder);
   }, []);
 
+  const handleCoEsignUpdated = useCallback(
+    (updatedCo: ChangeOrder) => {
+      setChangeOrder((c) => ({ ...c, coDetailCO: updatedCo }));
+    },
+    []
+  );
+
   return {
     state: changeOrder,
     actions: {
@@ -120,6 +126,7 @@ export function useChangeOrderFlow(
       handleChangeOrderWizardComplete,
       handleChangeOrderWizardCancel,
       resetChangeOrderFlow,
+      handleCoEsignUpdated,
     },
   };
 }

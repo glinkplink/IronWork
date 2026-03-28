@@ -20,6 +20,7 @@ import {
   validateLateFeeRate,
   validatePaymentTermsDays,
 } from '../lib/payment-terms';
+import { normalizeOwnerFullName, splitFullNameForForm } from '../lib/owner-name';
 import './JobForm.css';
 
 function patchJobSite(
@@ -40,17 +41,138 @@ function patchJobSite(
   };
 }
 
+function withCustomerNameParts(job: WelderJob, first: string, last: string): WelderJob {
+  return {
+    ...job,
+    customer_first_name: first,
+    customer_last_name: last,
+    customer_name: normalizeOwnerFullName(first, last),
+  };
+}
+
+function normalizeClientSearchToken(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function getClientNameParts(client: Client): { first: string; last: string; fullName: string } {
+  const fullName = normalizeClientSearchToken(client.name ?? '');
+  const { first, last } = splitFullNameForForm(client.name ?? '');
+  return {
+    first: normalizeClientSearchToken(first),
+    last: normalizeClientSearchToken(last),
+    fullName,
+  };
+}
+
+function isRelevantClientMatch(client: Client, firstNameQuery: string, lastNameQuery: string): boolean {
+  const firstQuery = normalizeClientSearchToken(firstNameQuery);
+  const lastQuery = normalizeClientSearchToken(lastNameQuery);
+  const { first, last, fullName } = getClientNameParts(client);
+
+  if (firstQuery && lastQuery) {
+    return first.startsWith(firstQuery) && last.startsWith(lastQuery);
+  }
+
+  if (firstQuery) {
+    return fullName.includes(firstQuery);
+  }
+
+  if (lastQuery) {
+    return fullName.includes(lastQuery);
+  }
+
+  return false;
+}
+
+function scoreClientMatch(client: Client, firstNameQuery: string, lastNameQuery: string): number {
+  const { first: clientFirst, last: clientLast, fullName } = getClientNameParts(client);
+  const tokens = fullName ? fullName.split(' ') : [];
+  const fullQuery = normalizeClientSearchToken(
+    [firstNameQuery, lastNameQuery].filter(Boolean).join(' ')
+  );
+
+  const firstPrefix = firstNameQuery ? clientFirst.startsWith(firstNameQuery) : false;
+  const lastPrefix = lastNameQuery ? clientLast.startsWith(lastNameQuery) : false;
+  const anyPrefix = [firstNameQuery, lastNameQuery]
+    .filter(Boolean)
+    .some((query) => tokens.some((token) => token.startsWith(query)));
+  const fullPrefix = fullQuery ? fullName.startsWith(fullQuery) : false;
+  const includesFirst = firstNameQuery ? fullName.includes(firstNameQuery) : false;
+  const includesLast = lastNameQuery ? fullName.includes(lastNameQuery) : false;
+
+  if (firstNameQuery && lastNameQuery) {
+    if (firstPrefix && lastPrefix) return 0;
+    if (fullPrefix) return 1;
+    if (firstPrefix) return 2;
+    if (lastPrefix) return 3;
+    if (includesFirst && includesLast) return 4;
+    if (anyPrefix) return 5;
+    return 6;
+  }
+
+  if (firstNameQuery) {
+    if (firstPrefix) return 0;
+    if (anyPrefix) return 1;
+    if (includesFirst) return 2;
+    return 3;
+  }
+
+  if (lastNameQuery) {
+    if (lastPrefix) return 0;
+    if (anyPrefix) return 1;
+    if (includesLast) return 2;
+    return 3;
+  }
+
+  return 0;
+}
+
+function rankClientMatches(clients: Client[], firstNameQuery: string, lastNameQuery: string): Client[] {
+  const firstQuery = normalizeClientSearchToken(firstNameQuery);
+  const lastQuery = normalizeClientSearchToken(lastNameQuery);
+  return [...clients]
+    .filter((client) => isRelevantClientMatch(client, firstQuery, lastQuery))
+    .sort((a, b) => {
+      const scoreDiff =
+        scoreClientMatch(a, firstQuery, lastQuery) - scoreClientMatch(b, firstQuery, lastQuery);
+      if (scoreDiff !== 0) return scoreDiff;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    })
+    .slice(0, 15);
+}
+
 interface JobFormProps {
   userId?: string;
   job: WelderJob;
   onChange: (job: WelderJob) => void;
   /** Shown for the "materials provided by welder" option (profile business name). */
   businessName?: string | null;
+  /** When true (no profile yet), show optional Your Information block for preview + capture. */
+  showOwnerNameFields?: boolean;
+  ownerFirstName?: string;
+  ownerLastName?: string;
+  ownerBusinessPhone?: string;
+  onOwnerFirstNameChange?: (value: string) => void;
+  onOwnerLastNameChange?: (value: string) => void;
+  onOwnerBusinessPhoneChange?: (value: string) => void;
   /** Opens agreement preview (e.g. switches to Preview tab and scrolls to top). */
   onGoToPreview?: () => void;
 }
 
-export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: JobFormProps) {
+export function JobForm({
+  userId,
+  job,
+  onChange,
+  businessName,
+  showOwnerNameFields = false,
+  ownerFirstName = '',
+  ownerLastName = '',
+  ownerBusinessPhone = '',
+  onOwnerFirstNameChange,
+  onOwnerLastNameChange,
+  onOwnerBusinessPhoneChange,
+  onGoToPreview,
+}: JobFormProps) {
   const materialsWelderLabel = businessName?.trim() || 'Service Provider';
   const [rawPrice, setRawPrice] = useState(() => (job.price === 0 ? '' : String(job.price)));
   const [rawDeposit, setRawDeposit] = useState(() => (job.deposit_amount === 0 ? '' : String(job.deposit_amount)));
@@ -83,12 +205,18 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
     onChange({ ...job, [field]: value });
   };
 
-  const customerNameRef = useRef(job.customer_name);
+  const customerNameRef = useRef(
+    normalizeOwnerFullName(job.customer_first_name, job.customer_last_name)
+  );
   useLayoutEffect(() => {
-    customerNameRef.current = job.customer_name;
+    customerNameRef.current = normalizeOwnerFullName(
+      job.customer_first_name,
+      job.customer_last_name
+    );
   });
 
   const comboboxId = useId();
+  const ownerNameFieldsId = useId();
   const listboxId = `${comboboxId}-client-listbox`;
   const siteComboboxId = useId();
   const siteListboxId = `${siteComboboxId}-job-site-listbox`;
@@ -139,7 +267,7 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
       return () => window.clearTimeout(id);
     }
 
-    const trimmed = job.customer_name.trim();
+    const trimmed = normalizeOwnerFullName(job.customer_first_name, job.customer_last_name).trim();
     if (!trimmed) {
       const id = window.setTimeout(() => {
         setClientMatches([]);
@@ -152,6 +280,8 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
 
     const id = window.setTimeout(() => {
       const q = customerNameRef.current.trim();
+      const firstNameQuery = job.customer_first_name;
+      const lastNameQuery = job.customer_last_name;
       if (!q) {
         setClientMatches([]);
         setClientListOpen(false);
@@ -169,20 +299,24 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
       }
 
       setClientSearchLoading(true);
-      void searchClients(userId, q).then((rows) => {
+      void searchClients(userId, {
+        firstName: firstNameQuery,
+        lastName: lastNameQuery,
+      }).then((rows) => {
         if (customerNameRef.current.trim() !== q) {
           setClientSearchLoading(false);
           return;
         }
+        const rankedRows = rankClientMatches(rows, firstNameQuery, lastNameQuery);
         setClientSearchLoading(false);
-        setClientMatches(rows);
-        setClientListOpen(rows.length > 0);
-        setClientHighlightIndex(rows.length > 0 ? 0 : -1);
+        setClientMatches(rankedRows);
+        setClientListOpen(rankedRows.length > 0);
+        setClientHighlightIndex(rankedRows.length > 0 ? 0 : -1);
       });
     }, 300);
 
     return () => window.clearTimeout(id);
-  }, [job.customer_name, userId, dropdownSuppressed]);
+  }, [job.customer_first_name, job.customer_last_name, userId, dropdownSuppressed]);
 
   useEffect(() => {
     const onDocMouseDown = (e: MouseEvent) => {
@@ -359,7 +493,12 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
   const applyClient = (client: Client) => {
     const patches: Partial<WelderJob> = {};
     const name = client.name?.trim();
-    if (name) patches.customer_name = name;
+    if (name) {
+      const { first, last } = splitFullNameForForm(name);
+      patches.customer_first_name = first;
+      patches.customer_last_name = last;
+      patches.customer_name = normalizeOwnerFullName(first, last);
+    }
     const phone = client.phone?.trim();
     if (phone) patches.customer_phone = formatUsPhoneInput(phone);
     const email = client.email?.trim();
@@ -386,9 +525,14 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
     }
   };
 
-  const handleCustomerNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomerFirstNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDropdownSuppressed(false);
-    updateField('customer_name', e.target.value);
+    onChange(withCustomerNameParts(job, e.target.value, job.customer_last_name));
+  };
+
+  const handleCustomerLastNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDropdownSuppressed(false);
+    onChange(withCustomerNameParts(job, job.customer_first_name, e.target.value));
   };
 
   const handleCustomerNameBlur = () => {
@@ -633,11 +777,62 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
     }
 
     if (blocked) return;
+
     onGoToPreview();
   };
 
+  const ownerFirstId = `${ownerNameFieldsId}-owner-first`;
+  const ownerLastId = `${ownerNameFieldsId}-owner-last`;
+  const ownerBizPhoneId = `${ownerNameFieldsId}-owner-biz-phone`;
+
   return (
     <form className="job-form" onSubmit={(e) => e.preventDefault()}>
+      {showOwnerNameFields && (
+        <section className="form-section job-form-your-information">
+          <h2>Your Information</h2>
+          <p className="help-text help-text-below-label job-form-your-information-autosign-note">
+            Add your name to pre-fill the Service Provider printed name and signature on the agreement
+            preview and PDF. Optional.
+          </p>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor={ownerFirstId}>First Name</label>
+              <input
+                id={ownerFirstId}
+                type="text"
+                autoComplete="given-name"
+                value={ownerFirstName}
+                onChange={(e) => onOwnerFirstNameChange?.(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor={ownerLastId}>Last Name</label>
+              <input
+                id={ownerLastId}
+                type="text"
+                autoComplete="family-name"
+                value={ownerLastName}
+                onChange={(e) => onOwnerLastNameChange?.(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor={ownerBizPhoneId}>Business Phone</label>
+              <input
+                id={ownerBizPhoneId}
+                type="tel"
+                autoComplete="tel"
+                value={formatUsPhoneInput(ownerBusinessPhone)}
+                onChange={(e) =>
+                  onOwnerBusinessPhoneChange?.(formatUsPhoneInput(e.target.value))
+                }
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Parties & Project Information */}
       <section className="form-section">
         <h2>Parties &amp; Project Information</h2>
@@ -651,28 +846,44 @@ export function JobForm({ userId, job, onChange, businessName, onGoToPreview }: 
           />
         </div>
         <div className="form-group form-group-combobox" ref={customerNameComboboxRef}>
-          <label htmlFor="customer_name">Customer Name *</label>
           <div className="customer-name-combobox">
-            <input
-              id="customer_name"
-              type="text"
-              role="combobox"
-              aria-expanded={clientListOpen}
-              aria-controls={listboxId}
-              aria-autocomplete="list"
-              aria-activedescendant={
-                clientListOpen && clientHighlightIndex >= 0 && clientMatches[clientHighlightIndex]
-                  ? `${listboxId}-option-${clientMatches[clientHighlightIndex].id}`
-                  : undefined
-              }
-              value={job.customer_name}
-              onChange={handleCustomerNameChange}
-              onBlur={handleCustomerNameBlur}
-              onKeyDown={handleCustomerNameKeyDown}
-              autoComplete="off"
-              required
-              placeholder="John Smith"
-            />
+            <div className="form-row job-form-customer-name-row">
+              <div className="form-group">
+                <label htmlFor={`${comboboxId}-customer-first`}>Customer First Name *</label>
+                <input
+                  id={`${comboboxId}-customer-first`}
+                  type="text"
+                  role="combobox"
+                  aria-expanded={clientListOpen}
+                  aria-controls={listboxId}
+                  aria-autocomplete="list"
+                  aria-activedescendant={
+                    clientListOpen && clientHighlightIndex >= 0 && clientMatches[clientHighlightIndex]
+                      ? `${listboxId}-option-${clientMatches[clientHighlightIndex].id}`
+                      : undefined
+                  }
+                  value={job.customer_first_name}
+                  onChange={handleCustomerFirstNameChange}
+                  onBlur={handleCustomerNameBlur}
+                  onKeyDown={handleCustomerNameKeyDown}
+                  autoComplete="given-name"
+                  placeholder="John"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor={`${comboboxId}-customer-last`}>Customer Last Name *</label>
+                <input
+                  id={`${comboboxId}-customer-last`}
+                  type="text"
+                  value={job.customer_last_name}
+                  onChange={handleCustomerLastNameChange}
+                  onBlur={handleCustomerNameBlur}
+                  onKeyDown={handleCustomerNameKeyDown}
+                  autoComplete="family-name"
+                  placeholder="Smith"
+                />
+              </div>
+            </div>
             {clientSearchLoading && (
               <span className="customer-name-combobox-status" aria-live="polite">
                 Searching…

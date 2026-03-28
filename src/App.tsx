@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { JobForm } from './components/JobForm';
 import { AgreementPreview } from './components/AgreementPreview';
 import { AuthPage } from './components/AuthPage';
@@ -9,7 +9,7 @@ import { useAppNavigation } from './hooks/useAppNavigation';
 import { useAuthProfile } from './hooks/useAuthProfile';
 import { upsertProfile } from './lib/db/profile';
 import { signUp } from './lib/auth';
-import { getDefaultCustomerObligations, getDefaultExclusions } from './lib/defaults';
+import { buildInitialProfileDefaults } from './lib/defaults';
 import { getInvoice } from './lib/db/invoices';
 import type { BusinessProfile, Job } from './types/db';
 import { Settings } from 'lucide-react';
@@ -22,6 +22,7 @@ import { ChangeOrderWizard } from './components/ChangeOrderWizard';
 import { useInvoiceFlow } from './hooks/useInvoiceFlow';
 import { useChangeOrderFlow } from './hooks/useChangeOrderFlow';
 import { useWorkOrderDraft } from './hooks/useWorkOrderDraft';
+import { normalizeOwnerFullName } from './lib/owner-name';
 import './App.css';
 
 function App() {
@@ -43,6 +44,15 @@ function App() {
   const [workOrderDetailJob, setWorkOrderDetailJob] = useState<import('./types/db').Job | null>(null);
   const [changeOrderListVersion, setChangeOrderListVersion] = useState(0);
   const [profileEntrySource, setProfileEntrySource] = useState<'work-orders' | null>(null);
+  const [ownerFirstName, setOwnerFirstName] = useState('');
+  const [ownerLastName, setOwnerLastName] = useState('');
+  const [ownerBusinessPhone, setOwnerBusinessPhone] = useState('');
+
+  const clearGuestInformationFields = useCallback(() => {
+    setOwnerFirstName('');
+    setOwnerLastName('');
+    setOwnerBusinessPhone('');
+  }, []);
 
   const { state: invoice, actions: invoiceFlow } = useInvoiceFlow(
     navigateTo,
@@ -60,14 +70,18 @@ function App() {
     profile,
     user?.id ?? null,
     navigateTo,
-    loadProfile
+    loadProfile,
+    clearGuestInformationFields
   );
 
   const handleCaptureAndSave = async (capture: {
     businessName: string;
     email: string;
     password: string;
+    saveAsDefaults: boolean;
   }) => {
+    const ownerName = normalizeOwnerFullName(ownerFirstName, ownerLastName);
+    const profilePhone = ownerBusinessPhone.trim() || null;
     const { data: authData, error: authError } = await signUp(capture.email, capture.password);
     if (authError || !authData.user) {
       throw new Error(authError?.message || 'Failed to create account');
@@ -77,8 +91,9 @@ function App() {
       user_id: authData.user.id,
       business_name: capture.businessName,
       email: capture.email,
-      default_exclusions: getDefaultExclusions(),
-      default_assumptions: getDefaultCustomerObligations(),
+      phone: profilePhone,
+      owner_name: ownerName || null,
+      ...buildInitialProfileDefaults(draft.job, capture.saveAsDefaults),
     });
 
     if (profileError || !createdProfile) {
@@ -87,7 +102,13 @@ function App() {
 
     setProfile(createdProfile);
 
-    return { userId: authData.user.id, businessName: capture.businessName, email: capture.email };
+    return {
+      userId: authData.user.id,
+      businessName: capture.businessName,
+      email: capture.email,
+      phone: profilePhone,
+      ownerName,
+    };
   };
 
   const handleEditProfileSaved = (savedProfile: BusinessProfile | null) => {
@@ -213,6 +234,7 @@ function App() {
           job={workOrderDetailJob}
           profile={profile}
           changeOrderListVersion={changeOrderListVersion}
+          onJobUpdated={setWorkOrderDetailJob}
           onBack={handleBackFromWorkOrderDetail}
           onStartChangeOrder={changeOrderFlow.handleStartChangeOrderFromDetail}
           onStartChangeOrderInvoice={(co, invoiceId) => {
@@ -240,6 +262,7 @@ function App() {
           onBack={changeOrderFlow.handleBackFromCODetail}
           onEdit={changeOrderFlow.handleEditCOFromDetail}
           onDelete={changeOrderFlow.handleDeleteCOFromDetail}
+          onCoUpdated={changeOrderFlow.handleCoEsignUpdated}
         />
       );
     }
@@ -290,6 +313,13 @@ function App() {
           job={draft.job}
           onChange={draftFlow.setJob}
           businessName={profile?.business_name}
+          ownerFirstName={ownerFirstName}
+          ownerLastName={ownerLastName}
+          ownerBusinessPhone={ownerBusinessPhone}
+          onOwnerFirstNameChange={setOwnerFirstName}
+          onOwnerLastNameChange={setOwnerLastName}
+          onOwnerBusinessPhoneChange={setOwnerBusinessPhone}
+          showOwnerNameFields={!profile}
           onGoToPreview={() => navigateTo('preview')}
         />
       );
@@ -299,6 +329,10 @@ function App() {
         job={draft.job}
         profile={profile}
         existingJobId={draft.currentJobId ?? undefined}
+        hasSession={Boolean(user)}
+        ownerFirstName={ownerFirstName}
+        ownerLastName={ownerLastName}
+        ownerBusinessPhone={ownerBusinessPhone}
         onSaveSuccess={draftFlow.handleSaveSuccess}
         onCaptureAndSave={!user ? handleCaptureAndSave : undefined}
         onCaptureFlowFinished={handleCaptureFlowFinished}
@@ -410,6 +444,7 @@ function App() {
                 className="btn-danger"
                 onClick={() => {
                   draftFlow.closeUnsavedModal();
+                  clearGuestInformationFields();
                   draftFlow.doCreateNewAgreement(profile);
                 }}
               >
