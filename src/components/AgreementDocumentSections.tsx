@@ -1,11 +1,19 @@
 import type { AgreementSection } from '../types';
+import './AgreementDocumentSections.css';
+
+const GUEST_SP_PLACEHOLDER = '(Will be filled in at final step)';
 
 interface AgreementDocumentSectionsProps {
   sections: AgreementSection[];
+  /** Anonymous preview before capture — empty SP name/email show placeholders. */
+  showGuestServiceProviderPlaceholders?: boolean;
 }
 
 /** Renders agreement body sections (same markup as preview/PDF). Parent supplies `.agreement-document` wrapper + ref for PDF. */
-export function AgreementDocumentSections({ sections }: AgreementDocumentSectionsProps) {
+export function AgreementDocumentSections({
+  sections,
+  showGuestServiceProviderPlaceholders = false,
+}: AgreementDocumentSectionsProps) {
   return (
     <>
       {sections.map((section) => (
@@ -43,6 +51,12 @@ export function AgreementDocumentSections({ sections }: AgreementDocumentSection
               }
               if (block.type === 'partiesLayout') {
                 const { agreementDate, serviceProvider: sp, customer: cu, jobSiteAddress } = block;
+                const spNameBlank = !sp.businessName.trim();
+                const spEmailBlank = !(sp.email ?? '').trim();
+                const spNameCell =
+                  showGuestServiceProviderPlaceholders && spNameBlank ? GUEST_SP_PLACEHOLDER : sp.businessName;
+                const spEmailCell =
+                  showGuestServiceProviderPlaceholders && spEmailBlank ? GUEST_SP_PLACEHOLDER : sp.email;
                 return (
                   <div key={`${block.type}-${bi}`} className="parties-layout">
                     <div className="parties-plain">
@@ -70,7 +84,11 @@ export function AgreementDocumentSections({ sections }: AgreementDocumentSection
                         </tr>
                         <tr>
                           <td className="table-label">Name</td>
-                          <td className="table-value">{sp.businessName}</td>
+                          <td
+                            className={`table-value${showGuestServiceProviderPlaceholders && spNameBlank ? ' parties-guest-preview-placeholder' : ''}`}
+                          >
+                            {spNameCell}
+                          </td>
                           <td className="table-value">{cu.name}</td>
                         </tr>
                         <tr>
@@ -80,7 +98,11 @@ export function AgreementDocumentSections({ sections }: AgreementDocumentSection
                         </tr>
                         <tr>
                           <td className="table-label">Email</td>
-                          <td className="table-value">{sp.email}</td>
+                          <td
+                            className={`table-value${showGuestServiceProviderPlaceholders && spEmailBlank ? ' parties-guest-preview-placeholder' : ''}`}
+                          >
+                            {spEmailCell}
+                          </td>
                           <td className="table-value">{cu.email}</td>
                         </tr>
                       </tbody>

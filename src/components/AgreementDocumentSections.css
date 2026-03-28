@@ -1,0 +1,6 @@
+/* Guest anonymous preview only — SP name/email placeholders */
+.content-table.parties-party-table td.table-value.parties-guest-preview-placeholder {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

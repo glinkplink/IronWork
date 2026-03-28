@@ -147,6 +147,7 @@ export function AgreementPreview({
 
   const displayProfile = postCaptureProfile ?? profile ?? guestPreviewProfile;
   const sections = generateAgreement(job, displayProfile);
+  const showGuestServiceProviderPlaceholders = !hasSession && postCaptureProfile === null;
 
   const {
     viewportRef: previewViewportRef,
@@ -495,7 +496,10 @@ export function AgreementPreview({
             }}
           >
             <div ref={documentRef} className="agreement-document">
-              <AgreementDocumentSections sections={sections} />
+              <AgreementDocumentSections
+                sections={sections}
+                showGuestServiceProviderPlaceholders={showGuestServiceProviderPlaceholders}
+              />
             </div>
           </div>
         </div>
