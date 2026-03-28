@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { PriceType, WelderJob } from '../types';
 import type { BusinessProfile } from '../types/db';
+import type { CaptureFlowFinishedPayload } from '../types/capture-flow';
 import { generateAgreement } from '../lib/agreement-generator';
 import { saveWorkOrder } from '../lib/db/jobs';
 import {
@@ -86,8 +87,8 @@ interface AgreementPreviewProps {
     email: string;
     password: string;
   }) => Promise<{ userId: string; businessName: string; email: string }>;
-  /** Called after PDF attempt (account + save already done). Parent may redirect. */
-  onCaptureFlowFinished?: (opts: { pdfOk: boolean }) => void;
+  /** Called after PDF or e-sign attempt (account + save already done). Parent may redirect. */
+  onCaptureFlowFinished?: (opts: CaptureFlowFinishedPayload) => void;
 }
 
 export function AgreementPreview({
@@ -189,14 +190,14 @@ export function AgreementPreview({
           setConfirmationMessage(
             `Account created! WO #${String(job.wo_number).padStart(4, '0')} saved. Signature request emailed to the customer.`
           );
-          onCaptureFlowFinished?.({ pdfOk: true });
+          onCaptureFlowFinished?.({ captureKind: 'esign', ok: true });
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Send for signature failed.';
           setSaveError(`Work order saved, but ${msg}`);
           setConfirmationMessage(
             `Account created! WO #${String(job.wo_number).padStart(4, '0')} saved.`
           );
-          onCaptureFlowFinished?.({ pdfOk: false });
+          onCaptureFlowFinished?.({ captureKind: 'esign', ok: false });
         }
         setShowCaptureModal(false);
         setCaptureSubmitting(false);
@@ -219,7 +220,7 @@ export function AgreementPreview({
         }
       }
 
-      onCaptureFlowFinished?.({ pdfOk });
+      onCaptureFlowFinished?.({ captureKind: 'pdf', ok: pdfOk });
 
       setShowCaptureModal(false);
       setCaptureSubmitting(false);

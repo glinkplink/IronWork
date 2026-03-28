@@ -4,11 +4,20 @@ import { supabase } from '../lib/supabase';
 import { getProfile } from '../lib/db/profile';
 import type { BusinessProfile } from '../types/db';
 import type { AppView } from './useAppNavigation';
+import type { CaptureFlowFinishedPayload } from '../types/capture-flow';
 
 const POST_CAPTURE_KEY = 'scope-lock-post-capture';
 const POST_CAPTURE_TTL_MS = 5 * 60 * 1000;
 
-type PostCapturePayload = { userId: string; ts: number; pdfOk: boolean };
+type PostCapturePayloadV2 = {
+  userId: string;
+  ts: number;
+  captureKind: 'pdf' | 'esign';
+  ok: boolean;
+};
+
+/** Legacy sessionStorage shape (treated as PDF outcome). */
+type PostCapturePayloadLegacy = { userId: string; ts: number; pdfOk: boolean };
 
 export type UseAuthProfileOptions = {
   replaceView: (next: AppView) => void;
@@ -24,26 +33,39 @@ export function useAuthProfile({
   const [profileLoading, setProfileLoading] = useState(true);
 
   const runPostCaptureRedirect = useCallback(
-    (pdfOk: boolean) => {
-      setWorkOrdersSuccessBanner(
-        pdfOk
-          ? 'Work order saved. PDF downloaded.'
-          : 'Work order saved. PDF could not be generated — open the work order to try again.'
-      );
+    ({ captureKind, ok }: CaptureFlowFinishedPayload) => {
+      if (captureKind === 'esign') {
+        setWorkOrdersSuccessBanner(
+          ok
+            ? 'Work order saved. Signature request sent to the customer.'
+            : 'Work order saved. Signature email could not be sent — open the work order to try again.'
+        );
+      } else {
+        setWorkOrdersSuccessBanner(
+          ok
+            ? 'Work order saved. PDF downloaded.'
+            : 'Work order saved. PDF could not be generated — open the work order to try again.'
+        );
+      }
       replaceView('work-orders');
     },
     [replaceView, setWorkOrdersSuccessBanner]
   );
 
   const handleCaptureFlowFinished = useCallback(
-    async ({ pdfOk }: { pdfOk: boolean }) => {
+    async (opts: CaptureFlowFinishedPayload) => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
 
-      const payload: PostCapturePayload = { userId: uid, ts: Date.now(), pdfOk };
+      const payload: PostCapturePayloadV2 = {
+        userId: uid,
+        ts: Date.now(),
+        captureKind: opts.captureKind,
+        ok: opts.ok,
+      };
 
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         try {
@@ -51,7 +73,7 @@ export function useAuthProfile({
         } catch {
           /* ignore */
         }
-        runPostCaptureRedirect(pdfOk);
+        runPostCaptureRedirect(opts);
         return;
       }
 
@@ -78,9 +100,9 @@ export function useAuthProfile({
       }
       if (!raw) return;
 
-      let parsed: PostCapturePayload | null = null;
+      let parsed: PostCapturePayloadV2 | PostCapturePayloadLegacy | null = null;
       try {
-        parsed = JSON.parse(raw) as PostCapturePayload;
+        parsed = JSON.parse(raw) as PostCapturePayloadV2 | PostCapturePayloadLegacy;
       } catch {
         try {
           sessionStorage.removeItem(POST_CAPTURE_KEY);
@@ -90,12 +112,28 @@ export function useAuthProfile({
         return;
       }
 
-      if (
-        !parsed ||
-        typeof parsed.ts !== 'number' ||
-        typeof parsed.userId !== 'string' ||
-        typeof parsed.pdfOk !== 'boolean'
-      ) {
+      if (!parsed || typeof parsed.ts !== 'number' || typeof parsed.userId !== 'string') {
+        try {
+          sessionStorage.removeItem(POST_CAPTURE_KEY);
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+
+      let normalized: CaptureFlowFinishedPayload | null = null;
+      if ('captureKind' in parsed && 'ok' in parsed) {
+        if (
+          (parsed.captureKind === 'pdf' || parsed.captureKind === 'esign') &&
+          typeof parsed.ok === 'boolean'
+        ) {
+          normalized = { captureKind: parsed.captureKind, ok: parsed.ok };
+        }
+      } else if ('pdfOk' in parsed && typeof parsed.pdfOk === 'boolean') {
+        normalized = { captureKind: 'pdf', ok: parsed.pdfOk };
+      }
+
+      if (!normalized) {
         try {
           sessionStorage.removeItem(POST_CAPTURE_KEY);
         } catch {
@@ -127,7 +165,7 @@ export function useAuthProfile({
       } catch {
         /* ignore */
       }
-      runPostCaptureRedirect(parsed.pdfOk);
+      runPostCaptureRedirect(normalized);
     };
 
     document.addEventListener('visibilitychange', tryFlushPendingPostCapture);
