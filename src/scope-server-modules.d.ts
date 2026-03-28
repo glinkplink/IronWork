@@ -23,4 +23,6 @@ declare module '@scope-server/esign-routes.mjs' {
     res: ServerResponse,
     helpers: EsignRouteHelpers
   ): Promise<boolean>;
+  /** Test helper: clears memoized Supabase service client between Vitest cases. */
+  export function resetEsignServiceSupabaseSingleton(): void;
 }

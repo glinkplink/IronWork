@@ -15,7 +15,10 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 import type { EsignRouteHelpers } from '@scope-server/esign-routes.mjs';
-import { tryHandleEsignRoute } from '@scope-server/esign-routes.mjs';
+import {
+  tryHandleEsignRoute,
+  resetEsignServiceSupabaseSingleton,
+} from '@scope-server/esign-routes.mjs';
 
 type ProcEnv = Record<string, string | undefined>;
 function nodeEnv(): ProcEnv {
@@ -118,6 +121,7 @@ describe('tryHandleEsignRoute', () => {
     env.DOCUSEAL_WEBHOOK_HEADER_NAME = 'X-Docuseal-Webhook-Secret';
     env.DOCUSEAL_WEBHOOK_HEADER_VALUE = 'correct-secret';
     createClientMock.mockReset();
+    resetEsignServiceSupabaseSingleton();
   });
 
   afterEach(() => {
@@ -279,6 +283,133 @@ describe('tryHandleEsignRoute', () => {
     const body = JSON.parse(res.body) as { jobId?: string; esign_submission_id?: string };
     expect(body.jobId).toBe(JOB_UUID);
     expect(body.esign_submission_id).toBe('900');
+  });
+
+  it('send returns 400 when a second document has non-string html', async () => {
+    const res = captureRes();
+    createClientMock.mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })),
+      },
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: baseJobRow(), error: null })),
+            })),
+          })),
+        })),
+      })),
+    });
+
+    const fetchMock = vi.mocked(globalThis.fetch);
+    const req = {
+      method: 'POST',
+      url: `/api/esign/work-orders/${JOB_UUID}/send`,
+      headers: { authorization: 'Bearer good-token' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        documents: [{ html: '<p>ok</p>' }, { html: null }],
+      }))
+    );
+    expect(res.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('send returns 400 when more than one document is sent', async () => {
+    const res = captureRes();
+    createClientMock.mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })),
+      },
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: baseJobRow(), error: null })),
+            })),
+          })),
+        })),
+      })),
+    });
+
+    const fetchMock = vi.mocked(globalThis.fetch);
+    const req = {
+      method: 'POST',
+      url: `/api/esign/work-orders/${JOB_UUID}/send`,
+      headers: { authorization: 'Bearer good-token' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        documents: [{ html: '<p>a</p>' }, { html: '<p>b</p>' }],
+      }))
+    );
+    expect(res.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('send returns 413 when document HTML exceeds the size limit', async () => {
+    const res = captureRes();
+    createClientMock.mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })),
+      },
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: baseJobRow(), error: null })),
+            })),
+          })),
+        })),
+      })),
+    });
+
+    const fetchMock = vi.mocked(globalThis.fetch);
+    const huge = 'x'.repeat(2 * 1024 * 1024 + 1);
+    const req = {
+      method: 'POST',
+      url: `/api/esign/work-orders/${JOB_UUID}/send`,
+      headers: { authorization: 'Bearer good-token' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        documents: [{ html: huge }],
+      }))
+    );
+    expect(res.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('send returns 503 when Supabase service env is missing', async () => {
+    const res = captureRes();
+    const proc = nodeEnv();
+    const prevKey = proc.SUPABASE_SERVICE_ROLE_KEY;
+    delete proc.SUPABASE_SERVICE_ROLE_KEY;
+    resetEsignServiceSupabaseSingleton();
+
+    const req = {
+      method: 'POST',
+      url: `/api/esign/work-orders/${JOB_UUID}/send`,
+      headers: { authorization: 'Bearer good-token' },
+    };
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({ documents: [{ html: '<p>x</p>' }] }))
+    );
+    expect(res.status).toBe(503);
+    const body = JSON.parse(res.body) as { error?: string };
+    expect(body.error).toBe('E-sign is temporarily unavailable.');
+    proc.SUPABASE_SERVICE_ROLE_KEY = prevKey;
+    resetEsignServiceSupabaseSingleton();
   });
 
   it('resend returns 400 when esign_submitter_id was never set', async () => {

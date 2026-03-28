@@ -30,7 +30,6 @@ export function useEsignPoller({ enabled, pollOnce }: UseEsignPollerOptions) {
     const runPoll = async () => {
       if (cancelled) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        schedule();
         return;
       }
       const shouldContinue = await pollOnceRef.current();

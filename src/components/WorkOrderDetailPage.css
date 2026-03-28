@@ -204,6 +204,12 @@
   font-size: 0.8125rem;
 }
 
+.wo-esign-signed-link-fallback {
+  cursor: default;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 /* .btn-action alone wins over bare .btn-primary (no global .btn-primary); use brand fill here */
 .wo-esign-actions .btn-primary.btn-action.wo-esign-actions-primary {
   background: var(--primary);

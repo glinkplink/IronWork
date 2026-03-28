@@ -2,9 +2,21 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'node:crypto';
 import { buildEsignRowFromSubmission, pickCustomerSubmitter, DOCUSEAL_CUSTOMER_ROLE } from './docuseal-esign-state.mjs';
 
+/** Max UTF-8 bytes for all HTML fields forwarded to DocuSeal on send (abuse / accident guard). */
+const ESIGN_MAX_HTML_BYTES = 2 * 1024 * 1024;
+
+const SEND_DOCUMENTS_ERROR =
+  'Body must include exactly one document: [{ html, name?, html_header?, html_footer? }].';
+
 function env(name, fallback = '') {
   const v = process.env[name];
   return v != null && String(v).trim() !== '' ? String(v).trim() : fallback;
+}
+
+function esignConfigError(message) {
+  const err = new Error(message);
+  err.code = 'ESIGN_CONFIG';
+  return err;
 }
 
 function isUuid(s) {
@@ -13,11 +25,11 @@ function isUuid(s) {
   );
 }
 
+/** Compare webhook shared secret to header using SHA-256 digests (fixed length; avoids length short-circuit). */
 function timingSafeEqualString(secret, headerVal) {
   try {
-    const a = Buffer.from(String(secret), 'utf8');
-    const b = Buffer.from(String(headerVal ?? ''), 'utf8');
-    if (a.length !== b.length) return false;
+    const a = crypto.createHash('sha256').update(Buffer.from(String(secret), 'utf8')).digest();
+    const b = crypto.createHash('sha256').update(Buffer.from(String(headerVal ?? ''), 'utf8')).digest();
     return crypto.timingSafeEqual(a, b);
   } catch {
     return false;
@@ -37,13 +49,22 @@ function getWebhookHeader(req, configuredName) {
   return req.headers[lower] ?? req.headers[configuredName] ?? '';
 }
 
-function createServiceSupabase() {
+let serviceSupabaseSingleton = null;
+
+/** Clears memoized service client (Vitest only — keeps per-test createClient mocks working). */
+export function resetEsignServiceSupabaseSingleton() {
+  serviceSupabaseSingleton = null;
+}
+
+function getServiceSupabase() {
+  if (serviceSupabaseSingleton) return serviceSupabaseSingleton;
   const url = env('SUPABASE_URL');
   const key = env('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !key) {
-    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for e-sign routes.');
+    throw esignConfigError('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for e-sign routes.');
   }
-  return createClient(url, key);
+  serviceSupabaseSingleton = createClient(url, key);
+  return serviceSupabaseSingleton;
 }
 
 function docusealBase() {
@@ -52,7 +73,7 @@ function docusealBase() {
 
 function docusealHeaders() {
   const key = env('DOCUSEAL_API_KEY');
-  if (!key) throw new Error('DOCUSEAL_API_KEY is not set.');
+  if (!key) throw esignConfigError('DOCUSEAL_API_KEY is not set.');
   return {
     'Content-Type': 'application/json',
     'X-Auth-Token': key,
@@ -82,6 +103,45 @@ async function docusealFetchJson(path, init = {}) {
     throw err;
   }
   return json;
+}
+
+/** @returns {string|null} error message or null if valid */
+function validateSendDocuments(documents) {
+  if (!Array.isArray(documents) || documents.length === 0) {
+    return SEND_DOCUMENTS_ERROR;
+  }
+  if (documents.length !== 1) {
+    return SEND_DOCUMENTS_ERROR;
+  }
+  for (const doc of documents) {
+    if (doc == null || typeof doc !== 'object' || Array.isArray(doc)) {
+      return SEND_DOCUMENTS_ERROR;
+    }
+    if (typeof doc.html !== 'string') {
+      return SEND_DOCUMENTS_ERROR;
+    }
+    if (doc.html_header != null && typeof doc.html_header !== 'string') {
+      return SEND_DOCUMENTS_ERROR;
+    }
+    if (doc.html_footer != null && typeof doc.html_footer !== 'string') {
+      return SEND_DOCUMENTS_ERROR;
+    }
+  }
+  return null;
+}
+
+function countEsignHtmlUtf8Bytes(documents) {
+  let n = 0;
+  for (const doc of documents) {
+    n += Buffer.byteLength(doc.html, 'utf8');
+    if (typeof doc.html_header === 'string') {
+      n += Buffer.byteLength(doc.html_header, 'utf8');
+    }
+    if (typeof doc.html_footer === 'string') {
+      n += Buffer.byteLength(doc.html_footer, 'utf8');
+    }
+  }
+  return n;
 }
 
 function publicEsignPayload(row) {
@@ -168,7 +228,7 @@ async function handleSend(req, res, readJsonBody, sendJson, sendText, jobId) {
     return;
   }
 
-  const supabase = createServiceSupabase();
+  const supabase = getServiceSupabase();
   const { data: userData, error: userErr } = await supabase.auth.getUser(token);
   if (userErr || !userData?.user?.id) {
     sendJson(res, 401, { error: 'Invalid or expired session.' });
@@ -199,8 +259,17 @@ async function handleSend(req, res, readJsonBody, sendJson, sendText, jobId) {
   }
 
   const documents = body.documents;
-  if (!Array.isArray(documents) || documents.length === 0 || typeof documents[0]?.html !== 'string') {
-    sendJson(res, 400, { error: 'Body must include documents: [{ html, name?, html_header?, html_footer? }].' });
+  const docErr = validateSendDocuments(documents);
+  if (docErr) {
+    sendJson(res, 400, { error: docErr });
+    return;
+  }
+
+  const htmlBytes = countEsignHtmlUtf8Bytes(documents);
+  if (htmlBytes > ESIGN_MAX_HTML_BYTES) {
+    sendJson(res, 413, {
+      error: `Document HTML exceeds maximum size (${ESIGN_MAX_HTML_BYTES} bytes).`,
+    });
     return;
   }
 
@@ -270,7 +339,7 @@ async function handleResend(req, res, readJsonBody, sendJson, jobId) {
     body = {};
   }
 
-  const supabase = createServiceSupabase();
+  const supabase = getServiceSupabase();
   const { data: userData, error: userErr } = await supabase.auth.getUser(token);
   if (userErr || !userData?.user?.id) {
     sendJson(res, 401, { error: 'Invalid or expired session.' });
@@ -445,7 +514,7 @@ async function handleWebhook(req, res, readJsonBody, sendJson, sendText) {
     return;
   }
 
-  const supabase = createServiceSupabase();
+  const supabase = getServiceSupabase();
   const resolved = await resolveJobForWebhook(supabase, data, verified);
   if (!resolved) {
     sendJson(res, 200, { ok: true, ignored: true });
@@ -514,7 +583,12 @@ export async function tryHandleEsignRoute(req, res, helpers) {
     }
   } catch (e) {
     console.error('E-sign route error:', e);
-    sendJson(res, 500, { error: e instanceof Error ? e.message : 'Server error' });
+    const code = e && typeof e === 'object' && 'code' in e ? e.code : undefined;
+    if (code === 'ESIGN_CONFIG') {
+      sendJson(res, 503, { error: 'E-sign is temporarily unavailable.' });
+      return true;
+    }
+    sendJson(res, 500, { error: 'E-sign route failed.' });
     return true;
   }
 

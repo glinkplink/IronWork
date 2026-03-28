@@ -93,4 +93,40 @@ describe('useEsignPoller', () => {
     });
     expect(pollOnce).toHaveBeenCalledTimes(1);
   });
+
+  it('does not double-poll when becoming visible after hidden; interval continues once', async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get() {
+        return visibilityStateRef.current;
+      },
+    });
+
+    const pollOnce = vi.fn(async () => true);
+    render(<PollerHarness enabled pollOnce={pollOnce} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    });
+    expect(pollOnce).toHaveBeenCalledTimes(1);
+
+    setVisibilityState('hidden');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS * 3);
+    });
+    expect(pollOnce).toHaveBeenCalledTimes(1);
+
+    setVisibilityState('visible');
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+    });
+    expect(pollOnce).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    });
+    expect(pollOnce).toHaveBeenCalledTimes(3);
+  });
 });

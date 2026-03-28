@@ -449,15 +449,20 @@ export function WorkOrderDetailPage({
               </span>
             </button>
           ) : null}
-          {job.esign_signed_document_url ? (
+          {job.esign_signed_document_url &&
+          job.esign_signed_document_url.trim().startsWith('https://') ? (
             <a
               className="btn-secondary btn-action"
-              href={job.esign_signed_document_url}
+              href={job.esign_signed_document_url.trim()}
               target="_blank"
-              rel="noreferrer"
+              rel="noreferrer noopener"
             >
               View signed PDF
             </a>
+          ) : job.esign_signed_document_url ? (
+            <span className="btn-secondary btn-action wo-esign-signed-link-fallback" title={job.esign_signed_document_url}>
+              Signed PDF link unavailable
+            </span>
           ) : null}
         </div>
       </section>
