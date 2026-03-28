@@ -164,7 +164,7 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 **Anonymous (no session):**
 - Full app shell: **Home → Create Work Order → JobForm → Preview**.
 - Header shows **Sign In** only (no Work Orders / gear until logged in).
-- **Primary signup path:** when there is no profile yet, **JobForm** shows optional **Your Information** (first/last, Business Email, Business Phone). Values feed a guest preview stub so the agreement preview can show signature and Service Provider contact before capture; all fields are optional for Preview / save / send. **Download & Save** (or **Save & Send for Signature**) → **CaptureModal** (business name, account email, password) → `signUp` + `upsertProfile` (`business_name`, `owner_name`, `email` = Business Email if set else modal email, `phone`) → `saveWorkOrder` → PDF or e-sign send. No separate “register” flow in the header for visitors.
+- **Primary signup path:** when there is no profile yet, **JobForm** shows optional **Your Information** (first/last for agreement autosign preview, optional Business Phone for preview). Guest preview stub has no email until capture. **Download & Save** (or **Save & Send for Signature**) → **CaptureModal** (business name, account email, password) → `signUp` + `upsertProfile` (`business_name`, `owner_name`, `email` from modal, `phone` from optional form field) → `saveWorkOrder` → PDF or e-sign send. No separate “register” flow in the header for visitors.
 
 **Returning user:**
 - **Sign In** → `AuthPage` (email + password only; new accounts still come from capture on first save, not from AuthPage).

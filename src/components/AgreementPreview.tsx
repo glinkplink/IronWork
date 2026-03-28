@@ -89,7 +89,6 @@ interface AgreementPreviewProps {
   /** Guest contractor fields from App when no profile (preview + anonymous capture). */
   ownerFirstName?: string;
   ownerLastName?: string;
-  ownerBusinessEmail?: string;
   ownerBusinessPhone?: string;
   onSaveSuccess: (savedJobId: string, isNewSave: boolean) => void | Promise<void>;
   onCaptureAndSave?: (capture: {
@@ -114,7 +113,6 @@ export function AgreementPreview({
   hasSession = false,
   ownerFirstName = '',
   ownerLastName = '',
-  ownerBusinessEmail = '',
   ownerBusinessPhone = '',
   onSaveSuccess,
   onCaptureAndSave,
@@ -141,10 +139,9 @@ export function AgreementPreview({
       buildGuestPreviewProfile({
         ownerFirstName,
         ownerLastName,
-        ownerBusinessEmail,
         ownerBusinessPhone,
       }),
-    [ownerFirstName, ownerLastName, ownerBusinessEmail, ownerBusinessPhone]
+    [ownerFirstName, ownerLastName, ownerBusinessPhone]
   );
 
   const displayProfile = postCaptureProfile ?? profile ?? guestPreviewProfile;
@@ -468,7 +465,7 @@ export function AgreementPreview({
         </div>
         {!job.customer_email?.trim() && (
           <p className="preview-esign-hint">
-            Customer email is required on the form to send for signature (download is still available).
+            Customer email is required on the form to send for signature.
           </p>
         )}
       </div>

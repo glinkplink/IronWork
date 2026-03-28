@@ -8,11 +8,9 @@ import { normalizeOwnerFullName } from './owner-name';
 export function buildGuestPreviewProfile(input: {
   ownerFirstName: string;
   ownerLastName: string;
-  ownerBusinessEmail: string;
   ownerBusinessPhone: string;
 }): BusinessProfile {
   const ownerFull = normalizeOwnerFullName(input.ownerFirstName, input.ownerLastName);
-  const emailTrim = input.ownerBusinessEmail.trim();
   const phoneTrim = input.ownerBusinessPhone.trim();
 
   return {
@@ -21,7 +19,7 @@ export function buildGuestPreviewProfile(input: {
     business_name: '',
     owner_name: ownerFull || null,
     phone: phoneTrim || null,
-    email: emailTrim || null,
+    email: null,
     address: null,
     google_business_profile_url: null,
     default_exclusions: [],
