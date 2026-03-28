@@ -19,6 +19,7 @@ import {
   sendChangeOrderForSignature,
   resendChangeOrderSignature,
   mergeEsignResponseIntoChangeOrder,
+  pollChangeOrderEsignStatus,
 } from '../lib/esign-api';
 import './ChangeOrderDetailPage.css';
 
@@ -88,12 +89,18 @@ export function ChangeOrderDetailPage({
   );
 
   const refreshCoRow = useCallback(async () => {
-    const row = await getChangeOrderById(co.id);
-    if (row && onCoUpdated) {
-      onCoUpdated(row);
+    try {
+      const r = await pollChangeOrderEsignStatus(co.id);
+      const updatedCo = mergeEsignResponseIntoChangeOrder(co, r);
+      onCoUpdated?.(updatedCo);
+      return updatedCo;
+    } catch {
+      // Fallback to passive DB read if active poll fails
+      const row = await getChangeOrderById(co.id);
+      if (row && onCoUpdated) onCoUpdated(row);
+      return row;
     }
-    return row;
-  }, [co.id, onCoUpdated]);
+  }, [co, onCoUpdated]);
 
   useEsignPoller({
     enabled: Boolean(onCoUpdated) && shouldPollEsignStatus(co.esign_status),

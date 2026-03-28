@@ -1765,4 +1765,160 @@ describe('tryHandleEsignRoute', () => {
     });
     expect(updateEqMock).toHaveBeenCalledWith('id', CO_UUID);
   });
+
+  it('CO status returns 401 without Authorization header', async () => {
+    const res = captureRes();
+    const req = {
+      method: 'GET',
+      url: `/api/esign/change-orders/${CO_UUID}/status`,
+      headers: {},
+    };
+    const handled = await tryHandleEsignRoute(req as never, res as never, defaultHelpers());
+    expect(handled).toBe(true);
+    expect(res.status).toBe(401);
+    expect(JSON.parse(res.body).error).toMatch(/bearer/i);
+  });
+
+  it('CO status returns current row when esign_submission_id is null', async () => {
+    const res = captureRes();
+    createClientMock.mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })),
+      },
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: baseCORow(), error: null })),
+            })),
+          })),
+        })),
+      })),
+    });
+
+    const fetchMock = vi.mocked(globalThis.fetch);
+    const req = {
+      method: 'GET',
+      url: `/api/esign/change-orders/${CO_UUID}/status`,
+      headers: { authorization: 'Bearer good-token' },
+    };
+    await tryHandleEsignRoute(req as never, res as never, defaultHelpers());
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body) as { coId?: string; jobId?: string; esign_status?: string };
+    expect(body.coId).toBe(CO_UUID);
+    expect(body.jobId).toBe(JOB_UUID);
+    expect(body.esign_status).toBe('not_sent');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('CO status fetches DocuSeal, updates change_orders, returns updated payload', async () => {
+    const res = captureRes();
+    const coWithSubmission = baseCORow({
+      status: 'pending_approval',
+      esign_submission_id: '900',
+      esign_submitter_id: '77',
+      esign_status: 'sent',
+    });
+    const updatedCo = {
+      ...coWithSubmission,
+      esign_status: 'opened',
+      esign_submitter_state: 'opened',
+      esign_opened_at: '2026-03-28T15:00:00Z',
+    };
+
+    createClientMock.mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })),
+      },
+      from: vi
+        .fn()
+        .mockImplementationOnce(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({ data: coWithSubmission, error: null })),
+              })),
+            })),
+          })),
+        }))
+        .mockImplementationOnce(() => ({
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                select: vi.fn(() => ({
+                  single: vi.fn(async () => ({ data: updatedCo, error: null })),
+                })),
+              })),
+            })),
+          })),
+        })),
+    });
+
+    const submission = docusealSubmissionResponse(900);
+    submission.submitters[0].status = 'opened';
+    submission.submitters[0].opened_at = '2026-03-28T15:00:00Z';
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify(submission), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'GET',
+      url: `/api/esign/change-orders/${CO_UUID}/status`,
+      headers: { authorization: 'Bearer good-token' },
+    };
+    await tryHandleEsignRoute(req as never, res as never, defaultHelpers());
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body) as { coId?: string; jobId?: string; esign_status?: string; esign_opened_at?: string };
+    expect(body.coId).toBe(CO_UUID);
+    expect(body.jobId).toBe(JOB_UUID);
+    expect(body.esign_status).toBe('opened');
+    expect(body.esign_opened_at).toBe('2026-03-28T15:00:00Z');
+  });
+
+  it('CO status returns current row (200) when buildChangeOrderPatchFromSubmission returns null', async () => {
+    const res = captureRes();
+    const coWithSubmission = baseCORow({
+      status: 'pending_approval',
+      esign_submission_id: '900',
+      esign_submitter_id: '77',
+      esign_status: 'sent',
+    });
+
+    createClientMock.mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })),
+      },
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: coWithSubmission, error: null })),
+            })),
+          })),
+        })),
+      })),
+    });
+
+    // Submission with no submitters — buildChangeOrderPatchFromSubmission returns null
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(JSON.stringify({ id: 900, status: 'pending', submitters: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const req = {
+      method: 'GET',
+      url: `/api/esign/change-orders/${CO_UUID}/status`,
+      headers: { authorization: 'Bearer good-token' },
+    };
+    await tryHandleEsignRoute(req as never, res as never, defaultHelpers());
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body) as { coId?: string; esign_status?: string };
+    expect(body.coId).toBe(CO_UUID);
+    expect(body.esign_status).toBe('sent');
+  });
 });

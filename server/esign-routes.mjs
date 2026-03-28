@@ -379,6 +379,10 @@ function matchEsignPath(method, pathname) {
   if (method === 'GET' && woStatusMatch) {
     return { kind: 'esign-status', jobId: woStatusMatch[1] };
   }
+  const coStatusMatch = pathname.match(/^\/api\/esign\/change-orders\/([0-9a-fA-F-]{36})\/status$/);
+  if (method === 'GET' && coStatusMatch) {
+    return { kind: 'co-esign-status', coId: coStatusMatch[1] };
+  }
   const coMatch = pathname.match(/^\/api\/esign\/change-orders\/([0-9a-fA-F-]{36})\/(send|resend)$/);
   if (method === 'POST' && coMatch) {
     return { kind: 'co-esign', coId: coMatch[1], action: coMatch[2] };
@@ -716,6 +720,81 @@ async function handlePollStatus(req, res, sendJson, jobId) {
   }
 
   sendJson(res, 200, { jobId, ...publicEsignPayload(updated) });
+}
+
+async function handleCoStatus(req, res, sendJson, coId) {
+  const token = getBearerToken(req);
+  if (!token) {
+    sendJson(res, 401, { error: 'Missing or invalid Authorization bearer token.' });
+    return;
+  }
+
+  const supabase = getServiceSupabase();
+  const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+  if (userErr || !userData?.user?.id) {
+    sendJson(res, 401, { error: 'Invalid or expired session.' });
+    return;
+  }
+  const userId = userData.user.id;
+
+  const { data: co, error: coErr } = await supabase
+    .from('change_orders')
+    .select('*')
+    .eq('id', coId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (coErr) {
+    sendJson(res, 500, { error: coErr.message });
+    return;
+  }
+  if (!co) {
+    sendJson(res, 404, { error: 'Change order not found.' });
+    return;
+  }
+
+  // If there's no submission ID, nothing to poll - return current state
+  if (!co.esign_submission_id) {
+    sendJson(res, 200, { coId, jobId: co.job_id, ...publicCoEsignPayload(co) });
+    return;
+  }
+
+  // Fetch current state from DocuSeal
+  let submission;
+  try {
+    submission = await docusealFetchJson(`/submissions/${co.esign_submission_id}`, {
+      method: 'GET',
+    });
+  } catch (e) {
+    const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 502;
+    sendJson(res, status, {
+      error: e instanceof Error ? e.message : 'Failed to fetch status from DocuSeal.',
+    });
+    return;
+  }
+
+  const patch = buildChangeOrderPatchFromSubmission(submission, co.status);
+  if (!patch) {
+    // Could not derive patch - return current state
+    sendJson(res, 200, { coId, jobId: co.job_id, ...publicCoEsignPayload(co) });
+    return;
+  }
+
+  // Update DB if state has changed
+  const { data: updated, error: upErr } = await supabase
+    .from('change_orders')
+    .update(patch)
+    .eq('id', coId)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (upErr) {
+    sendJson(res, 500, { error: upErr.message });
+    return;
+  }
+
+  sendJson(res, 200, { coId, jobId: co.job_id, ...publicCoEsignPayload(updated) });
 }
 
 function publicCoEsignPayload(row) {
@@ -1409,6 +1488,10 @@ export async function tryHandleEsignRoute(req, res, helpers) {
     }
     if (route.kind === 'esign-status') {
       await handlePollStatus(req, res, sendJson, route.jobId);
+      return true;
+    }
+    if (route.kind === 'co-esign-status') {
+      await handleCoStatus(req, res, sendJson, route.coId);
       return true;
     }
     if (route.kind === 'co-esign' && route.action === 'send') {
