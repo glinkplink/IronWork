@@ -130,10 +130,32 @@ function App() {
     navigateTo('work-order-detail');
   };
 
+  const handleOpenChangeOrderDetailFromList = (
+    jobRow: Job,
+    changeOrderRow: import('./types/db').ChangeOrder
+  ) => {
+    setWorkOrderDetailJob(jobRow);
+    changeOrderFlow.handleOpenCODetail(changeOrderRow, 'work-orders');
+  };
+
   const handleBackFromWorkOrderDetail = () => {
     setWorkOrderDetailJob(null);
     changeOrderFlow.resetFlowForBackToList();
     navigateTo('work-orders');
+  };
+
+  const handleBackFromCODetail = () => {
+    if (changeOrder.coDetailBackTarget === 'work-orders') {
+      setWorkOrderDetailJob(null);
+    }
+    changeOrderFlow.handleBackFromCODetail();
+  };
+
+  const handleDeleteCOFromDetail = () => {
+    if (changeOrder.coDetailBackTarget === 'work-orders') {
+      setWorkOrderDetailJob(null);
+    }
+    changeOrderFlow.handleDeleteCOFromDetail();
   };
 
   if (authLoading) {
@@ -223,6 +245,7 @@ function App() {
           onStartInvoice={invoiceFlow.handleStartInvoice}
           onOpenPendingInvoice={invoiceFlow.handleOpenPendingInvoice}
           onOpenWorkOrderDetail={handleOpenWorkOrderDetail}
+          onOpenChangeOrderDetail={handleOpenChangeOrderDetailFromList}
         />
       );
     }
@@ -259,9 +282,9 @@ function App() {
           co={changeOrder.coDetailCO}
           job={workOrderDetailJob}
           profile={profile}
-          onBack={changeOrderFlow.handleBackFromCODetail}
+          onBack={handleBackFromCODetail}
           onEdit={changeOrderFlow.handleEditCOFromDetail}
-          onDelete={changeOrderFlow.handleDeleteCOFromDetail}
+          onDelete={handleDeleteCOFromDetail}
           onCoUpdated={changeOrderFlow.handleCoEsignUpdated}
         />
       );

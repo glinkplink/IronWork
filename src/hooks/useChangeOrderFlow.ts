@@ -2,16 +2,20 @@ import { useState, useCallback, useRef, useEffect, type Dispatch, type SetStateA
 import type { Job, ChangeOrder } from '../types/db';
 import type { AppView } from './useAppNavigation';
 
+export type ChangeOrderDetailBackTarget = 'work-order-detail' | 'work-orders';
+
 export type ChangeOrderFlowState = {
   changeOrderFlowJob: Job | null;
   wizardExistingCO: ChangeOrder | null;
   coDetailCO: ChangeOrder | null;
+  coDetailBackTarget: ChangeOrderDetailBackTarget;
 };
 
 const initialChangeOrder: ChangeOrderFlowState = {
   changeOrderFlowJob: null,
   wizardExistingCO: null,
   coDetailCO: null,
+  coDetailBackTarget: 'work-order-detail',
 };
 
 export function useChangeOrderFlow(
@@ -31,6 +35,7 @@ export function useChangeOrderFlow(
       changeOrderFlowJob: null,
       wizardExistingCO: null,
       coDetailCO: null,
+      coDetailBackTarget: 'work-order-detail',
     }));
   }, []);
 
@@ -45,16 +50,21 @@ export function useChangeOrderFlow(
   }, [workOrderDetailJob, navigateTo]);
 
   const handleOpenCODetail = useCallback(
-    (co: ChangeOrder) => {
-      setChangeOrder((c) => ({ ...c, coDetailCO: co }));
+    (co: ChangeOrder, backTarget: ChangeOrderDetailBackTarget = 'work-order-detail') => {
+      setChangeOrder((c) => ({ ...c, coDetailCO: co, coDetailBackTarget: backTarget }));
       navigateTo('co-detail');
     },
     [navigateTo]
   );
 
   const handleBackFromCODetail = useCallback(() => {
-    setChangeOrder((c) => ({ ...c, coDetailCO: null }));
-    navigateTo('work-order-detail');
+    const backTarget = changeOrderRef.current.coDetailBackTarget;
+    setChangeOrder((c) => ({
+      ...c,
+      coDetailCO: null,
+      coDetailBackTarget: 'work-order-detail',
+    }));
+    navigateTo(backTarget);
   }, [navigateTo]);
 
   const handleEditCOFromDetail = useCallback(
@@ -71,9 +81,14 @@ export function useChangeOrderFlow(
   );
 
   const handleDeleteCOFromDetail = useCallback(() => {
-    setChangeOrder((c) => ({ ...c, coDetailCO: null }));
+    const backTarget = changeOrderRef.current.coDetailBackTarget;
+    setChangeOrder((c) => ({
+      ...c,
+      coDetailCO: null,
+      coDetailBackTarget: 'work-order-detail',
+    }));
     setChangeOrderListVersion((v) => v + 1);
-    navigateTo('work-order-detail');
+    navigateTo(backTarget);
   }, [navigateTo, setChangeOrderListVersion]);
 
   const handleChangeOrderWizardComplete = useCallback((savedCo: ChangeOrder) => {

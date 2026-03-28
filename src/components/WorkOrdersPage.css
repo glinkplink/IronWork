@@ -1,6 +1,11 @@
 .work-orders-page {
-  max-width: 720px;
+  max-width: none;
   margin: 0 auto;
+  width: 100%;
+}
+
+.work-orders-page .work-orders-row {
+  gap: var(--space-xl);
 }
 
 .work-orders-page .work-orders-row-main {
@@ -219,4 +224,116 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.work-orders-page .work-orders-co-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem 0;
+  margin-top: 6px;
+  max-width: 100%;
+}
+
+.work-orders-page .work-orders-co-shortcut-wrap {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.work-orders-page .work-orders-co-shortcut-divider {
+  align-self: center;
+  padding: 0 0.45rem;
+  color: var(--border-strong);
+  font-weight: 600;
+}
+
+.work-orders-page .work-orders-co-shortcut {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.work-orders-page .work-orders-co-shortcut:focus {
+  outline: none;
+}
+
+.work-orders-page .work-orders-co-shortcut:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.work-orders-page .work-orders-co-shortcut:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.work-orders-page .work-orders-co-shortcut-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.work-orders-page .work-orders-co-shortcut:hover .work-orders-co-shortcut-label {
+  color: var(--primary-hover);
+}
+
+.work-orders-page .work-orders-co-shortcut-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--text-secondary);
+}
+
+.work-orders-page .work-orders-co-shortcut-segment {
+  width: 0.9rem;
+  height: 0.34rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+}
+
+.work-orders-page .work-orders-co-shortcut-segment-active {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.work-orders-page .work-orders-co-shortcut-segment-success {
+  border-color: #2d6a2e;
+  background: #2d6a2e;
+}
+
+.work-orders-page .work-orders-co-shortcut-segment-danger {
+  border-color: #9f2d20;
+  background: #9f2d20;
+}
+
+.work-orders-page .work-orders-co-shortcut-segment-warning {
+  border-color: #9a5b16;
+  background: #9a5b16;
+}
+
+.work-orders-page .work-orders-co-shortcut-status-text {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .work-orders-page .work-orders-row {
+    gap: var(--space-lg);
+  }
 }

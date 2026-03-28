@@ -182,6 +182,7 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 
 **Work Orders details worth remembering:**
 - `WorkOrdersPage` shows **Contract value** rollups from `job.price`, not invoice totals.
+- `WorkOrdersPage` shows inline per-job change-order shortcuts beneath the WO e-sign strip; each shortcut opens CO detail directly, and CO detail returns to Work Orders when entered from that list.
 - If invoice-status rows are partially malformed, the page shows a warning banner but keeps valid invoice actions enabled.
 - `WorkOrderDetailPage` has a single **job-level** invoice strip; invoice actions are not rendered per change-order row.
 - `ChangeOrderWizard` now saves the CO, sends the DocuSeal request immediately, then routes to `ChangeOrderDetailPage`; CO business `status` tracks approval lifecycle (`pending_approval` after send/open, `approved` on completed signature, `rejected` on decline).

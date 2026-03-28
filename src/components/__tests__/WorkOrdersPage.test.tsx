@@ -3,22 +3,23 @@ import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Job, WorkOrderListJob } from '../../types/db';
+import type { ChangeOrder, Job, WorkOrderListJob } from '../../types/db';
 import { WorkOrdersPage } from '../WorkOrdersPage';
 import type { ListInvoiceStatusByJobResult } from '../../lib/db/invoices';
 import { ESIGN_POLL_INTERVAL_MS } from '../../lib/esign-live';
 
 const listJobsForWorkOrders = vi.fn();
-const listInFlightEsignJobs = vi.fn();
-const refreshEsignStatuses = vi.fn();
 const getJobById = vi.fn();
+const getChangeOrderById = vi.fn();
 const listInvoiceStatusByJob = vi.fn();
 
 vi.mock('../../lib/db/jobs', () => ({
   listJobsForWorkOrders: (...args: unknown[]) => listJobsForWorkOrders(...args),
-  listInFlightEsignJobs: (...args: unknown[]) => listInFlightEsignJobs(...args),
-  refreshEsignStatuses: (...args: unknown[]) => refreshEsignStatuses(...args),
   getJobById: (...args: unknown[]) => getJobById(...args),
+}));
+
+vi.mock('../../lib/db/change-orders', () => ({
+  getChangeOrderById: (...args: unknown[]) => getChangeOrderById(...args),
 }));
 
 vi.mock('../../lib/db/invoices', async (importOriginal) => {
@@ -40,6 +41,7 @@ const listJobA: WorkOrderListJob = {
   created_at: '2025-01-01T12:00:00Z',
   price: 100,
   esign_status: 'not_sent',
+  changeOrders: [],
 };
 
 const listJobB: WorkOrderListJob = {
@@ -52,7 +54,52 @@ const listJobB: WorkOrderListJob = {
   created_at: '2025-01-02T12:00:00Z',
   price: 200,
   esign_status: 'sent',
+  changeOrders: [],
 };
+
+function previewCO(
+  id: string,
+  coNumber: number,
+  esignStatus: WorkOrderListJob['changeOrders'][number]['esign_status']
+) {
+  return {
+    id,
+    job_id: 'job-a',
+    co_number: coNumber,
+    esign_status: esignStatus,
+  };
+}
+
+function minimalFullChangeOrder(id: string, coNumber: number): ChangeOrder {
+  return {
+    id,
+    user_id: 'u1',
+    job_id: 'job-a',
+    co_number: coNumber,
+    description: `CO ${coNumber}`,
+    reason: 'extra work',
+    status: 'pending_approval',
+    requires_approval: true,
+    line_items: [],
+    time_amount: 0,
+    time_unit: 'hours',
+    time_note: '',
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    esign_submission_id: null,
+    esign_submitter_id: null,
+    esign_embed_src: null,
+    esign_status: 'not_sent',
+    esign_submission_state: null,
+    esign_submitter_state: null,
+    esign_sent_at: null,
+    esign_opened_at: null,
+    esign_completed_at: null,
+    esign_declined_at: null,
+    esign_decline_reason: null,
+    esign_signed_document_url: null,
+  };
+}
 
 function minimalFullJob(id: string, customer: string): Job {
   return {
@@ -127,6 +174,7 @@ function renderPage() {
   const onStartInvoice = vi.fn();
   const onOpenPendingInvoice = vi.fn();
   const onOpenWorkOrderDetail = vi.fn();
+  const onOpenChangeOrderDetail = vi.fn();
   const onClearSuccessBanner = vi.fn();
   render(
     <WorkOrdersPage
@@ -138,9 +186,16 @@ function renderPage() {
       onStartInvoice={onStartInvoice}
       onOpenPendingInvoice={onOpenPendingInvoice}
       onOpenWorkOrderDetail={onOpenWorkOrderDetail}
+      onOpenChangeOrderDetail={onOpenChangeOrderDetail}
     />
   );
-  return { onStartInvoice, onOpenPendingInvoice, onOpenWorkOrderDetail, onClearSuccessBanner };
+  return {
+    onStartInvoice,
+    onOpenPendingInvoice,
+    onOpenWorkOrderDetail,
+    onOpenChangeOrderDetail,
+    onClearSuccessBanner,
+  };
 }
 
 async function flushAsync() {
@@ -157,12 +212,9 @@ describe('WorkOrdersPage', () => {
 
   beforeEach(() => {
     listJobsForWorkOrders.mockReset();
-    listInFlightEsignJobs.mockReset();
-    refreshEsignStatuses.mockReset();
     getJobById.mockReset();
+    getChangeOrderById.mockReset();
     listInvoiceStatusByJob.mockReset();
-    listInFlightEsignJobs.mockResolvedValue([]);
-    refreshEsignStatuses.mockResolvedValue([]);
     listJobsForWorkOrders.mockResolvedValue([listJobA]);
     listInvoiceStatusByJob.mockResolvedValue({
       data: [],
@@ -170,6 +222,9 @@ describe('WorkOrdersPage', () => {
       warning: null,
     } satisfies ListInvoiceStatusByJobResult);
     getJobById.mockImplementation((id: string) => Promise.resolve(minimalFullJob(id, id)));
+    getChangeOrderById.mockImplementation((id: string) =>
+      Promise.resolve(minimalFullChangeOrder(id, Number(id.replace(/\D/g, '')) || 1))
+    );
   });
 
   it('shows compact e-sign progress strip when esign_status is not not_sent', async () => {
@@ -192,9 +247,9 @@ describe('WorkOrdersPage', () => {
 
   it('polls the jobs list while an e-sign is in flight and updates the row strip', async () => {
     vi.useFakeTimers();
-    listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
-    listInFlightEsignJobs.mockResolvedValueOnce([]);
-    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+    listJobsForWorkOrders
+      .mockResolvedValueOnce([listJobB])
+      .mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
 
     renderPage();
     await flushAsync();
@@ -207,9 +262,7 @@ describe('WorkOrdersPage', () => {
     await flushAsync();
 
     expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
-    expect(listJobsForWorkOrders).toHaveBeenCalledTimes(1);
-    expect(listInFlightEsignJobs).toHaveBeenCalledTimes(1);
-    expect(refreshEsignStatuses).toHaveBeenCalledWith(['job-b'], 'u1');
+    expect(listJobsForWorkOrders).toHaveBeenCalledTimes(2);
   });
 
   it('does not start polling when no e-sign rows are in flight', async () => {
@@ -225,14 +278,13 @@ describe('WorkOrdersPage', () => {
     });
 
     expect(listJobsForWorkOrders).toHaveBeenCalledTimes(1);
-    expect(listInFlightEsignJobs).not.toHaveBeenCalled();
   });
 
   it('stops polling after the refreshed list reaches a terminal e-sign state', async () => {
     vi.useFakeTimers();
-    listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
-    listInFlightEsignJobs.mockResolvedValueOnce([]);
-    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+    listJobsForWorkOrders
+      .mockResolvedValueOnce([listJobB])
+      .mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
 
     renderPage();
     await flushAsync();
@@ -250,29 +302,73 @@ describe('WorkOrdersPage', () => {
       await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS * 2);
     });
 
-    expect(listJobsForWorkOrders).toHaveBeenCalledTimes(1);
-    expect(listInFlightEsignJobs).toHaveBeenCalledTimes(1);
-    expect(refreshEsignStatuses).toHaveBeenCalledTimes(1);
+    expect(listJobsForWorkOrders).toHaveBeenCalledTimes(2);
   });
 
-  it('refreshes disappeared in-flight rows so terminal statuses appear without a page reload', async () => {
+  it('polls while an inline change order is in flight and updates its compact status', async () => {
     vi.useFakeTimers();
-    listJobsForWorkOrders.mockResolvedValueOnce([listJobB]);
-    listInFlightEsignJobs.mockResolvedValueOnce([]);
-    refreshEsignStatuses.mockResolvedValueOnce([{ ...listJobB, esign_status: 'completed' }]);
+    listJobsForWorkOrders
+      .mockResolvedValueOnce([
+        { ...listJobA, changeOrders: [previewCO('co-1', 1, 'opened')] },
+      ])
+      .mockResolvedValueOnce([
+        { ...listJobA, changeOrders: [previewCO('co-1', 1, 'completed')] },
+      ]);
 
     renderPage();
     await flushAsync();
 
-    expect(screen.getByLabelText('E-signature status: Sent')).toBeInTheDocument();
+    expect(screen.getByText('Opened')).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
     });
     await flushAsync();
 
-    expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
-    expect(refreshEsignStatuses).toHaveBeenCalledWith(['job-b'], 'u1');
+    expect(screen.getByText('Signed')).toBeInTheDocument();
+    expect(listJobsForWorkOrders).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders inline change order shortcuts in order and opens hydrated CO detail', async () => {
+    listJobsForWorkOrders.mockResolvedValue([
+      {
+        ...listJobA,
+        changeOrders: [previewCO('co-2', 2, 'completed'), previewCO('co-1', 1, 'opened')],
+      },
+    ]);
+    getJobById.mockResolvedValue(minimalFullJob('job-a', 'Customer A'));
+    getChangeOrderById.mockImplementation((id: string) =>
+      Promise.resolve(minimalFullChangeOrder(id, id === 'co-1' ? 1 : 2))
+    );
+
+    const user = userEvent.setup();
+    const { onOpenChangeOrderDetail, onOpenWorkOrderDetail } = renderPage();
+
+    await screen.findByText('Customer A');
+
+    const shortcutButtons = screen.getAllByRole('button', { name: /Open CO #/i });
+    expect(shortcutButtons).toHaveLength(2);
+    expect(screen.getByText('CO #0001')).toBeInTheDocument();
+    expect(screen.getByText('CO #0002')).toBeInTheDocument();
+    expect(screen.getByText('Opened')).toBeInTheDocument();
+    expect(screen.getByText('Signed')).toBeInTheDocument();
+
+    const list = latestWorkOrdersListUl();
+    const row = list.querySelector('li.work-orders-row');
+    expect(row).toBeTruthy();
+    const detailButton = within(row as HTMLElement).getByRole('button', { name: /Customer A/i });
+
+    await user.click(detailButton);
+    await waitFor(() => {
+      expect(onOpenWorkOrderDetail).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open CO #0001' }));
+    await waitFor(() => {
+      expect(onOpenChangeOrderDetail).toHaveBeenCalledTimes(1);
+    });
+    expect(onOpenChangeOrderDetail.mock.calls[0][0].id).toBe('job-a');
+    expect(onOpenChangeOrderDetail.mock.calls[0][1].id).toBe('co-1');
   });
 
   it('shows date on first meta line and capitalized job type on second', async () => {
@@ -298,6 +394,7 @@ describe('WorkOrdersPage', () => {
         onStartInvoice={() => {}}
         onOpenPendingInvoice={() => {}}
         onOpenWorkOrderDetail={() => {}}
+        onOpenChangeOrderDetail={() => {}}
       />
     );
 
@@ -328,6 +425,7 @@ describe('WorkOrdersPage', () => {
         onStartInvoice={() => {}}
         onOpenPendingInvoice={() => {}}
         onOpenWorkOrderDetail={() => {}}
+        onOpenChangeOrderDetail={() => {}}
       />
     );
 

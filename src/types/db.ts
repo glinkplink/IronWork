@@ -107,6 +107,13 @@ export type EsignJobStatus =
   | 'declined'
   | 'expired';
 
+export interface WorkOrderListChangeOrderPreview {
+  id: string;
+  job_id: string;
+  co_number: number;
+  esign_status: EsignJobStatus;
+}
+
 /** Narrow row for Work Orders list screen only (not full Job). */
 export interface WorkOrderListJob {
   id: string;
@@ -118,6 +125,7 @@ export interface WorkOrderListJob {
   created_at: string;
   price: number;
   esign_status: EsignJobStatus;
+  changeOrders: WorkOrderListChangeOrderPreview[];
 }
 
 /** Invoice fields needed for Work Orders list actions / summary (no line_items). */

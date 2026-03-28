@@ -1,6 +1,50 @@
 import { supabase } from '../supabase';
-import type { EsignJobStatus, Job, WorkOrderListJob } from '../../types/db';
+import type {
+  EsignJobStatus,
+  Job,
+  WorkOrderListChangeOrderPreview,
+  WorkOrderListJob,
+} from '../../types/db';
 import type { WelderJob } from '../../types';
+
+const WORK_ORDER_LIST_SELECT = `
+  id,
+  wo_number,
+  customer_name,
+  job_type,
+  other_classification,
+  agreement_date,
+  created_at,
+  price,
+  esign_status,
+  change_orders (
+    id,
+    job_id,
+    co_number,
+    esign_status
+  )
+`;
+
+function mapWorkOrderListChangeOrderRow(
+  row: Record<string, unknown>
+): WorkOrderListChangeOrderPreview {
+  const esignRaw = row.esign_status;
+  const esign_status: EsignJobStatus =
+    esignRaw === 'sent' ||
+    esignRaw === 'opened' ||
+    esignRaw === 'completed' ||
+    esignRaw === 'declined' ||
+    esignRaw === 'expired'
+      ? esignRaw
+      : 'not_sent';
+
+  return {
+    id: String(row.id),
+    job_id: String(row.job_id ?? ''),
+    co_number: Number(row.co_number) || 0,
+    esign_status,
+  };
+}
 
 function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
   const priceRaw = row.price;
@@ -21,6 +65,13 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
     esignRaw === 'expired'
       ? esignRaw
       : 'not_sent';
+  const changeOrderRows = Array.isArray(row.change_orders) ? row.change_orders : [];
+  const changeOrders = changeOrderRows
+    .filter(
+      (value): value is Record<string, unknown> => typeof value === 'object' && value !== null
+    )
+    .map((value) => mapWorkOrderListChangeOrderRow(value))
+    .sort((a, b) => a.co_number - b.co_number);
 
   return {
     id: String(row.id),
@@ -32,15 +83,14 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
     created_at: String(row.created_at ?? ''),
     price,
     esign_status,
+    changeOrders,
   };
 }
 
 export const listJobsForWorkOrders = async (userId: string): Promise<WorkOrderListJob[]> => {
   const { data, error } = await supabase
     .from('jobs')
-    .select(
-      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price, esign_status'
-    )
+    .select(WORK_ORDER_LIST_SELECT)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -55,9 +105,7 @@ export const listJobsForWorkOrders = async (userId: string): Promise<WorkOrderLi
 export const listInFlightEsignJobs = async (userId: string): Promise<WorkOrderListJob[]> => {
   const { data, error } = await supabase
     .from('jobs')
-    .select(
-      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price, esign_status'
-    )
+    .select(WORK_ORDER_LIST_SELECT)
     .eq('user_id', userId)
     .in('esign_status', ['sent', 'opened'])
     .order('created_at', { ascending: false });
@@ -78,9 +126,7 @@ export const refreshEsignStatuses = async (
 
   const { data, error } = await supabase
     .from('jobs')
-    .select(
-      'id, wo_number, customer_name, job_type, other_classification, agreement_date, created_at, price, esign_status'
-    )
+    .select(WORK_ORDER_LIST_SELECT)
     .eq('user_id', userId)
     .in('id', jobIds);
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type {
   BusinessProfile,
+  ChangeOrder,
   Job,
   Invoice,
   EsignJobStatus,
@@ -9,15 +10,15 @@ import type {
 } from '../types/db';
 import {
   listJobsForWorkOrders,
-  listInFlightEsignJobs,
-  refreshEsignStatuses,
   getJobById,
 } from '../lib/db/jobs';
+import { getChangeOrderById } from '../lib/db/change-orders';
 import { listInvoiceStatusByJob, getInvoice, invoiceStatusMapFromRows } from '../lib/db/invoices';
 import { useEsignPoller } from '../hooks/useEsignPoller';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
 import { shouldPollEsignStatus } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
+import { formatEsignStatusLabel } from '../lib/esign-labels';
 import { formatWorkOrderListJobType } from '../lib/work-order-list-label';
 import './WorkOrdersPage.css';
 
@@ -71,6 +72,30 @@ function renderEsignStrip(status: EsignJobStatus) {
   );
 }
 
+function hasInFlightEsign(job: WorkOrderListJob): boolean {
+  return (
+    shouldPollEsignStatus(job.esign_status) ||
+    job.changeOrders.some((changeOrder) => shouldPollEsignStatus(changeOrder.esign_status))
+  );
+}
+
+function coStatusTone(status: EsignJobStatus): 'inactive' | 'active' | 'success' | 'danger' | 'warning' {
+  switch (status) {
+    case 'sent':
+    case 'opened':
+      return 'active';
+    case 'completed':
+      return 'success';
+    case 'declined':
+      return 'danger';
+    case 'expired':
+      return 'warning';
+    case 'not_sent':
+    default:
+      return 'inactive';
+  }
+}
+
 interface WorkOrdersPageProps {
   userId: string;
   profile: BusinessProfile | null;
@@ -80,6 +105,7 @@ interface WorkOrdersPageProps {
   onStartInvoice: (job: Job) => void;
   onOpenPendingInvoice: (job: Job, invoice: Invoice) => void;
   onOpenWorkOrderDetail: (job: Job) => void;
+  onOpenChangeOrderDetail: (job: Job, changeOrder: ChangeOrder) => void;
 }
 
 export function WorkOrdersPage({
@@ -91,6 +117,7 @@ export function WorkOrdersPage({
   onStartInvoice,
   onOpenPendingInvoice,
   onOpenWorkOrderDetail,
+  onOpenChangeOrderDetail,
 }: WorkOrdersPageProps) {
   const [jobs, setJobs] = useState<WorkOrderListJob[]>([]);
   const [jobsLoading, setJobsLoading] = useState(true);
@@ -103,13 +130,16 @@ export function WorkOrdersPage({
   const {
     busyJobIds: actionLoadingJobIds,
     handleOpenDetail,
+    handleOpenChangeOrderDetail,
     handleStartInvoice,
     handleOpenPendingInvoice,
   } = useWorkOrderRowActions({
     userId,
     getJobById,
+    getChangeOrderById,
     getInvoice,
     onOpenWorkOrderDetail,
+    onOpenChangeOrderDetail,
     onStartInvoice,
     onOpenPendingInvoice,
   });
@@ -123,7 +153,7 @@ export function WorkOrdersPage({
     }
   });
 
-  const hasInFlightEsign = jobs.some((job) => shouldPollEsignStatus(job.esign_status));
+  const hasAnyInFlightEsign = jobs.some((job) => hasInFlightEsign(job));
 
   useEffect(() => {
     let cancelled = false;
@@ -164,23 +194,11 @@ export function WorkOrdersPage({
   }, [userId]);
 
   useEsignPoller({
-    enabled: hasInFlightEsign,
+    enabled: hasAnyInFlightEsign,
     pollOnce: async () => {
-      const updatedRows = await listInFlightEsignJobs(userId);
-      const updatedById = new Map(updatedRows.map((r) => [r.id, r]));
-      const missingInFlightIds = jobs
-        .filter((job) => shouldPollEsignStatus(job.esign_status) && !updatedById.has(job.id))
-        .map((job) => job.id);
-      const refreshedTerminalRows =
-        missingInFlightIds.length > 0 ? await refreshEsignStatuses(missingInFlightIds, userId) : [];
-      const mergedById = new Map([
-        ...updatedRows.map((row) => [row.id, row] as const),
-        ...refreshedTerminalRows.map((row) => [row.id, row] as const),
-      ]);
-      setJobs((prev) => prev.map((job) => mergedById.get(job.id) ?? job));
-      return [...updatedRows, ...refreshedTerminalRows].some((job) =>
-        shouldPollEsignStatus(job.esign_status)
-      );
+      const refreshedJobs = await listJobsForWorkOrders(userId);
+      setJobs(refreshedJobs);
+      return refreshedJobs.some((job) => hasInFlightEsign(job));
     },
   });
 
@@ -321,6 +339,7 @@ export function WorkOrdersPage({
                     ? `WO #${String(job.wo_number).padStart(4, '0')}`
                     : 'WO (no #)';
                 const rowBusy = actionLoadingJobIds.has(job.id);
+                const changeOrders = [...job.changeOrders].sort((a, b) => a.co_number - b.co_number);
                 return (
                   <li key={job.id} className="work-orders-row">
                     <div className="work-orders-row-main">
@@ -339,6 +358,45 @@ export function WorkOrdersPage({
                           {formatWorkOrderListJobType(job)}
                         </span>
                         {renderEsignStrip(job.esign_status)}
+                        {changeOrders.length > 0 ? (
+                          <span className="work-orders-co-shortcuts" role="list" aria-label={`${woLabel} change orders`}>
+                            {changeOrders.map((changeOrder, index) => {
+                              const coLabel = `CO #${String(changeOrder.co_number).padStart(4, '0')}`;
+                              const statusLabel = formatEsignStatusLabel(changeOrder.esign_status);
+                              return (
+                                <span
+                                  key={changeOrder.id}
+                                  className="work-orders-co-shortcut-wrap"
+                                  role="listitem"
+                                >
+                                  {index > 0 ? (
+                                    <span className="work-orders-co-shortcut-divider" aria-hidden="true">
+                                      |
+                                    </span>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className="work-orders-co-shortcut"
+                                    disabled={rowBusy}
+                                    onClick={() => handleOpenChangeOrderDetail(job, changeOrder)}
+                                    aria-label={`Open ${coLabel}`}
+                                  >
+                                    <span className="work-orders-co-shortcut-label">{coLabel}</span>
+                                    <span className="work-orders-co-shortcut-status">
+                                      <span
+                                        className={`work-orders-co-shortcut-segment work-orders-co-shortcut-segment-${coStatusTone(changeOrder.esign_status)}`}
+                                        aria-hidden="true"
+                                      />
+                                      <span className="work-orders-co-shortcut-status-text">
+                                        {statusLabel}
+                                      </span>
+                                    </span>
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                     <div className="work-orders-row-actions">
