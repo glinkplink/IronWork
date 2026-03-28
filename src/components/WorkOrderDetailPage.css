@@ -193,7 +193,8 @@
 
 .wo-esign-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  flex-wrap: nowrap;
   gap: var(--space-sm);
   align-items: center;
   justify-content: center;
@@ -201,6 +202,35 @@
 
 .wo-esign-actions .btn-action {
   font-size: 0.8125rem;
+}
+
+/* .btn-action alone wins over bare .btn-primary (no global .btn-primary); use brand fill here */
+.wo-esign-actions .btn-primary.btn-action.wo-esign-actions-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.wo-esign-actions .btn-primary.btn-action.wo-esign-actions-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.wo-esign-actions .btn-primary.btn-action.wo-esign-actions-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wo-esign-actions-primary {
+  width: min(100%, 20rem);
+  box-sizing: border-box;
+}
+
+.wo-esign-actions .wo-esign-actions-copy {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.65rem;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 520px) {

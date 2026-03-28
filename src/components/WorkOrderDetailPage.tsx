@@ -67,10 +67,12 @@ export function WorkOrderDetailPage({
   onOpenCODetail,
 }: WorkOrderDetailPageProps) {
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [pdfError, setPdfError] = useState('');
   const [esignError, setEsignError] = useState('');
   const [esignBusy, setEsignBusy] = useState(false);
+  const [esignSigningLinkCopied, setEsignSigningLinkCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([]);
   const [coLoading, setCoLoading] = useState(true);
@@ -257,6 +259,22 @@ export function WorkOrderDetailPage({
     };
   }, [job.esign_status, onJobUpdated, refreshJobRow]);
 
+  useEffect(() => {
+    return () => {
+      if (copySigningLinkTimeoutRef.current !== null) {
+        clearTimeout(copySigningLinkTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setEsignSigningLinkCopied(false);
+    if (copySigningLinkTimeoutRef.current !== null) {
+      clearTimeout(copySigningLinkTimeoutRef.current);
+      copySigningLinkTimeoutRef.current = null;
+    }
+  }, [job.id, job.esign_embed_src]);
+
   const buildEsignPayload = () => {
     const wo = String(welderJob.wo_number).padStart(4, '0');
     const agreementSections = generateAgreement(welderJob, profile);
@@ -310,6 +328,26 @@ export function WorkOrderDetailPage({
       setEsignError(e instanceof Error ? e.message : 'Resend failed.');
     } finally {
       setEsignBusy(false);
+    }
+  };
+
+  const handleCopySigningLink = async () => {
+    const url = job.esign_embed_src;
+    if (!url) return;
+    setEsignError('');
+    if (copySigningLinkTimeoutRef.current !== null) {
+      clearTimeout(copySigningLinkTimeoutRef.current);
+      copySigningLinkTimeoutRef.current = null;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setEsignSigningLinkCopied(true);
+      copySigningLinkTimeoutRef.current = setTimeout(() => {
+        copySigningLinkTimeoutRef.current = null;
+        setEsignSigningLinkCopied(false);
+      }, 1000);
+    } catch {
+      setEsignError('Could not copy signing link.');
     }
   };
 
@@ -420,7 +458,7 @@ export function WorkOrderDetailPage({
           {!job.esign_submitter_id ? (
             <button
               type="button"
-              className="btn-primary btn-action"
+              className="btn-primary btn-action wo-esign-actions-primary"
               disabled={esignBusy || !job.customer_email?.trim()}
               title={
                 !job.customer_email?.trim() ? 'Customer email is required to send for signature' : undefined
@@ -432,22 +470,24 @@ export function WorkOrderDetailPage({
           ) : job.esign_status !== 'completed' ? (
             <button
               type="button"
-              className="btn-primary btn-action"
+              className="btn-primary btn-action wo-esign-actions-primary"
               disabled={esignBusy}
               onClick={() => void handleEsignResend()}
             >
-              {esignBusy ? 'Sending…' : 'Resend signature email'}
+              {esignBusy ? 'Sending…' : 'Resend Work Order'}
             </button>
           ) : null}
           {job.esign_embed_src ? (
-            <a
-              className="btn-secondary btn-action"
-              href={job.esign_embed_src}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              className="btn-secondary btn-action wo-esign-actions-copy"
+              disabled={esignBusy}
+              onClick={() => void handleCopySigningLink()}
             >
-              Open signing link
-            </a>
+              <span aria-live="polite">
+                {esignSigningLinkCopied ? 'Copied to clipboard' : 'Copy signing link'}
+              </span>
+            </button>
           ) : null}
           {job.esign_signed_document_url ? (
             <a
