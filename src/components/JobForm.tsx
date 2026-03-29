@@ -23,6 +23,13 @@ import {
 import { normalizeOwnerFullName, splitFullNameForForm } from '../lib/owner-name';
 import './JobForm.css';
 
+function formatLocalDateForDateInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function patchJobSite(
   base: WelderJob,
   p: Partial<Pick<WelderJob, 'job_site_street' | 'job_site_city' | 'job_site_state' | 'job_site_zip'>>
@@ -220,6 +227,7 @@ export function JobForm({
   const listboxId = `${comboboxId}-client-listbox`;
   const siteComboboxId = useId();
   const siteListboxId = `${siteComboboxId}-job-site-listbox`;
+  const todayLocal = formatLocalDateForDateInput(new Date());
   const geoapifyApiKey = (import.meta.env.VITE_GEOAPIFY_API_KEY as string | undefined)?.trim() ?? '';
 
   const [clientMatches, setClientMatches] = useState<Client[]>([]);
@@ -841,7 +849,7 @@ export function JobForm({
           <input
             id="agreement_date"
             type="date"
-            min={new Date().toISOString().split('T')[0]}
+            min={todayLocal}
             value={job.agreement_date}
             onChange={(e) => updateField('agreement_date', e.target.value)}
           />
@@ -1093,7 +1101,7 @@ export function JobForm({
           <input
             id="target_start"
             type="date"
-            min={new Date().toISOString().split('T')[0]}
+            min={todayLocal}
             value={job.target_start}
             onChange={(e) => updateField('target_start', e.target.value)}
           />

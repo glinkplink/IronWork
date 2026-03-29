@@ -37,6 +37,7 @@ const baseJob: WelderJob = {
 afterEach(() => {
   cleanup();
   searchClients.mockReset();
+  vi.useRealTimers();
 });
 
 function buildClient(overrides: Partial<Client> & Pick<Client, 'id' | 'name'>): Client {
@@ -78,6 +79,21 @@ async function clickAgreementPreview(
 }
 
 describe('JobForm payment terms', () => {
+  it('uses the local calendar day for date input minimums', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-28T00:30:00.000Z'));
+
+    render(<JobForm job={baseJob} onChange={vi.fn()} />);
+
+    const today = new Date();
+    const expectedMin = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+      today.getDate()
+    ).padStart(2, '0')}`;
+
+    expect(screen.getByLabelText(/Agreement Date/i)).toHaveAttribute('min', expectedMin);
+    expect(screen.getByLabelText(/Target Start Date/i)).toHaveAttribute('min', expectedMin);
+  });
+
   it('sets payment_terms_days when selecting Net 30', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
