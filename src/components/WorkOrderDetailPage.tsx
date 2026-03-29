@@ -28,6 +28,7 @@ import {
   pollWorkOrderEsignStatus,
   resendWorkOrderSignature,
   sendWorkOrderForSignature,
+  fetchSignedDocumentBlobUrl,
 } from '../lib/esign-api';
 import { getJobById } from '../lib/db/jobs';
 import { jobLocationSingleLine } from '../lib/job-site-address';
@@ -84,6 +85,7 @@ export function WorkOrderDetailPage({
   const [pdfError, setPdfError] = useState('');
   const [esignError, setEsignError] = useState('');
   const [esignBusy, setEsignBusy] = useState(false);
+  const [signedDocBusy, setSignedDocBusy] = useState(false);
   const [esignSigningLinkCopied, setEsignSigningLinkCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [hydratedJob, setHydratedJob] = useState<Job | null>(initialJob);
@@ -424,6 +426,22 @@ export function WorkOrderDetailPage({
     }
   };
 
+  const handleViewSignedDoc = async () => {
+    if (!job?.esign_signed_document_url) return;
+    setEsignError('');
+    setSignedDocBusy(true);
+    let blobUrl: string | null = null;
+    try {
+      blobUrl = await fetchSignedDocumentBlobUrl(job.esign_signed_document_url);
+      window.open(blobUrl, '_blank', 'noopener');
+    } catch (e) {
+      setEsignError(e instanceof Error ? e.message : 'Could not load signed document.');
+    } finally {
+      setSignedDocBusy(false);
+      if (blobUrl) setTimeout(() => URL.revokeObjectURL(blobUrl!), 60_000);
+    }
+  };
+
   const downloadCombinedPdf = async () => {
     if (!job || !welderJob || !sections) return;
     setPdfError('');
@@ -591,20 +609,15 @@ export function WorkOrderDetailPage({
               </span>
             </button>
           ) : null}
-          {job.esign_signed_document_url &&
-          job.esign_signed_document_url.trim().startsWith('https://') ? (
-            <a
+          {job.esign_signed_document_url ? (
+            <button
+              type="button"
               className="btn-secondary btn-action"
-              href={job.esign_signed_document_url.trim()}
-              target="_blank"
-              rel="noreferrer noopener"
+              disabled={signedDocBusy}
+              onClick={() => void handleViewSignedDoc()}
             >
-              View signed PDF
-            </a>
-          ) : job.esign_signed_document_url ? (
-            <span className="btn-secondary btn-action wo-esign-signed-link-fallback" title={job.esign_signed_document_url}>
-              Signed PDF link unavailable
-            </span>
+              {signedDocBusy ? 'Loading…' : 'View signed PDF'}
+            </button>
           ) : null}
         </div>
       </section>

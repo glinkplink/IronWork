@@ -24,6 +24,7 @@ import {
   resendChangeOrderSignature,
   mergeEsignResponseIntoChangeOrder,
   pollChangeOrderEsignStatus,
+  fetchSignedDocumentBlobUrl,
 } from '../lib/esign-api';
 import './ChangeOrderDetailPage.css';
 
@@ -84,6 +85,7 @@ export function ChangeOrderDetailPage({
   };
 
   const [coEsignBusy, setCoEsignBusy] = useState(false);
+  const [signedDocBusy, setSignedDocBusy] = useState(false);
   const [coSigningLinkCopied, setCoSigningLinkCopied] = useState(false);
   const [coEsignResendNotice, setCoEsignResendNotice] = useState(false);
   const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -204,6 +206,22 @@ export function ChangeOrderDetailPage({
         setCoSigningLinkCopied(false);
       }, 2000);
     });
+  };
+
+  const handleViewSignedDoc = async () => {
+    if (!co.esign_signed_document_url) return;
+    setPdfError('');
+    setSignedDocBusy(true);
+    let blobUrl: string | null = null;
+    try {
+      blobUrl = await fetchSignedDocumentBlobUrl(co.esign_signed_document_url);
+      window.open(blobUrl, '_blank', 'noopener');
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : 'Could not load signed document.');
+    } finally {
+      setSignedDocBusy(false);
+      if (blobUrl) setTimeout(() => URL.revokeObjectURL(blobUrl!), 60_000);
+    }
   };
 
   const handleDelete = async () => {
@@ -335,20 +353,15 @@ export function ChangeOrderDetailPage({
               </span>
             </button>
           ) : null}
-          {co.esign_signed_document_url &&
-          co.esign_signed_document_url.trim().startsWith('https://') ? (
-            <a
+          {co.esign_signed_document_url ? (
+            <button
+              type="button"
               className="btn-secondary btn-action"
-              href={co.esign_signed_document_url.trim()}
-              target="_blank"
-              rel="noreferrer noopener"
+              disabled={signedDocBusy}
+              onClick={() => void handleViewSignedDoc()}
             >
-              View signed PDF
-            </a>
-          ) : co.esign_signed_document_url ? (
-            <span className="btn-secondary btn-action wo-esign-signed-link-fallback" title={co.esign_signed_document_url}>
-              Signed PDF link unavailable
-            </span>
+              {signedDocBusy ? 'Loading…' : 'View signed PDF'}
+            </button>
           ) : null}
         </div>
       </section>

@@ -371,6 +371,9 @@ function matchEsignPath(method, pathname) {
   if (method === 'POST' && pathname === '/api/webhooks/docuseal') {
     return { kind: 'webhook' };
   }
+  if (method === 'GET' && pathname === '/api/esign/documents/download') {
+    return { kind: 'doc-download' };
+  }
   const woMatch = pathname.match(/^\/api\/esign\/work-orders\/([0-9a-fA-F-]{36})\/(send|resend)$/);
   if (method === 'POST' && woMatch) {
     return { kind: 'esign', jobId: woMatch[1], action: woMatch[2] };
@@ -388,6 +391,73 @@ function matchEsignPath(method, pathname) {
     return { kind: 'co-esign', coId: coMatch[1], action: coMatch[2] };
   }
   return null;
+}
+
+async function handleDocumentDownload(req, res, sendJson) {
+  const token = getBearerToken(req);
+  if (!token) {
+    sendJson(res, 401, { error: 'Missing or invalid Authorization bearer token.' });
+    return;
+  }
+
+  const supabase = getServiceSupabase();
+  const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+  if (userErr || !userData?.user?.id) {
+    sendJson(res, 401, { error: 'Invalid or expired session.' });
+    return;
+  }
+
+  const url = new URL(req.url, 'http://127.0.0.1');
+  const docUrl = url.searchParams.get('url');
+  if (!docUrl || typeof docUrl !== 'string') {
+    sendJson(res, 400, { error: 'Missing url parameter.' });
+    return;
+  }
+
+  // Validate the URL belongs to the configured DocuSeal host to prevent SSRF
+  let parsedDocUrl;
+  try {
+    parsedDocUrl = new URL(docUrl);
+  } catch {
+    sendJson(res, 400, { error: 'Invalid url parameter.' });
+    return;
+  }
+  const docusealHost = new URL(docusealBase()).hostname;
+  if (parsedDocUrl.hostname !== docusealHost) {
+    sendJson(res, 403, { error: 'URL not permitted.' });
+    return;
+  }
+
+  const apiKey = env('DOCUSEAL_API_KEY');
+  if (!apiKey) {
+    sendJson(res, 503, { error: 'E-sign is temporarily unavailable.' });
+    return;
+  }
+
+  const upstream = await fetch(docUrl, { headers: { 'X-Auth-Token': apiKey } });
+  if (!upstream.ok) {
+    sendJson(res, upstream.status, { error: `DocuSeal returned ${upstream.status}.` });
+    return;
+  }
+
+  const contentType = upstream.headers.get('content-type') || 'application/pdf';
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Content-Disposition': 'inline; filename="signed-document.pdf"',
+    'Cache-Control': 'private, no-store',
+  });
+  // Stream the body directly
+  const reader = upstream.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  res.end();
 }
 
 async function handleSend(req, res, readJsonBody, sendJson, sendText, jobId) {
@@ -1496,6 +1566,10 @@ export async function tryHandleEsignRoute(req, res, helpers) {
   if (!route) return false;
 
   try {
+    if (route.kind === 'doc-download') {
+      await handleDocumentDownload(req, res, sendJson);
+      return true;
+    }
     if (route.kind === 'webhook') {
       await handleWebhook(req, res, readJsonBody, sendJson, sendText);
       return true;

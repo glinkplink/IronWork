@@ -58,6 +58,29 @@ export async function sendWorkOrderForSignature(
   return json as EsignApiResponse;
 }
 
+/**
+ * Fetch a signed document via the server proxy (attaches DocuSeal auth server-side).
+ * Returns a blob URL that the caller should revoke after use.
+ */
+export async function fetchSignedDocumentBlobUrl(signedDocumentUrl: string): Promise<string> {
+  const res = await fetchWithSupabaseAuth(
+    `/api/esign/documents/download?url=${encodeURIComponent(signedDocumentUrl)}`
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let msg = text;
+    try {
+      const j = JSON.parse(text) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg || `Failed to load signed document (${res.status}).`);
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 /** Apply send/resend API payload onto an in-memory `Job` row. */
 export function mergeEsignResponseIntoJob(job: Job, r: EsignApiResponse): Job {
   return {

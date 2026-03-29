@@ -165,6 +165,6 @@ describe('ChangeOrderDetailPage', () => {
     );
 
     expect(screen.queryByRole('button', { name: /copy signing link/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /view signed pdf/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /view signed pdf/i })).toBeInTheDocument();
   });
 });
