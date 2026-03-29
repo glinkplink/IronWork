@@ -441,7 +441,7 @@ describe('WorkOrdersPage', () => {
 
     await user.click(screen.getByRole('button', { name: /open work order for 2 more change orders/i }));
 
-    expect(onOpenWorkOrderDetail).toHaveBeenCalledWith('job-a');
+    expect(onOpenWorkOrderDetail).toHaveBeenCalledWith('job-a', 'change-orders');
   });
 
   it('opens hydrated change-order detail from preview shortcuts', async () => {

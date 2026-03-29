@@ -53,6 +53,7 @@ interface WorkOrderDetailPageProps {
   job?: Job | null;
   profile: BusinessProfile | null;
   changeOrderListVersion?: number;
+  initialScrollTarget?: 'top' | 'change-orders';
   onJobLoaded?: (job: Job) => void;
   onJobUpdated?: (job: Job) => void;
   onBack: () => void;
@@ -67,6 +68,7 @@ export function WorkOrderDetailPage({
   job: initialJob = null,
   profile,
   changeOrderListVersion = 0,
+  initialScrollTarget = 'top',
   onJobLoaded,
   onJobUpdated,
   onBack,
@@ -75,7 +77,9 @@ export function WorkOrderDetailPage({
   onOpenCODetail,
 }: WorkOrderDetailPageProps) {
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const changeOrdersSectionRef = useRef<HTMLElement | null>(null);
   const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialScrollHandledRef = useRef(false);
 
   const [pdfError, setPdfError] = useState('');
   const [esignError, setEsignError] = useState('');
@@ -103,6 +107,10 @@ export function WorkOrderDetailPage({
     setJobLoading(false);
     setJobLoadError('');
   }, [initialJob, jobId]);
+
+  useEffect(() => {
+    initialScrollHandledRef.current = false;
+  }, [jobId, initialScrollTarget]);
 
   useEffect(() => {
     if (initialJob && initialJob.id === jobId) return;
@@ -149,6 +157,7 @@ export function WorkOrderDetailPage({
     () => getEsignProgressModel(job?.esign_status ?? 'not_sent'),
     [job?.esign_status]
   );
+  const showCopySigningLink = Boolean(job?.esign_embed_src && job.esign_status !== 'completed');
 
   const loadCOs = useCallback(async () => {
     if (!job) {
@@ -172,6 +181,16 @@ export function WorkOrderDetailPage({
   useEffect(() => {
     void loadCOs();
   }, [loadCOs, changeOrderListVersion]);
+
+  useEffect(() => {
+    if (initialScrollTarget !== 'change-orders') return;
+    if (initialScrollHandledRef.current) return;
+    if (coLoading) return;
+    const section = changeOrdersSectionRef.current;
+    if (!section) return;
+    section.scrollIntoView({ block: 'start' });
+    initialScrollHandledRef.current = true;
+  }, [initialScrollTarget, coLoading]);
 
   useEffect(() => {
     if (!job) return;
@@ -560,7 +579,7 @@ export function WorkOrderDetailPage({
               {esignBusy ? 'Sending…' : 'Resend Work Order'}
             </button>
           ) : null}
-          {job.esign_embed_src ? (
+          {showCopySigningLink ? (
             <button
               type="button"
               className="btn-secondary btn-action wo-esign-actions-copy"
@@ -596,96 +615,98 @@ export function WorkOrderDetailPage({
         </div>
       </div>
 
-      <h2 className="co-list-heading"><span>Change Orders</span></h2>
-      {coNewCoBlockError ? (
-        <p className="work-orders-empty" role="alert">
-          {coNewCoBlockError}
-        </p>
-      ) : null}
-      {!coNewCoBlockLoading && !coNewCoBlockError && coNewCoBlockedByInvoice ? (
-        <p className="work-orders-empty wo-co-finalized-block">
-          Work order invoice has been finalized. New change orders cannot be added.
-        </p>
-      ) : null}
-      {coInvoiceStatusError ? (
-        <p className="work-orders-empty" role="alert">
-          {coInvoiceStatusError}
-        </p>
-      ) : null}
-      {coError ? (
-        <p className="work-orders-empty" role="alert">
-          {coError}
-        </p>
-      ) : coLoading ? (
-        <p className="work-orders-loading">Loading change orders…</p>
-      ) : changeOrders.length === 0 ? (
-        <p className="work-orders-empty">No change orders yet.</p>
-      ) : (
-        <ul className="work-orders-list" style={{ listStyle: 'none', margin: '0 0 var(--space-lg)', padding: 0 }}>
-          {changeOrders.map((co) => {
-            const inv = coInvoiceById?.get(co.id) ?? null;
-            return (
-              <li key={co.id} className="co-list-item">
-                <div className="work-orders-row-main">
-                  <button
-                    type="button"
-                    className="work-orders-row-detail-hit"
-                    onClick={() => onOpenCODetail(co)}
-                  >
-                    <span className="co-list-desc">{co.description || '—'}</span>
-                    <span className="co-list-amount">${computeCOTotal(co.line_items).toFixed(2)}</span>
-                    <span className="co-list-number">CO #{String(co.co_number).padStart(4, '0')}</span>
-                  </button>
-                </div>
-                <div className="work-orders-row-actions">
-                  {coInvoiceStatusLoading ? (
+      <section ref={changeOrdersSectionRef} aria-labelledby="change-orders-heading">
+        <h2 id="change-orders-heading" className="co-list-heading"><span>Change Orders</span></h2>
+        {coNewCoBlockError ? (
+          <p className="work-orders-empty" role="alert">
+            {coNewCoBlockError}
+          </p>
+        ) : null}
+        {!coNewCoBlockLoading && !coNewCoBlockError && coNewCoBlockedByInvoice ? (
+          <p className="work-orders-empty wo-co-finalized-block">
+            Work order invoice has been finalized. New change orders cannot be added.
+          </p>
+        ) : null}
+        {coInvoiceStatusError ? (
+          <p className="work-orders-empty" role="alert">
+            {coInvoiceStatusError}
+          </p>
+        ) : null}
+        {coError ? (
+          <p className="work-orders-empty" role="alert">
+            {coError}
+          </p>
+        ) : coLoading ? (
+          <p className="work-orders-loading">Loading change orders…</p>
+        ) : changeOrders.length === 0 ? (
+          <p className="work-orders-empty">No change orders yet.</p>
+        ) : (
+          <ul className="work-orders-list" style={{ listStyle: 'none', margin: '0 0 var(--space-lg)', padding: 0 }}>
+            {changeOrders.map((co) => {
+              const inv = coInvoiceById?.get(co.id) ?? null;
+              return (
+                <li key={co.id} className="co-list-item">
+                  <div className="work-orders-row-main">
                     <button
                       type="button"
-                      className="wo-row-create-invoice-outline work-orders-invoice-status-loading"
-                      disabled
-                      aria-busy="true"
+                      className="work-orders-row-detail-hit"
+                      onClick={() => onOpenCODetail(co)}
                     >
-                      Loading…
+                      <span className="co-list-desc">{co.description || '—'}</span>
+                      <span className="co-list-amount">${computeCOTotal(co.line_items).toFixed(2)}</span>
+                      <span className="co-list-number">CO #{String(co.co_number).padStart(4, '0')}</span>
                     </button>
-                  ) : coInvoiceStatusError ? (
-                    <button
-                      type="button"
-                      className="wo-row-create-invoice-outline work-orders-invoice-status-unavailable"
-                      disabled
-                    >
-                      Unavailable
-                    </button>
-                  ) : !inv ? (
-                    <button
-                      type="button"
-                      className="wo-row-create-invoice-outline"
-                      onClick={() => onStartChangeOrderInvoice(co, null)}
-                    >
-                      Invoice
-                    </button>
-                  ) : inv.status === 'draft' ? (
-                    <button
-                      type="button"
-                      className="badge-pending"
-                      onClick={() => onStartChangeOrderInvoice(co, inv.id)}
-                    >
-                      Pending
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="badge-invoiced"
-                      onClick={() => onStartChangeOrderInvoice(co, inv.id)}
-                    >
-                      Invoiced
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  </div>
+                  <div className="work-orders-row-actions">
+                    {coInvoiceStatusLoading ? (
+                      <button
+                        type="button"
+                        className="wo-row-create-invoice-outline work-orders-invoice-status-loading"
+                        disabled
+                        aria-busy="true"
+                      >
+                        Loading…
+                      </button>
+                    ) : coInvoiceStatusError ? (
+                      <button
+                        type="button"
+                        className="wo-row-create-invoice-outline work-orders-invoice-status-unavailable"
+                        disabled
+                      >
+                        Unavailable
+                      </button>
+                    ) : !inv ? (
+                      <button
+                        type="button"
+                        className="wo-row-create-invoice-outline"
+                        onClick={() => onStartChangeOrderInvoice(co, null)}
+                      >
+                        Invoice
+                      </button>
+                    ) : inv.status === 'draft' ? (
+                      <button
+                        type="button"
+                        className="badge-pending"
+                        onClick={() => onStartChangeOrderInvoice(co, inv.id)}
+                      >
+                        Pending
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="badge-invoiced"
+                        onClick={() => onStartChangeOrderInvoice(co, inv.id)}
+                      >
+                        Invoiced
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <div className="work-order-detail-footer">
         <button

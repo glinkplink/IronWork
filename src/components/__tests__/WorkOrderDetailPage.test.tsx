@@ -404,6 +404,56 @@ describe('WorkOrderDetailPage', () => {
     expect(sentMeta.textContent).not.toMatch(/:\d{2}:\d{2}/);
   });
 
+  it('scrolls to the change-order section when opened from the overflow link', async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        jobId="job-1"
+        job={minimalJob()}
+        profile={minimalProfile()}
+        initialScrollTarget="change-orders"
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+
+    await screen.findByText('CO #0001');
+
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalled();
+    });
+  });
+
+  it('hides copy signing link once the work order is signed', () => {
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        jobId="job-1"
+        job={{
+          ...jobWithEsign('completed'),
+          esign_submitter_id: 'submitter-1',
+          esign_embed_src: 'https://example.com/sign',
+        }}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /copy signing link/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /view signed pdf/i })).toBeInTheDocument();
+  });
+
   it('disables Create Change Order when a downloaded job-level invoice blocks', async () => {
     mockFns.setCoBlockResult({ blocks: true, error: null });
     render(

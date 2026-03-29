@@ -88,6 +88,7 @@ function App() {
 
   const [workOrderDetailJobId, setWorkOrderDetailJobId] = useState<string | null>(null);
   const [workOrderDetailJob, setWorkOrderDetailJob] = useState<import('./types/db').Job | null>(null);
+  const [workOrderDetailStartSection, setWorkOrderDetailStartSection] = useState<'top' | 'change-orders'>('top');
   const [changeOrderListVersion, setChangeOrderListVersion] = useState(0);
   const [profileEntrySource, setProfileEntrySource] = useState<'work-orders' | null>(null);
   const [ownerFirstName, setOwnerFirstName] = useState('');
@@ -178,9 +179,10 @@ function App() {
     navigateTo('work-orders');
   };
 
-  const handleOpenWorkOrderDetail = (jobId: string) => {
+  const handleOpenWorkOrderDetail = (jobId: string, targetSection: 'top' | 'change-orders' = 'top') => {
     setWorkOrderDetailJobId(jobId);
     setWorkOrderDetailJob(null);
+    setWorkOrderDetailStartSection(targetSection);
     navigateTo('work-order-detail');
   };
 
@@ -196,6 +198,7 @@ function App() {
   const handleBackFromWorkOrderDetail = () => {
     setWorkOrderDetailJobId(null);
     setWorkOrderDetailJob(null);
+    setWorkOrderDetailStartSection('top');
     changeOrderFlow.resetFlowForBackToList();
     navigateTo('work-orders');
   };
@@ -317,6 +320,7 @@ function App() {
           job={workOrderDetailJob}
           profile={profile}
           changeOrderListVersion={changeOrderListVersion}
+          initialScrollTarget={workOrderDetailStartSection}
           onJobLoaded={(job: Job) => {
             setWorkOrderDetailJobId(job.id);
             setWorkOrderDetailJob(job);

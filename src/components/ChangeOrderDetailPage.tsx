@@ -93,6 +93,7 @@ export function ChangeOrderDetailPage({
     () => getEsignProgressModel(co.esign_status, 'change_order'),
     [co.esign_status]
   );
+  const showCopySigningLink = Boolean(co.esign_embed_src && co.esign_status !== 'completed');
 
   const refreshCoRow = useCallback(async () => {
     try {
@@ -322,7 +323,7 @@ export function ChangeOrderDetailPage({
               {coEsignBusy ? 'Sending…' : 'Resend Change Order'}
             </button>
           ) : null}
-          {co.esign_embed_src ? (
+          {showCopySigningLink ? (
             <button
               type="button"
               className="btn-secondary btn-action wo-esign-actions-copy"

@@ -279,7 +279,7 @@ interface WorkOrdersPageProps {
   onCompleteProfileClick: () => void;
   onStartInvoice: (job: Job) => void;
   onOpenPendingInvoice: (job: Job, invoice: Invoice) => void;
-  onOpenWorkOrderDetail: (jobId: string) => void;
+  onOpenWorkOrderDetail: (jobId: string, targetSection?: 'top' | 'change-orders') => void;
   onOpenChangeOrderDetail: (job: Job, changeOrder: ChangeOrder) => void;
 }
 
@@ -416,9 +416,9 @@ export function WorkOrdersPage({
 
   const handleOpenMoreChangeOrders = useCallback(
     (job: WorkOrderDashboardJob) => {
-      handleOpenDetail(job);
+      onOpenWorkOrderDetail(job.id, 'change-orders');
     },
-    [handleOpenDetail]
+    [onOpenWorkOrderDetail]
   );
 
   const handleLoadMore = useCallback(() => {
