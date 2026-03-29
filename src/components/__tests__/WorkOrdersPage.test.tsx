@@ -437,7 +437,7 @@ describe('WorkOrdersPage', () => {
 
     await screen.findByText('Customer A');
     expect(screen.getAllByRole('button', { name: /Open CO #/i })).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /open work order for 2 more change orders/i })).toHaveTextContent('+2 more');
+    expect(screen.getByRole('button', { name: /open work order for 2 more change orders/i })).toHaveTextContent('View 2 more change orders');
 
     await user.click(screen.getByRole('button', { name: /open work order for 2 more change orders/i }));
 
@@ -536,11 +536,10 @@ describe('WorkOrdersPage', () => {
     expect(getInvoice).toHaveBeenCalledWith('inv-a');
   });
 
-  it('shows date on first meta line and capitalized job type on second', async () => {
+  it('shows the date on the row header', async () => {
     renderPage();
     await screen.findByText('Customer A');
     expect(screen.getByText('Jan 1, 2025')).toBeInTheDocument();
-    expect(screen.getByText('Repair')).toBeInTheDocument();
   });
 
   it('clears the success banner after 10 seconds and not before', async () => {

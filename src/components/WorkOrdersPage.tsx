@@ -21,7 +21,6 @@ import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
 import { shouldPollEsignStatus } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
 import { formatEsignStatusLabel } from '../lib/esign-labels';
-import { formatWorkOrderListJobType } from '../lib/work-order-list-label';
 import './WorkOrdersPage.css';
 
 const HIDE_COMPLETE_PROFILE_CTA_PREFIX = 'scope-lock-hide-complete-profile-cta:';
@@ -167,6 +166,11 @@ const WorkOrderRow = memo(function WorkOrderRow({
     job.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : 'WO (no #)';
   const invoice = job.latestInvoice;
   const hiddenChangeOrderCount = Math.max(job.changeOrderCount - job.changeOrderPreview.length, 0);
+  const jobMetaLabel = formatRowDate(job);
+  const moreChangeOrdersLabel =
+    hiddenChangeOrderCount === 1
+      ? 'View 1 more change order'
+      : `View ${hiddenChangeOrderCount} more change orders`;
 
   return (
     <li className="work-orders-row">
@@ -177,14 +181,15 @@ const WorkOrderRow = memo(function WorkOrderRow({
           disabled={rowBusy}
           onClick={() => onOpenDetail(job)}
         >
-          <span className="work-orders-wo">{woLabel}</span>
+          <span className="work-orders-row-heading">
+            <span className="work-orders-wo">{woLabel}</span>
+            <span className="work-orders-meta-inline">{jobMetaLabel}</span>
+          </span>
           {renderEsignStrip(job.esign_status)}
           <span className="work-orders-customer">{job.customer_name}</span>
         </button>
-        <span className="work-orders-meta">
-          <span className="work-orders-meta-date">{formatRowDate(job)}</span>
-          <span className="work-orders-meta-type">{formatWorkOrderListJobType(job)}</span>
-          {job.changeOrderPreview.length > 0 || hiddenChangeOrderCount > 0 ? (
+        {job.changeOrderPreview.length > 0 || hiddenChangeOrderCount > 0 ? (
+          <span className="work-orders-meta">
             <span className="work-orders-co-shortcuts" role="list" aria-label={`${woLabel} change orders`}>
               {job.changeOrderPreview.map((changeOrder) => {
                 const coLabel = `CO #${String(changeOrder.co_number).padStart(4, '0')}`;
@@ -214,22 +219,22 @@ const WorkOrderRow = memo(function WorkOrderRow({
                   </span>
                 );
               })}
-              {hiddenChangeOrderCount > 0 ? (
-                <span className="work-orders-co-shortcut-wrap" role="listitem">
-                  <button
-                    type="button"
-                    className="work-orders-co-more-button"
-                    disabled={rowBusy}
-                    onClick={() => onOpenMoreChangeOrders(job)}
-                    aria-label={`Open work order for ${hiddenChangeOrderCount} more change orders`}
-                  >
-                    {`+${hiddenChangeOrderCount} more`}
-                  </button>
-                </span>
-              ) : null}
             </span>
-          ) : null}
-        </span>
+            {hiddenChangeOrderCount > 0 ? (
+              <span className="work-orders-co-more-wrap">
+                <button
+                  type="button"
+                  className="work-orders-co-more-button"
+                  disabled={rowBusy}
+                  onClick={() => onOpenMoreChangeOrders(job)}
+                  aria-label={`Open work order for ${hiddenChangeOrderCount} more change orders`}
+                >
+                  {moreChangeOrdersLabel}
+                </button>
+              </span>
+            ) : null}
+          </span>
+        ) : null}
       </div>
       <div className="work-orders-row-actions">
         {!invoice ? (
