@@ -350,6 +350,7 @@ export function WorkOrdersPage({
                         onClick={() => handleOpenDetail(job)}
                       >
                         <span className="work-orders-wo">{woLabel}</span>
+                        {renderEsignStrip(job.esign_status)}
                         <span className="work-orders-customer">{job.customer_name}</span>
                       </button>
                       <span className="work-orders-meta">
@@ -357,10 +358,9 @@ export function WorkOrdersPage({
                         <span className="work-orders-meta-type">
                           {formatWorkOrderListJobType(job)}
                         </span>
-                        {renderEsignStrip(job.esign_status)}
                         {changeOrders.length > 0 ? (
                           <span className="work-orders-co-shortcuts" role="list" aria-label={`${woLabel} change orders`}>
-                            {changeOrders.map((changeOrder, index) => {
+                            {changeOrders.map((changeOrder) => {
                               const coLabel = `CO #${String(changeOrder.co_number).padStart(4, '0')}`;
                               const statusLabel = formatEsignStatusLabel(changeOrder.esign_status);
                               return (
@@ -369,11 +369,6 @@ export function WorkOrdersPage({
                                   className="work-orders-co-shortcut-wrap"
                                   role="listitem"
                                 >
-                                  {index > 0 ? (
-                                    <span className="work-orders-co-shortcut-divider" aria-hidden="true">
-                                      |
-                                    </span>
-                                  ) : null}
                                   <button
                                     type="button"
                                     className="work-orders-co-shortcut"
