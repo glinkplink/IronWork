@@ -232,6 +232,19 @@ export function buildChangeOrderEsignSendPayload(
 ): EsignSendDocumentsPayload {
   const coLabelNum = String(co.co_number).padStart(4, '0');
   const { html, html_header, html_footer } = buildDocusealChangeOrderEsignParts(co, job, profile);
+  const contractorName = profile?.business_name ?? 'Your Contractor';
+  const signerName = profile?.owner_name ?? contractorName;
+  const customerFirst = job.customer_name.split(' ')[0] || job.customer_name;
+  const woRef = job.wo_number != null
+    ? `Work Order #${String(job.wo_number).padStart(4, '0')}`
+    : 'your project';
+  const woParenthetical = job.wo_number != null
+    ? ` (WO #${String(job.wo_number).padStart(4, '0')})`
+    : '';
+  const location = jobLocationSingleLine(job.job_location);
+  const descriptionSnippet = co.description.trim().length > 0
+    ? `\nChange: ${co.description.trim().split('\n')[0]}`
+    : '';
   return {
     name: `Change Order #${coLabelNum}`,
     send_email: true,
@@ -244,8 +257,8 @@ export function buildChangeOrderEsignSendPayload(
       },
     ],
     message: {
-      subject: `Please sign: Change Order #${coLabelNum}`,
-      body: 'Please review and sign the change order.\n\n{{submitter.link}}',
+      subject: `${contractorName} sent you a Change Order to sign — CO #${coLabelNum}${woParenthetical}`,
+      body: `Hi ${customerFirst},\n\n${contractorName} has issued a Change Order against ${woRef}${location ? ` at ${location}` : ''} that requires your review and signature.\n\nReference: Change Order #${coLabelNum}${descriptionSnippet}\n\nPlease review and sign using the link below:\n\n{{submitter.link}}\n\nThank you,\n${signerName}\n${contractorName}`,
     },
   };
 }

@@ -30,6 +30,7 @@ import {
   sendWorkOrderForSignature,
 } from '../lib/esign-api';
 import { getJobById } from '../lib/db/jobs';
+import { jobLocationSingleLine } from '../lib/job-site-address';
 import { formatEsignTimestamp, shouldPollEsignStatus } from '../lib/esign-live';
 import { useEsignPoller } from '../hooks/useEsignPoller';
 import { getEsignProgressModel } from '../lib/esign-progress';
@@ -249,6 +250,15 @@ export function WorkOrderDetailPage({
     });
     const header = buildDocusealHtmlHeader(getWorkOrderHeaderLabel(welderJob));
     const footer = buildDocusealHtmlFooter(buildDocusealEsignFooterLine(profile, welderJob));
+    const contractorName = profile?.business_name ?? 'Your Contractor';
+    const signerName = profile?.owner_name ?? contractorName;
+    const customerFirst = welderJob.customer_name.split(' ')[0] || welderJob.customer_name;
+    const rawType = (welderJob.job_type || '').trim().toLowerCase();
+    const jobTypeLabel = rawType === 'other'
+      ? ((welderJob.other_classification ?? '').trim() || 'work')
+      : (rawType || 'work');
+    const jobTypeCap = jobTypeLabel.charAt(0).toUpperCase() + jobTypeLabel.slice(1);
+    const location = jobLocationSingleLine(welderJob.job_location);
     return {
       name: `Work Order #${wo}`,
       send_email: true,
@@ -261,8 +271,8 @@ export function WorkOrderDetailPage({
         },
       ],
       message: {
-        subject: `Please sign: Work Order #${wo}`,
-        body: `Please review and sign the work order.\n\n{{submitter.link}}`,
+        subject: `${contractorName} sent you a Work Order to sign — WO #${wo}`,
+        body: `Hi ${customerFirst},\n\n${contractorName} has prepared a Work Order for your ${jobTypeCap} project${location ? ` at ${location}` : ''} and is requesting your signature.\n\nReference: Work Order #${wo}\n\nPlease review and sign using the link below:\n\n{{submitter.link}}\n\nThank you,\n${signerName}\n${contractorName}`,
       },
     };
   };
