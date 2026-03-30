@@ -43,6 +43,7 @@ import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { computeCOTotal, listChangeOrders } from '../lib/db/change-orders';
 import {
   changeOrderInvoiceStatusMapFromRows,
+  getInvoiceBusinessStatus,
   getBlocksNewChangeOrdersForJob,
   listInvoiceStatusByChangeOrder,
 } from '../lib/db/invoices';
@@ -697,13 +698,13 @@ export function WorkOrderDetailPage({
                       >
                         Invoice
                       </button>
-                    ) : inv.status === 'draft' ? (
+                    ) : getInvoiceBusinessStatus(inv) === 'draft' ? (
                       <button
                         type="button"
                         className="badge-pending"
                         onClick={() => onStartChangeOrderInvoice(co, inv.id)}
                       >
-                        Pending
+                        Draft
                       </button>
                     ) : (
                       <button

@@ -146,7 +146,7 @@ export function InvoiceWizard({
     return 'labor';
   });
 
-  const [fixedTotal, setFixedTotal] = useState(initial.fixedTotal);
+  const [fixedTotal] = useState(initial.fixedTotal);
   const [laborRows, setLaborRows] = useState<LaborRow[]>(initial.laborRows);
   const [materialsYes, setMaterialsYes] = useState<boolean | null>(initial.materialsYes);
   const [materialRows, setMaterialRows] = useState<MaterialRow[]>(initial.materialRows);

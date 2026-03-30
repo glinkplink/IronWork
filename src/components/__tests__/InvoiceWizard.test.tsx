@@ -163,11 +163,11 @@ describe('InvoiceWizard', () => {
       expect(screen.getByText(/CO #0002 only/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/Change orders on this job/i)).toBeNull();
-    expect(screen.getByLabelText('CO #0002')).toHaveValue(100);
+    expect(screen.getByText('CO #0002').parentElement).toHaveTextContent('$100.00');
 
     const summary = screen.getByRole('region', { name: /amount preview/i });
     expect(within(summary).getByText((_, node) => node?.textContent === 'Original Total$0.00')).toBeInTheDocument();
-    expect(within(summary).getByText((_, node) => node?.textContent === 'CO Total$100.00')).toBeInTheDocument();
+    expect(within(summary).getByText((_, node) => node?.textContent === 'Change Order Total$100.00')).toBeInTheDocument();
     expect(within(summary).getByText((_, node) => node?.textContent === 'Total$100.00')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /confirm/i }));
@@ -195,16 +195,16 @@ describe('InvoiceWizard', () => {
     renderWizard();
 
     await waitFor(() => {
-      expect(screen.getByLabelText('CO #0001')).toBeInTheDocument();
+      expect(screen.getByText('CO #0001')).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText('Original scope total')).toHaveValue(100);
-    expect(screen.getByLabelText('CO #0001')).toHaveValue(100);
-    expect(screen.getByLabelText('CO #0002')).toHaveValue(100);
+    expect(screen.getByText('Original scope total').parentElement).toHaveTextContent('$100.00');
+    expect(screen.getByText('CO #0001').parentElement).toHaveTextContent('$100.00');
+    expect(screen.getByText('CO #0002').parentElement).toHaveTextContent('$100.00');
 
     const summary = screen.getByRole('region', { name: /amount preview/i });
     expect(within(summary).getByText((_, node) => node?.textContent === 'Original Total$100.00')).toBeInTheDocument();
-    expect(within(summary).getByText((_, node) => node?.textContent === 'CO Total$200.00')).toBeInTheDocument();
+    expect(within(summary).getByText((_, node) => node?.textContent === 'Change Order Total$200.00')).toBeInTheDocument();
     expect(within(summary).getByText((_, node) => node?.textContent === 'Total$300.00')).toBeInTheDocument();
   });
 });

@@ -19,6 +19,10 @@ export type InvoiceDraft = Pick<
   | 'notes'
 >;
 
+interface GenerateInvoiceHtmlOptions {
+  extraSectionsHtml?: string;
+}
+
 function formatDate(iso: string): string {
   if (!iso) return '';
   const [year, month, day] = iso.split('-').map(Number);
@@ -119,7 +123,8 @@ function lineItemsRows(items: InvoiceLineItem[]): string {
 export function generateInvoiceHtml(
   invoice: Invoice | InvoiceDraft,
   job: Job,
-  profile: BusinessProfile | null
+  profile: BusinessProfile | null,
+  options: GenerateInvoiceHtmlOptions = {}
 ): string {
   const invoiceDateStr = formatDate(invoice.invoice_date);
   const dueDateStr = formatDate(invoice.due_date);
@@ -217,6 +222,7 @@ export function generateInvoiceHtml(
       <h3 class="section-title">Payment methods</h3>
       ${paymentList}
       ${notesBlock}
+      ${options.extraSectionsHtml ?? ''}
     </div>
   `;
 }

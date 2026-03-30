@@ -454,7 +454,7 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByRole('button', { name: /download signed pdf/i })).toBeInTheDocument();
   });
 
-  it('disables Create Change Order when a downloaded job-level invoice blocks', async () => {
+  it('disables Create Change Order when an issued job-level invoice blocks', async () => {
     mockFns.setCoBlockResult({ blocks: true, error: null });
     render(
       <WorkOrderDetailPage

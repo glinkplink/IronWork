@@ -94,13 +94,13 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
 function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderInvoiceStatus | null {
   const id = row.id;
   const job_id = row.job_id;
-  const status = row.status;
+  const issued_at =
+    typeof row.issued_at === 'string' && row.issued_at.trim() ? row.issued_at : null;
   const created_at = row.created_at;
   const invoice_number = row.invoice_number;
   if (typeof id !== 'string' || typeof job_id !== 'string' || typeof created_at !== 'string') {
     return null;
   }
-  if (status !== 'draft' && status !== 'downloaded') return null;
   const parsedInvoiceNumber =
     typeof invoice_number === 'number' ? invoice_number : Number(invoice_number);
   if (!Number.isFinite(parsedInvoiceNumber)) return null;
@@ -108,7 +108,7 @@ function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderIn
   return {
     id,
     job_id,
-    status,
+    issued_at,
     invoice_number: parsedInvoiceNumber,
     created_at,
   };

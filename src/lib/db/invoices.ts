@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import type {
   ChangeOrderInvoiceStatus,
+  InvoiceBusinessStatus,
   Invoice,
   InvoiceLineItem,
   InvoiceLineItemSource,
@@ -25,10 +26,16 @@ export type CreateInvoiceInput = {
 type BaseInvoiceStatusRow = {
   id: string;
   job_id: string;
-  status: 'draft' | 'downloaded';
+  issued_at: string | null;
   invoice_number: number;
   created_at: string;
 };
+
+export function getInvoiceBusinessStatus(invoice: {
+  issued_at: string | null;
+}): InvoiceBusinessStatus {
+  return invoice.issued_at ? 'invoiced' : 'draft';
+}
 
 const VALID_LINE_SOURCES: Record<InvoiceLineItemSource, true> = {
   original_scope: true,
@@ -79,6 +86,7 @@ export function mapInvoiceRow(data: Record<string, unknown>): Invoice {
     invoice_date: data.invoice_date as string,
     due_date: data.due_date as string,
     status: data.status as Invoice['status'],
+    issued_at: (data.issued_at as string | null) ?? null,
     line_items,
     subtotal: Number(data.subtotal),
     tax_rate: Number(data.tax_rate),
@@ -88,6 +96,18 @@ export function mapInvoiceRow(data: Record<string, unknown>): Invoice {
     notes: (data.notes as string | null) ?? null,
     created_at: data.created_at as string,
     updated_at: data.updated_at as string,
+    esign_submission_id: (data.esign_submission_id as string | null) ?? null,
+    esign_submitter_id: (data.esign_submitter_id as string | null) ?? null,
+    esign_embed_src: (data.esign_embed_src as string | null) ?? null,
+    esign_status: (data.esign_status as Invoice['esign_status']) ?? 'not_sent',
+    esign_submission_state: (data.esign_submission_state as string | null) ?? null,
+    esign_submitter_state: (data.esign_submitter_state as string | null) ?? null,
+    esign_sent_at: (data.esign_sent_at as string | null) ?? null,
+    esign_opened_at: (data.esign_opened_at as string | null) ?? null,
+    esign_completed_at: (data.esign_completed_at as string | null) ?? null,
+    esign_declined_at: (data.esign_declined_at as string | null) ?? null,
+    esign_decline_reason: (data.esign_decline_reason as string | null) ?? null,
+    esign_signed_document_url: (data.esign_signed_document_url as string | null) ?? null,
   };
 }
 
@@ -146,6 +166,7 @@ export const updateInvoice = async (
     invoice_date: invoice.invoice_date,
     due_date: invoice.due_date,
     status: invoice.status,
+    issued_at: invoice.issued_at,
     line_items: invoice.line_items,
     subtotal: invoice.subtotal,
     tax_rate: invoice.tax_rate,
@@ -153,6 +174,18 @@ export const updateInvoice = async (
     total: invoice.total,
     payment_methods: normalizePaymentMethods(invoice.payment_methods),
     notes: invoice.notes,
+    esign_submission_id: invoice.esign_submission_id,
+    esign_submitter_id: invoice.esign_submitter_id,
+    esign_embed_src: invoice.esign_embed_src,
+    esign_status: invoice.esign_status,
+    esign_submission_state: invoice.esign_submission_state,
+    esign_submitter_state: invoice.esign_submitter_state,
+    esign_sent_at: invoice.esign_sent_at,
+    esign_opened_at: invoice.esign_opened_at,
+    esign_completed_at: invoice.esign_completed_at,
+    esign_declined_at: invoice.esign_declined_at,
+    esign_decline_reason: invoice.esign_decline_reason,
+    esign_signed_document_url: invoice.esign_signed_document_url,
   };
 
   const { data, error } = await supabase
@@ -167,17 +200,6 @@ export const updateInvoice = async (
   }
 
   return { data: mapInvoiceRow(data as Record<string, unknown>), error: null };
-};
-
-export const markInvoiceDownloaded = async (
-  id: string
-): Promise<{ error: Error | null }> => {
-  const { error } = await supabase.from('invoices').update({ status: 'downloaded' }).eq('id', id);
-
-  if (error) {
-    return { error: new Error(error.message) };
-  }
-  return { error: null };
 };
 
 export type ListInvoiceStatusByJobResult =
@@ -216,8 +238,6 @@ export function changeOrderInvoiceStatusMapFromRows(
 }
 
 function mapBaseInvoiceStatusRow(row: Record<string, unknown>): BaseInvoiceStatusRow | null {
-  const status = row.status;
-  if (status !== 'draft' && status !== 'downloaded') return null;
   const id = row.id;
   const job_id = row.job_id;
   if (typeof id !== 'string' || typeof job_id !== 'string') return null;
@@ -226,10 +246,11 @@ function mapBaseInvoiceStatusRow(row: Record<string, unknown>): BaseInvoiceStatu
   if (!Number.isFinite(invoice_number)) return null;
   const created_at = row.created_at;
   if (typeof created_at !== 'string') return null;
+  const issued_at = typeof row.issued_at === 'string' && row.issued_at.trim() ? row.issued_at : null;
   return {
     id,
     job_id,
-    status,
+    issued_at,
     invoice_number,
     created_at,
   };
@@ -252,14 +273,14 @@ function parseWorkOrderInvoiceStatusRow(
 }
 
 /**
- * True when the row is a finalized job-level invoice (no line item has change_order_id).
+ * True when the row is an issued job-level invoice (no line item has change_order_id).
  * Aligns with `parseWorkOrderInvoiceStatusRow` job-level semantics and `create_change_order` in the DB.
  */
-export function isDownloadedJobLevelInvoiceRow(row: {
-  status: unknown;
+export function isIssuedJobLevelInvoiceRow(row: {
+  issued_at: unknown;
   line_items: unknown;
 }): boolean {
-  if (row.status !== 'downloaded') return false;
+  if (typeof row.issued_at !== 'string' || row.issued_at.trim() === '') return false;
   const lineItems = Array.isArray(row.line_items) ? row.line_items : [];
   for (const item of lineItems) {
     if (typeof item !== 'object' || item === null) continue;
@@ -278,7 +299,7 @@ export type GetBlocksNewChangeOrdersForJobResult = {
 };
 
 /**
- * Whether new change orders are blocked for this job (downloaded job-level invoice exists).
+ * Whether new change orders are blocked for this job (issued job-level invoice exists).
  * On query failure, returns `{ blocks: true, error }` (fail-closed).
  */
 export async function getBlocksNewChangeOrdersForJob(
@@ -287,7 +308,7 @@ export async function getBlocksNewChangeOrdersForJob(
 ): Promise<GetBlocksNewChangeOrdersForJobResult> {
   const { data, error } = await supabase
     .from('invoices')
-    .select('status, line_items')
+    .select('issued_at, line_items')
     .eq('user_id', userId)
     .eq('job_id', jobId);
 
@@ -297,7 +318,7 @@ export async function getBlocksNewChangeOrdersForJob(
   }
 
   for (const row of data ?? []) {
-    if (isDownloadedJobLevelInvoiceRow(row as { status: unknown; line_items: unknown })) {
+    if (isIssuedJobLevelInvoiceRow(row as { issued_at: unknown; line_items: unknown })) {
       return { blocks: true, error: null };
     }
   }
@@ -331,7 +352,7 @@ export const listInvoiceStatusByJob = async (
 ): Promise<ListInvoiceStatusByJobResult> => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, job_id, status, invoice_number, created_at, line_items')
+    .select('id, job_id, issued_at, invoice_number, created_at, line_items')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -365,7 +386,7 @@ export const listInvoiceStatusByChangeOrder = async (
 ): Promise<ListInvoiceStatusByChangeOrderResult> => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, job_id, status, invoice_number, created_at, line_items')
+    .select('id, job_id, issued_at, invoice_number, created_at, line_items')
     .eq('user_id', userId)
     .eq('job_id', jobId)
     .order('created_at', { ascending: false });

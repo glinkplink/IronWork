@@ -26,9 +26,13 @@ vi.mock('../../lib/db/jobs', () => ({
   getJobById: (...args: unknown[]) => getJobById(...args),
 }));
 
-vi.mock('../../lib/db/invoices', () => ({
-  getInvoice: (...args: unknown[]) => getInvoice(...args),
-}));
+vi.mock('../../lib/db/invoices', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/db/invoices')>();
+  return {
+    ...actual,
+    getInvoice: (...args: unknown[]) => getInvoice(...args),
+  };
+});
 
 const summaryResult: WorkOrdersDashboardSummary = {
   jobCount: 2,
@@ -148,6 +152,7 @@ function minimalInvoice(id: string): Invoice {
     invoice_date: '2025-01-01',
     due_date: '2025-01-14',
     status: 'draft',
+    issued_at: null,
     line_items: [],
     subtotal: 100,
     tax_rate: 0,
@@ -157,6 +162,18 @@ function minimalInvoice(id: string): Invoice {
     notes: null,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
+    esign_submission_id: null,
+    esign_submitter_id: null,
+    esign_embed_src: null,
+    esign_status: 'not_sent',
+    esign_submission_state: null,
+    esign_submitter_state: null,
+    esign_sent_at: null,
+    esign_opened_at: null,
+    esign_completed_at: null,
+    esign_declined_at: null,
+    esign_decline_reason: null,
+    esign_signed_document_url: null,
   };
 }
 
@@ -400,7 +417,7 @@ describe('WorkOrdersPage', () => {
     expect(onOpenWorkOrderDetail).toHaveBeenCalledWith('job-a', 'change-orders');
   });
 
-  it('renders Pending and Invoiced actions from dashboard invoice fields', async () => {
+  it('renders Draft and Invoiced actions from dashboard invoice fields', async () => {
     listWorkOrdersDashboardPage.mockResolvedValue(
       makePageResult([
         {
@@ -408,7 +425,7 @@ describe('WorkOrdersPage', () => {
           latestInvoice: {
             id: 'inv-a',
             job_id: 'job-a',
-            status: 'draft',
+            issued_at: null,
             invoice_number: 1,
             created_at: '2025-01-03T00:00:00Z',
           },
@@ -418,7 +435,7 @@ describe('WorkOrdersPage', () => {
           latestInvoice: {
             id: 'inv-b',
             job_id: 'job-b',
-            status: 'downloaded',
+            issued_at: '2025-01-04T00:00:00Z',
             invoice_number: 2,
             created_at: '2025-01-04T00:00:00Z',
           },
@@ -430,7 +447,7 @@ describe('WorkOrdersPage', () => {
 
     await waitFor(() => {
       const list = latestWorkOrdersListUl();
-      expect(within(list).getByRole('button', { name: /^Pending$/i })).toBeInTheDocument();
+      expect(within(list).getByRole('button', { name: /^Draft$/i })).toBeInTheDocument();
       expect(within(list).getByRole('button', { name: /^Invoiced$/i })).toBeInTheDocument();
     });
   });
@@ -443,7 +460,7 @@ describe('WorkOrdersPage', () => {
           latestInvoice: {
             id: 'inv-a',
             job_id: 'job-a',
-            status: 'draft',
+            issued_at: null,
             invoice_number: 1,
             created_at: '2025-01-03T00:00:00Z',
           },
@@ -454,8 +471,8 @@ describe('WorkOrdersPage', () => {
     const user = userEvent.setup();
     const { onOpenPendingInvoice } = renderPage();
 
-    await screen.findByRole('button', { name: /^Pending$/i });
-    await user.click(screen.getByRole('button', { name: /^Pending$/i }));
+    await screen.findByRole('button', { name: /^Draft$/i });
+    await user.click(screen.getByRole('button', { name: /^Draft$/i }));
 
     await waitFor(() => {
       expect(onOpenPendingInvoice).toHaveBeenCalledTimes(1);
@@ -466,7 +483,7 @@ describe('WorkOrdersPage', () => {
   it('shows the date on the row header', async () => {
     renderPage();
     await screen.findByText('Customer A');
-    expect(screen.getByText('Jan 1, 2025')).toBeInTheDocument();
+    expect(screen.getByText((text) => text.includes('Jan 1, 2025'))).toBeInTheDocument();
   });
 
   it('clears the success banner after 10 seconds and not before', async () => {

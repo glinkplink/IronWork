@@ -22,7 +22,6 @@ type LoadProfile = (opts?: { silent?: boolean }) => void | Promise<void>;
 
 export function useInvoiceFlow(
   navigateTo: (view: AppView) => void,
-  setWorkOrdersSuccessBanner: (msg: string) => void,
   loadProfile: LoadProfile
 ) {
   const [invoice, setInvoice] = useState<InvoiceFlowState>(initialInvoice);
@@ -142,24 +141,6 @@ export function useInvoiceFlow(
     navigateTo('invoice-wizard');
   }, [navigateTo]);
 
-  const handleAfterInvoiceDownload = useCallback(
-    (inv: Invoice) => {
-      setWorkOrdersSuccessBanner(
-        `Invoice #${String(inv.invoice_number).padStart(4, '0')} downloaded and saved!`
-      );
-      navigateTo('work-orders');
-      setInvoice((i) => ({
-        ...i,
-        invoiceFlowJob: null,
-        invoiceFlowChangeOrder: null,
-        invoiceFlowTarget: null,
-        activeInvoice: null,
-      }));
-      void loadProfile({ silent: true });
-    },
-    [navigateTo, loadProfile, setWorkOrdersSuccessBanner]
-  );
-
   const handleInvoiceUpdated = useCallback((inv: Invoice) => {
     setInvoice((i) => ({ ...i, activeInvoice: inv }));
   }, []);
@@ -179,7 +160,6 @@ export function useInvoiceFlow(
       handleInvoiceWizardCancel,
       handleInvoiceFinalWorkOrders,
       handleEditInvoice,
-      handleAfterInvoiceDownload,
       handleInvoiceUpdated,
       resetInvoiceFlow,
     },

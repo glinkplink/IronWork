@@ -22,14 +22,18 @@ function buildBaseSteps(): [EsignProgressStep, EsignProgressStep, EsignProgressS
 
 export function getEsignProgressModel(
   status: EsignJobStatus,
-  documentKind: 'work_order' | 'change_order' = 'work_order'
+  documentKind: 'work_order' | 'change_order' | 'invoice' = 'work_order'
 ): EsignProgressModel {
   const steps = buildBaseSteps();
-  const docCompleted =
-    documentKind === 'change_order' ? 'Change order has been signed.' : 'Work order has been signed.';
-  const docDeclined =
-    documentKind === 'change_order'
-      ? 'Customer declined the change order.'
+  const docCompleted = documentKind === 'change_order'
+    ? 'Change order has been signed.'
+    : documentKind === 'invoice'
+      ? 'Invoice has been signed.'
+      : 'Work order has been signed.';
+  const docDeclined = documentKind === 'change_order'
+    ? 'Customer declined the change order.'
+    : documentKind === 'invoice'
+      ? 'Customer declined the invoice.'
       : 'Customer declined the work order.';
 
   switch (status) {

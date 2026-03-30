@@ -101,11 +101,7 @@ function App() {
     setOwnerBusinessPhone('');
   }, []);
 
-  const { state: invoice, actions: invoiceFlow } = useInvoiceFlow(
-    navigateTo,
-    (msg) => setWorkOrdersSuccessBanner(msg),
-    loadProfile
-  );
+  const { state: invoice, actions: invoiceFlow } = useInvoiceFlow(navigateTo, loadProfile);
 
   const { state: changeOrder, actions: changeOrderFlow } = useChangeOrderFlow(
     workOrderDetailJob,
@@ -387,7 +383,6 @@ function App() {
           profile={profile}
           onWorkOrders={invoiceFlow.handleInvoiceFinalWorkOrders}
           onEditInvoice={invoiceFlow.handleEditInvoice}
-          onAfterDownload={invoiceFlow.handleAfterInvoiceDownload}
           onInvoiceUpdated={invoiceFlow.handleInvoiceUpdated}
         />
       );

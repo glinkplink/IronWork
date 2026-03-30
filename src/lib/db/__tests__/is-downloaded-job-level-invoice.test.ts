@@ -25,23 +25,25 @@ vi.mock('../../supabase', () => ({
   },
 }));
 
-import { getBlocksNewChangeOrdersForJob, isDownloadedJobLevelInvoiceRow } from '../invoices';
+import { getBlocksNewChangeOrdersForJob, isIssuedJobLevelInvoiceRow } from '../invoices';
 
-describe('isDownloadedJobLevelInvoiceRow', () => {
-  it('is true for downloaded with no change_order_id on lines', () => {
+describe('isIssuedJobLevelInvoiceRow', () => {
+  it('is true for issued rows with no change_order_id on lines', () => {
     expect(
-      isDownloadedJobLevelInvoiceRow({
-        status: 'downloaded',
+      isIssuedJobLevelInvoiceRow({
+        issued_at: '2025-01-02T00:00:00Z',
         line_items: [{ description: 'Scope' }],
       })
     ).toBe(true);
-    expect(isDownloadedJobLevelInvoiceRow({ status: 'downloaded', line_items: [] })).toBe(true);
+    expect(
+      isIssuedJobLevelInvoiceRow({ issued_at: '2025-01-02T00:00:00Z', line_items: [] })
+    ).toBe(true);
   });
 
-  it('is false for draft job-level rows', () => {
+  it('is false for unissued job-level rows', () => {
     expect(
-      isDownloadedJobLevelInvoiceRow({
-        status: 'draft',
+      isIssuedJobLevelInvoiceRow({
+        issued_at: null,
         line_items: [{ description: 'Scope' }],
       })
     ).toBe(false);
@@ -49,14 +51,14 @@ describe('isDownloadedJobLevelInvoiceRow', () => {
 
   it('is false when any line has change_order_id', () => {
     expect(
-      isDownloadedJobLevelInvoiceRow({
-        status: 'downloaded',
+      isIssuedJobLevelInvoiceRow({
+        issued_at: '2025-01-02T00:00:00Z',
         line_items: [{ change_order_id: 'co-1' }],
       })
     ).toBe(false);
     expect(
-      isDownloadedJobLevelInvoiceRow({
-        status: 'downloaded',
+      isIssuedJobLevelInvoiceRow({
+        issued_at: '2025-01-02T00:00:00Z',
         line_items: [{ description: 'x' }, { change_order_id: 'co-1' }],
       })
     ).toBe(false);
@@ -69,22 +71,22 @@ describe('getBlocksNewChangeOrdersForJob', () => {
     mockState.error = null;
   });
 
-  it('returns blocks true when a downloaded job-level row exists', async () => {
-    mockState.rows = [{ status: 'downloaded', line_items: [] }];
+  it('returns blocks true when an issued job-level row exists', async () => {
+    mockState.rows = [{ issued_at: '2025-01-02T00:00:00Z', line_items: [] }];
     const result = await getBlocksNewChangeOrdersForJob('u1', 'j1');
     expect(result.error).toBeNull();
     expect(result.blocks).toBe(true);
   });
 
-  it('returns blocks false when only CO-scoped downloaded rows exist', async () => {
-    mockState.rows = [{ status: 'downloaded', line_items: [{ change_order_id: 'co-1' }] }];
+  it('returns blocks false when only CO-scoped issued rows exist', async () => {
+    mockState.rows = [{ issued_at: '2025-01-02T00:00:00Z', line_items: [{ change_order_id: 'co-1' }] }];
     const result = await getBlocksNewChangeOrdersForJob('u1', 'j1');
     expect(result.error).toBeNull();
     expect(result.blocks).toBe(false);
   });
 
-  it('returns blocks false for draft job-level only', async () => {
-    mockState.rows = [{ status: 'draft', line_items: [{ description: 'x' }] }];
+  it('returns blocks false for unissued job-level only', async () => {
+    mockState.rows = [{ issued_at: null, line_items: [{ description: 'x' }] }];
     const result = await getBlocksNewChangeOrdersForJob('u1', 'j1');
     expect(result.error).toBeNull();
     expect(result.blocks).toBe(false);

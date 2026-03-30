@@ -12,6 +12,11 @@
   margin-bottom: var(--space-sm);
 }
 
+.invoice-final-esign-card {
+  margin-left: 0;
+  margin-right: 0;
+}
+
 .invoice-final-notes-heading-slot {
   display: flex;
   flex-direction: column;

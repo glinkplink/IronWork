@@ -13,7 +13,7 @@ import {
   listWorkOrdersDashboard,
   listWorkOrdersDashboardPage,
 } from '../lib/db/jobs';
-import { getInvoice } from '../lib/db/invoices';
+import { getInvoice, getInvoiceBusinessStatus } from '../lib/db/invoices';
 import { useEsignPoller } from '../hooks/useEsignPoller';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
 import { shouldPollEsignStatus } from '../lib/esign-live';
@@ -177,14 +177,14 @@ const WorkOrderRow = memo(function WorkOrderRow({
           >
             Invoice
           </button>
-        ) : invoice.status === 'draft' ? (
+        ) : getInvoiceBusinessStatus(invoice) === 'draft' ? (
           <button
             type="button"
             className="badge-pending"
             disabled={rowBusy}
             onClick={() => onOpenPendingInvoice(job)}
           >
-            Pending
+            Draft
           </button>
         ) : (
           <button
