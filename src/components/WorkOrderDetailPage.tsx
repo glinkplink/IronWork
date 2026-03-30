@@ -159,7 +159,11 @@ export function WorkOrderDetailPage({
     () => getEsignProgressModel(job?.esign_status ?? 'not_sent'),
     [job?.esign_status]
   );
-  const showCopySigningLink = Boolean(job?.esign_embed_src && job.esign_status !== 'completed');
+  const showCopySigningLink = Boolean(
+    job?.esign_embed_src &&
+    job.esign_status !== 'not_sent' &&
+    job.esign_status !== 'completed'
+  );
 
   const loadCOs = useCallback(async () => {
     if (!job) {
@@ -609,7 +613,7 @@ export function WorkOrderDetailPage({
           {job.esign_signed_document_url ? (
             <button
               type="button"
-              className="btn-secondary btn-action"
+              className="btn-primary btn-action"
               disabled={signedDocBusy}
               onClick={() => void handleViewSignedDoc()}
             >

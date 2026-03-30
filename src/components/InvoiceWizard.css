@@ -117,3 +117,48 @@
 .invoice-payment-methods-group {
   margin-top: 0;
 }
+
+.invoice-co-amounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.invoice-co-amount-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.invoice-co-amount-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.invoice-co-amount-value {
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  background: var(--surface-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.invoice-readonly-field {
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  padding: 10px 12px;
+  background: var(--surface-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}

@@ -95,7 +95,11 @@ export function ChangeOrderDetailPage({
     () => getEsignProgressModel(co.esign_status, 'change_order'),
     [co.esign_status]
   );
-  const showCopySigningLink = Boolean(co.esign_embed_src && co.esign_status !== 'completed');
+  const showCopySigningLink = Boolean(
+    co.esign_embed_src &&
+    co.esign_status !== 'not_sent' &&
+    co.esign_status !== 'completed'
+  );
 
   const refreshCoRow = useCallback(async () => {
     try {
@@ -353,7 +357,7 @@ export function ChangeOrderDetailPage({
           {co.esign_signed_document_url ? (
             <button
               type="button"
-              className="btn-secondary btn-action"
+              className="btn-primary btn-action"
               disabled={signedDocBusy}
               onClick={() => void handleViewSignedDoc()}
             >

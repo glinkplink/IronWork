@@ -41,6 +41,13 @@ function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function formatCurrency(value: number): string {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function computeChangeOrderTotal(co: ChangeOrder): number {
   return roundCurrency(
     (Array.isArray(co.line_items) ? co.line_items : []).reduce((sum, item) => {
@@ -77,7 +84,7 @@ function InvoicePreviewSummary({
         <span className="invoice-wizard-summary-value">${originalTotal.toFixed(2)}</span>
       </div>
       <div className="invoice-wizard-summary-row">
-        <span>CO Total</span>
+        <span>Change Order Total</span>
         <span className="invoice-wizard-summary-value">${changeOrderTotal.toFixed(2)}</span>
       </div>
       <div className="invoice-wizard-summary-row">
@@ -207,22 +214,18 @@ export function InvoiceWizard({
   const total = roundCurrency(subtotal + tax_amount);
   const selectedCOAmountFields =
     !existingInvoice && selectedCOs.length > 0 ? (
-      <>
+      <div className="invoice-co-amounts-grid">
         {selectedCOs.map((co) => {
           const coLabel = `CO #${String(co.co_number).padStart(4, '0')}`;
+          const coTotal = computeChangeOrderTotal(co);
           return (
-            <div key={co.id} className="form-group">
-              <label htmlFor={`selected-co-total-${co.id}`}>{coLabel}</label>
-              <input
-                id={`selected-co-total-${co.id}`}
-                type="number"
-                readOnly
-                value={computeChangeOrderTotal(co)}
-              />
+            <div key={co.id} className="invoice-co-amount-item">
+              <label className="invoice-co-amount-label">{coLabel}</label>
+              <div className="invoice-co-amount-value">${formatCurrency(coTotal)}</div>
             </div>
           );
         })}
-      </>
+      </div>
     ) : null;
 
   const togglePayment = (method: string) => {
@@ -497,14 +500,9 @@ export function InvoiceWizard({
           {coPickerSection}
           <div className="form-group">
             <label htmlFor="fixed-total">Original scope total</label>
-            <input
-              id="fixed-total"
-              type="number"
-              min={0}
-              step="0.01"
-              value={fixedTotal}
-              onChange={(e) => setFixedTotal(Number(e.target.value))}
-            />
+            <div className="invoice-readonly-field">
+              ${formatCurrency(fixedTotal)}
+            </div>
           </div>
           {selectedCOAmountFields}
           <div className="form-group">
