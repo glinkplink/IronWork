@@ -157,8 +157,8 @@ export function InvoiceFinalPage({
           Payment links coming soon. Download the PDF to share manually in the meantime.
         </p>
         <div className="invoice-final-payment-actions">
-          <button disabled className="btn-primary btn-action">Send Invoice (Coming Soon)</button>
-          <button disabled className="btn-secondary btn-action" title="Stripe payment links coming soon">Copy Payment Link</button>
+          <button disabled className="btn-secondary btn-action">Send Invoice (Coming Soon)</button>
+          <button disabled className="btn-primary btn-action" title="Stripe payment links coming soon">Copy Payment Link</button>
         </div>
       </section>
 
