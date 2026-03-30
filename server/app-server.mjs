@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import puppeteer from 'puppeteer-core';
 import { tryHandleEsignRoute } from './esign-routes.mjs';
+import { tryHandleStripeRoute } from './stripe-routes.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,13 +48,16 @@ function sendJson(res, statusCode, payload) {
 }
 
 async function readJsonBody(req) {
+  const raw = await readRawBody(req);
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function readRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
     chunks.push(chunk);
   }
-
-  const raw = Buffer.concat(chunks).toString('utf8');
-  return raw ? JSON.parse(raw) : {};
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 function getMimeType(filePath) {
@@ -233,6 +237,16 @@ async function createAppServer() {
       sendText,
     });
     if (handledEsign) {
+      return;
+    }
+
+    const handledStripe = await tryHandleStripeRoute(req, res, {
+      readJsonBody,
+      readRawBody,
+      sendJson,
+      sendText,
+    });
+    if (handledStripe) {
       return;
     }
 
