@@ -83,10 +83,12 @@ function InvoicePreviewSummary({
         <span>Original Total</span>
         <span className="invoice-wizard-summary-value">${originalTotal.toFixed(2)}</span>
       </div>
-      <div className="invoice-wizard-summary-row">
-        <span>Change Order Total</span>
-        <span className="invoice-wizard-summary-value">${changeOrderTotal.toFixed(2)}</span>
-      </div>
+      {changeOrderTotal > 0 ? (
+        <div className="invoice-wizard-summary-row">
+          <span>Change Order Total</span>
+          <span className="invoice-wizard-summary-value">${changeOrderTotal.toFixed(2)}</span>
+        </div>
+      ) : null}
       <div className="invoice-wizard-summary-row">
         <span>{`Tax (${formatTaxPercent(tax_rate)})`}</span>
         <span className="invoice-wizard-summary-value">${tax_amount.toFixed(2)}</span>
