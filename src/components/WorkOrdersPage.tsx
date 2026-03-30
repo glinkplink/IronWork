@@ -151,7 +151,7 @@ const WorkOrderRow = memo(function WorkOrderRow({
         >
           <span className="work-orders-row-heading">
             <span className="work-orders-wo">{woLabel}</span>
-            <span className="work-orders-meta-inline">{jobMetaLabel}</span>
+            <span className="work-orders-wo-date">{`· ${jobMetaLabel}`}</span>
           </span>
           {renderEsignStrip(job.esign_status)}
           <span className="work-orders-customer">{job.customer_name}</span>
