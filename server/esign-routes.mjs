@@ -71,6 +71,16 @@ function docusealBase() {
   return env('DOCUSEAL_BASE_URL', 'https://api.docuseal.com').replace(/\/$/, '');
 }
 
+/**
+ * Last-two-labels suffix so app.docuseal.com matches api.docuseal.com.
+ * Not a full PSL eTLD+1 (e.g. co.uk); looser than exact host — any sibling subdomain
+ * of the API host's suffix passes. Fine for DocuSeal cloud; self-hosted on busy domains may want a tighter list.
+ */
+function registrableDomainSuffix(hostname) {
+  const parts = hostname.split('.').filter(Boolean);
+  return parts.length >= 2 ? parts.slice(-2).join('.') : hostname;
+}
+
 function docusealHeaders() {
   const key = env('DOCUSEAL_API_KEY');
   if (!key) throw esignConfigError('DOCUSEAL_API_KEY is not set.');
@@ -422,8 +432,10 @@ async function handleDocumentDownload(req, res, sendJson) {
     sendJson(res, 400, { error: 'Invalid url parameter.' });
     return;
   }
-  const docusealHost = new URL(docusealBase()).hostname;
-  if (parsedDocUrl.hostname !== docusealHost) {
+  const baseHostname = new URL(docusealBase()).hostname;
+  const docSuffix = registrableDomainSuffix(parsedDocUrl.hostname);
+  const baseSuffix = registrableDomainSuffix(baseHostname);
+  if (parsedDocUrl.protocol !== 'https:' || docSuffix !== baseSuffix) {
     sendJson(res, 403, { error: 'URL not permitted.' });
     return;
   }
@@ -443,7 +455,7 @@ async function handleDocumentDownload(req, res, sendJson) {
   const contentType = upstream.headers.get('content-type') || 'application/pdf';
   res.writeHead(200, {
     'Content-Type': contentType,
-    'Content-Disposition': 'inline; filename="signed-document.pdf"',
+    'Content-Disposition': 'attachment; filename="signed-document.pdf"',
     'Cache-Control': 'private, no-store',
   });
   // Stream the body directly

@@ -17,7 +17,6 @@ const listWorkOrdersDashboard = vi.fn();
 const listWorkOrdersDashboardPage = vi.fn();
 const getWorkOrdersDashboardSummary = vi.fn();
 const getJobById = vi.fn();
-const getChangeOrderById = vi.fn();
 const getInvoice = vi.fn();
 
 vi.mock('../../lib/db/jobs', () => ({
@@ -188,7 +187,6 @@ function renderPage() {
   const onStartInvoice = vi.fn();
   const onOpenPendingInvoice = vi.fn();
   const onOpenWorkOrderDetail = vi.fn();
-  const onOpenChangeOrderDetail = vi.fn();
   const onClearSuccessBanner = vi.fn();
   render(
     <WorkOrdersPage
@@ -201,7 +199,6 @@ function renderPage() {
       onStartInvoice={onStartInvoice}
       onOpenPendingInvoice={onOpenPendingInvoice}
       onOpenWorkOrderDetail={onOpenWorkOrderDetail}
-      onOpenChangeOrderDetail={onOpenChangeOrderDetail}
     />
   );
   return {
@@ -209,7 +206,6 @@ function renderPage() {
     onStartInvoice,
     onOpenPendingInvoice,
     onOpenWorkOrderDetail,
-    onOpenChangeOrderDetail,
     onClearSuccessBanner,
   };
 }
@@ -236,9 +232,6 @@ describe('WorkOrdersPage', () => {
     getWorkOrdersDashboardSummary.mockResolvedValue({ data: summaryResult, error: null });
     listWorkOrdersDashboard.mockResolvedValue([]);
     getJobById.mockImplementation((id: string) => Promise.resolve(minimalFullJob(id, id)));
-    getChangeOrderById.mockImplementation((id: string) =>
-      Promise.resolve(minimalFullChangeOrder(id, Number(id.replace(/\D/g, '')) || 1))
-    );
     getInvoice.mockImplementation((id: string) => Promise.resolve(minimalInvoice(id)));
   });
 

@@ -24,7 +24,7 @@ import {
   resendChangeOrderSignature,
   mergeEsignResponseIntoChangeOrder,
   pollChangeOrderEsignStatus,
-  fetchSignedDocumentBlobUrl,
+  downloadSignedDocumentFile,
 } from '../lib/esign-api';
 import './ChangeOrderDetailPage.css';
 
@@ -212,15 +212,12 @@ export function ChangeOrderDetailPage({
     if (!co.esign_signed_document_url) return;
     setPdfError('');
     setSignedDocBusy(true);
-    let blobUrl: string | null = null;
     try {
-      blobUrl = await fetchSignedDocumentBlobUrl(co.esign_signed_document_url);
-      window.open(blobUrl, '_blank', 'noopener');
+      await downloadSignedDocumentFile(co.esign_signed_document_url);
     } catch (e) {
       setPdfError(e instanceof Error ? e.message : 'Could not load signed document.');
     } finally {
       setSignedDocBusy(false);
-      if (blobUrl) setTimeout(() => URL.revokeObjectURL(blobUrl!), 60_000);
     }
   };
 
@@ -360,7 +357,7 @@ export function ChangeOrderDetailPage({
               disabled={signedDocBusy}
               onClick={() => void handleViewSignedDoc()}
             >
-              {signedDocBusy ? 'Loading…' : 'View signed PDF'}
+              {signedDocBusy ? 'Loading…' : 'Download signed PDF'}
             </button>
           ) : null}
         </div>

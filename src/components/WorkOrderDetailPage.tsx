@@ -28,7 +28,7 @@ import {
   pollWorkOrderEsignStatus,
   resendWorkOrderSignature,
   sendWorkOrderForSignature,
-  fetchSignedDocumentBlobUrl,
+  downloadSignedDocumentFile,
 } from '../lib/esign-api';
 import { getJobById } from '../lib/db/jobs';
 import { jobLocationSingleLine } from '../lib/job-site-address';
@@ -430,15 +430,12 @@ export function WorkOrderDetailPage({
     if (!job?.esign_signed_document_url) return;
     setEsignError('');
     setSignedDocBusy(true);
-    let blobUrl: string | null = null;
     try {
-      blobUrl = await fetchSignedDocumentBlobUrl(job.esign_signed_document_url);
-      window.open(blobUrl, '_blank', 'noopener');
+      await downloadSignedDocumentFile(job.esign_signed_document_url);
     } catch (e) {
       setEsignError(e instanceof Error ? e.message : 'Could not load signed document.');
     } finally {
       setSignedDocBusy(false);
-      if (blobUrl) setTimeout(() => URL.revokeObjectURL(blobUrl!), 60_000);
     }
   };
 
@@ -616,7 +613,7 @@ export function WorkOrderDetailPage({
               disabled={signedDocBusy}
               onClick={() => void handleViewSignedDoc()}
             >
-              {signedDocBusy ? 'Loading…' : 'View signed PDF'}
+              {signedDocBusy ? 'Loading…' : 'Download signed PDF'}
             </button>
           ) : null}
         </div>

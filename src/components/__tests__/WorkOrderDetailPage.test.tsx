@@ -451,7 +451,7 @@ describe('WorkOrderDetailPage', () => {
     );
 
     expect(screen.queryByRole('button', { name: /copy signing link/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /view signed pdf/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /download signed pdf/i })).toBeInTheDocument();
   });
 
   it('disables Create Change Order when a downloaded job-level invoice blocks', async () => {

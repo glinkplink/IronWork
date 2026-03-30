@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  */
+/// <reference types="node" />
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 function requestUrl(input: string | URL | Request): string {
@@ -51,6 +52,30 @@ function captureRes() {
     },
     end(chunk: string) {
       body = chunk;
+    },
+  };
+}
+
+/** For routes that use `res.write` + `res.end` (e.g. signed PDF proxy stream). */
+function captureStreamingRes() {
+  let status = 0;
+  const chunks: Buffer[] = [];
+  return {
+    get status() {
+      return status;
+    },
+    get combinedBody() {
+      return Buffer.concat(chunks);
+    },
+    writeHead(code: number, headers?: Record<string, string>) {
+      void headers;
+      status = code;
+    },
+    write(chunk: Uint8Array | Buffer) {
+      chunks.push(Buffer.from(chunk));
+    },
+    end() {
+      /* stream finished */
     },
   };
 }
@@ -284,6 +309,73 @@ describe('tryHandleEsignRoute', () => {
     const handled = await tryHandleEsignRoute(req as never, res as never, defaultHelpers());
     expect(handled).toBe(false);
     expect(res.status).toBe(0);
+  });
+
+  describe('GET /api/esign/documents/download', () => {
+    it('returns 403 when document URL is outside the DocuSeal registrable suffix (SSRF)', async () => {
+      const res = captureRes();
+      createClientMock.mockReturnValue({
+        auth: {
+          getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })),
+        },
+        from: vi.fn(),
+      });
+      const fetchMock = vi.mocked(globalThis.fetch);
+      fetchMock.mockClear();
+
+      const docUrl = 'https://evil.com/signed.pdf';
+      const req = {
+        method: 'GET',
+        url: `/api/esign/documents/download?url=${encodeURIComponent(docUrl)}`,
+        headers: { authorization: 'Bearer good-token' },
+      };
+      const handled = await tryHandleEsignRoute(req as never, res as never, defaultHelpers());
+      expect(handled).toBe(true);
+      expect(res.status).toBe(403);
+      const j = JSON.parse(res.body) as { error?: string };
+      expect(j.error).toMatch(/not permitted/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('allows another docuseal.com subdomain and streams upstream PDF bytes', async () => {
+      const res = captureStreamingRes();
+      createClientMock.mockReturnValue({
+        auth: {
+          getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })),
+        },
+        from: vi.fn(),
+      });
+
+      const docUrl = 'https://app.docuseal.com/files/signed-abc.pdf';
+      const encoder = new TextEncoder();
+      const pdfMarker = '%PDF-1.4 test';
+      const fetchMock = vi.mocked(globalThis.fetch);
+      fetchMock.mockImplementation(async (input: string | URL | Request) => {
+        const u = requestUrl(input);
+        expect(u).toBe(docUrl);
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode(pdfMarker));
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          status: 200,
+          headers: { 'Content-Type': 'application/pdf' },
+        });
+      });
+
+      const req = {
+        method: 'GET',
+        url: `/api/esign/documents/download?url=${encodeURIComponent(docUrl)}`,
+        headers: { authorization: 'Bearer good-token' },
+      };
+      const handled = await tryHandleEsignRoute(req as never, res as never, defaultHelpers());
+      expect(handled).toBe(true);
+      expect(res.status).toBe(200);
+      expect(res.combinedBody.toString('utf8')).toBe(pdfMarker);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('send returns 401 when Supabase rejects the JWT', async () => {

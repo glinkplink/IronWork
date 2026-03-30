@@ -237,10 +237,10 @@ export function JobForm({
   const [dropdownSuppressed, setDropdownSuppressed] = useState(false);
 
   const customerNameComboboxRef = useRef<HTMLDivElement>(null);
-  const customerNameBlurCloseTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const customerNameBlurCloseTimerRef = useRef<number | null>(null);
   const jobSiteStreetComboboxRef = useRef<HTMLDivElement>(null);
   const jobSiteStreetQueryRef = useRef(job.job_site_street);
-  const jobSiteStreetBlurCloseTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const jobSiteStreetBlurCloseTimerRef = useRef<number | null>(null);
   /** Only the latest autocomplete request may apply results (avoids stale short-query responses clearing longer-query UI). */
   const geoFetchSeqRef = useRef(0);
 
