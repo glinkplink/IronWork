@@ -12,9 +12,31 @@
   margin-bottom: var(--space-sm);
 }
 
-.invoice-final-esign-card {
-  margin-left: 0;
-  margin-right: 0;
+.invoice-final-payment-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.invoice-final-payment-card .wo-esign-heading {
+  margin: 0 0 var(--space-sm);
+}
+
+.invoice-final-payment-text {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0 0 var(--space-md);
+}
+
+.invoice-final-payment-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.invoice-final-payment-actions .btn-action {
+  width: 100%;
 }
 
 .invoice-final-notes-heading-slot {

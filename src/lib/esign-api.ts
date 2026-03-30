@@ -1,4 +1,4 @@
-import type { ChangeOrder, EsignJobStatus, Invoice, Job } from '../types/db';
+import type { ChangeOrder, EsignJobStatus, Job } from '../types/db';
 import { fetchWithSupabaseAuth } from './fetch-with-supabase-auth';
 
 export interface EsignSendDocumentsPayload {
@@ -155,28 +155,6 @@ export function mergeEsignResponseIntoChangeOrder(co: ChangeOrder, r: EsignApiRe
   };
 }
 
-export function mergeEsignResponseIntoInvoice(
-  invoice: Invoice,
-  r: EsignApiResponse
-): Invoice {
-  return {
-    ...invoice,
-    issued_at: r.issued_at ?? invoice.issued_at,
-    esign_submission_id: r.esign_submission_id,
-    esign_submitter_id: r.esign_submitter_id,
-    esign_embed_src: r.esign_embed_src ?? invoice.esign_embed_src,
-    esign_status: r.esign_status,
-    esign_submission_state: r.esign_submission_state,
-    esign_submitter_state: r.esign_submitter_state,
-    esign_sent_at: r.esign_sent_at,
-    esign_opened_at: r.esign_opened_at,
-    esign_completed_at: r.esign_completed_at,
-    esign_declined_at: r.esign_declined_at,
-    esign_decline_reason: r.esign_decline_reason,
-    esign_signed_document_url: r.esign_signed_document_url,
-  };
-}
-
 export async function resendWorkOrderSignature(
   jobId: string,
   message?: { subject?: string; body?: string }
@@ -276,77 +254,6 @@ export async function resendChangeOrderSignature(
   const res = await fetchWithSupabaseAuth(`/api/esign/change-orders/${coId}/resend`, {
     method: 'POST',
     body: JSON.stringify(message ? { message } : {}),
-  });
-  const text = await res.text();
-  let json: unknown = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
-  if (!res.ok) {
-    const msg =
-      json && typeof json === 'object' && json !== null && 'error' in json
-        ? String((json as { error: unknown }).error)
-        : text || res.statusText;
-    throw new Error(msg);
-  }
-  return json as EsignApiResponse;
-}
-
-export async function sendInvoiceForSignature(
-  invoiceId: string,
-  payload: EsignSendDocumentsPayload
-): Promise<EsignApiResponse> {
-  const res = await fetchWithSupabaseAuth(`/api/esign/invoices/${invoiceId}/send`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-  const text = await res.text();
-  let json: unknown = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
-  if (!res.ok) {
-    const msg =
-      json && typeof json === 'object' && json !== null && 'error' in json
-        ? String((json as { error: unknown }).error)
-        : text || res.statusText;
-    throw new Error(msg);
-  }
-  return json as EsignApiResponse;
-}
-
-export async function resendInvoiceSignature(
-  invoiceId: string,
-  message?: { subject?: string; body?: string }
-): Promise<EsignApiResponse> {
-  const res = await fetchWithSupabaseAuth(`/api/esign/invoices/${invoiceId}/resend`, {
-    method: 'POST',
-    body: JSON.stringify(message ? { message } : {}),
-  });
-  const text = await res.text();
-  let json: unknown = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
-  if (!res.ok) {
-    const msg =
-      json && typeof json === 'object' && json !== null && 'error' in json
-        ? String((json as { error: unknown }).error)
-        : text || res.statusText;
-    throw new Error(msg);
-  }
-  return json as EsignApiResponse;
-}
-
-export async function pollInvoiceEsignStatus(invoiceId: string): Promise<EsignApiResponse> {
-  const res = await fetchWithSupabaseAuth(`/api/esign/invoices/${invoiceId}/status`, {
-    method: 'GET',
   });
   const text = await res.text();
   let json: unknown = null;

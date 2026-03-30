@@ -28,7 +28,7 @@ Work agreement generator for contractors (initially welders). Contractors fill o
 | Auth + DB | Supabase (email/password auth, Postgres, RLS) |
 | App Server | Node **`server/app-server.mjs`**: Vite **middleware** (dev) or static **`dist/`** when `NODE_ENV=production`; loads **`.env`** then **`.env.local`** (`dotenv`) for server-only secrets |
 | PDF | Puppeteer Core + **system Chrome**; all document PDFs via **same-origin** `POST /api/pdf` |
-| E-sign | DocuSeal **HTML submissions** from the client; work-order, change-order, and invoice **send/resend** plus authenticated **`GET .../status`** (DocuSeal sync), **`POST /api/webhooks/docuseal`** (see **ARCHITECTURE.md**) |
+| E-sign | DocuSeal **HTML submissions** from the client; work-order and change-order **send/resend** plus authenticated **`GET .../status`** (DocuSeal sync), **`POST /api/webhooks/docuseal`** (see **ARCHITECTURE.md**) |
 | Styling | Plain CSS (`index.css`, global `App.css`, and co-located component/page CSS files) — no Tailwind |
 | Font | Barlow (+ Dancing Script for agreement signature) — field notebook aesthetic |
 
@@ -96,7 +96,7 @@ src/
     ChangeOrderWizard.css    # Wizard-only `.co-*` blocks (shared badge/section labels stay in App.css)
     InvoiceWizard.tsx        # Create/edit invoice; CO pickers + line `source` for merge on edit
     InvoiceWizard.css        # Invoice wizard materials/CO picker/payment group (chips stay global)
-    InvoiceFinalPage.tsx     # Invoice preview, PDF actions, and DocuSeal timeline/send-resend
+    InvoiceFinalPage.tsx     # Invoice preview, PDF actions, and payment link placeholder
     InvoiceFinalPage.css     # Invoice final page-only chrome (nav/headings shared in App.css)
     InvoicePreviewModal.tsx  # Full-screen invoice HTML preview
     InvoicePreviewModal.css  # Invoice preview modal overlay/scroll/sheet
@@ -113,7 +113,7 @@ src/
     agreement-sections-html.ts # Agreement sections → HTML string (combined PDFs)
     docuseal-agreement-html.ts # DocuSeal HTML document for WO (embedded CSS + field tags; uses esc())
     docuseal-change-order-html.ts # DocuSeal HTML document for CO (embedded CSS + field tags; uses esc()); optional `providerSignatureDataUrl` for SP signature image (same canvas PNG as WO)
-    docuseal-invoice-html.ts  # DocuSeal HTML/message builder for invoices (reuses invoice body + header/footer; uses esc())
+    docuseal-change-order-html.ts # DocuSeal HTML/message builder for change orders
     docuseal-header-footer.ts  # html_header / html_footer strings for DocuSeal submissions
     docuseal-constants.ts      # Shared DocuSeal role name(s)
     docuseal-signature-image.ts # Render DocuSeal SP signature as image in signed documents
@@ -135,7 +135,7 @@ src/
       profile.ts             # getProfile, upsertProfile, updateNextWoNumber
       clients.ts             # listClients, upsertClient, deleteClient
       jobs.ts                # listJobs, saveWorkOrder, dashboard page/summary RPC mapping, create/update/delete
-      invoices.ts            # Invoice CRUD + issuance/e-sign mapping; line item `source` in JSON
+      invoices.ts            # Invoice CRUD + issuance
       change-orders.ts       # Change order CRUD + totals
   hooks/
     useAppNavigation.ts      # URL/history-backed view state
@@ -163,7 +163,7 @@ server/
 
 ## Generated HTML strings (security)
 
-All user- or client-supplied text interpolated into HTML string generators (`invoice-generator.ts`, `change-order-generator.ts`, `agreement-sections-html.ts`, `docuseal-agreement-html.ts`, `docuseal-change-order-html.ts`, `docuseal-invoice-html.ts`, and any combined PDF HTML builders) must go through `esc()` from `src/lib/html-escape.ts`. React text in components (e.g. `AgreementDocumentSections`) is escaped by default; do not add new `dangerouslySetInnerHTML` pipelines built from raw user input without `esc()`.
+All user- or client-supplied text interpolated into HTML string generators (`invoice-generator.ts`, `change-order-generator.ts`, `agreement-sections-html.ts`, `docuseal-agreement-html.ts`, `docuseal-change-order-html.ts`, and any combined PDF HTML builders) must go through `esc()` from `src/lib/html-escape.ts`. React text in components (e.g. `AgreementDocumentSections`) is escaped by default; do not add new `dangerouslySetInnerHTML` pipelines built from raw user input without `esc()`.
 
 ---
 
@@ -189,9 +189,9 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 - Work Orders e-sign polling refreshes only loaded in-flight rows; targeted row refresh can still use the older `list_work_orders_dashboard` RPC because `0014` is already applied.
 - Clicking a work-order row navigates immediately with `jobId`; `WorkOrderDetailPage` loads the full job row locally and shows a loading state while hydrating.
 - `WorkOrderDetailPage` has a single **job-level** invoice strip; invoice actions are not rendered per change-order row.
-- Invoice business state is separate from invoice DocuSeal progress: no invoice row shows **Invoice**, an existing invoice with `issued_at = null` shows **Draft**, and `issued_at != null` shows **Invoiced**.
+- Invoice business state: no invoice row shows **Invoice**, an existing invoice with `issued_at = null` shows **Draft**, and `issued_at != null` shows **Invoiced**.
 - `ChangeOrderWizard` now saves the CO, sends the DocuSeal request immediately, then routes to `ChangeOrderDetailPage`; CO business `status` tracks approval lifecycle (`pending_approval` after send/open, `approved` on completed signature, `rejected` on decline).
-- **`jobs.esign_*`, `change_orders.esign_*`, and `invoices.esign_*`:** detail surfaces show e-sign progress, signing actions, and signed artifacts from the same DocuSeal state model. While e-sign is in-flight, detail pages call **`GET /api/esign/work-orders/:id/status`**, **`GET /api/esign/change-orders/:id/status`**, or **`GET /api/esign/invoices/:id/status`** (authenticated) to reconcile DocuSeal into the row; webhooks update the same fields. Invoice detail keeps the full Sent / Opened / Signed timeline card, but that timeline does not define the business badge. **Email** subject/body for DocuSeal notifications and **signed PDF** layout are best verified on the **deployed** app (public URL + production-like env), not assumed identical to every local setup.
+- **`jobs.esign_*` and `change_orders.esign_*`:** detail surfaces show e-sign progress, signing actions, and signed artifacts. While e-sign is in-flight, detail pages call **`GET /api/esign/work-orders/:id/status`** or **`GET /api/esign/change-orders/:id/status`** (authenticated) to reconcile DocuSeal into the row; webhooks update the same fields. **Email** subject/body for DocuSeal notifications and **signed PDF** layout are best verified on the **deployed** app (public URL + production-like env), not assumed identical to every local setup.
 
 **`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).
 - `App.tsx` lazy-loads preview, Work Orders, detail, change-order, and invoice screens. The initial shell stays eager; heavy document/dashboard flows load on demand, and the Work Orders chunk is idle-prefetched after sign-in.
@@ -223,7 +223,7 @@ Migrations are in `supabase/migrations/` — apply via Supabase CLI (`npx supaba
 | Current work order **draft** (form state) | No — in-memory until **Download & Save** |
 | Jobs | Yes — on **Download & Save** (`saveWorkOrder`); listed on **Work Orders** |
 | Clients | Yes — upserted on **Download & Save** keyed by `name_normalized`; **JobForm** can search/suggest when `userId` is set |
-| Invoices | Yes — wizard + final page; business state derives from `issued_at`, with separate `esign_*` tracking for the DocuSeal timeline |
+| Invoices | Yes — wizard + final page; business state derives from `issued_at` (Stripe payment links set this in future) |
 | Change orders | Yes — wizard + detail; `create_change_order` RPC + migration **0006_change_order_creation_lock.sql** for atomic numbering |
 
 ---

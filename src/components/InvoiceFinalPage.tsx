@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
-import { getInvoice, getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
+import { getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import {
@@ -9,21 +9,6 @@ import {
   fetchInvoicePdfBlob,
   getInvoicePdfFilename,
 } from '../lib/agreement-pdf';
-import {
-  downloadSignedDocumentFile,
-  mergeEsignResponseIntoInvoice,
-  pollInvoiceEsignStatus,
-  resendInvoiceSignature,
-  sendInvoiceForSignature,
-} from '../lib/esign-api';
-import {
-  buildInvoiceEsignNotificationMessage,
-  buildInvoiceEsignSendPayload,
-} from '../lib/docuseal-invoice-html';
-import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-image';
-import { formatEsignTimestamp, shouldPollEsignStatus } from '../lib/esign-live';
-import { getEsignProgressModel } from '../lib/esign-progress';
-import { useEsignPoller } from '../hooks/useEsignPoller';
 import './InvoiceFinalPage.css';
 
 interface InvoiceFinalPageProps {
@@ -48,15 +33,10 @@ export function InvoiceFinalPage({
   const [notesDraft, setNotesDraft] = useState(() => invoiceProp.notes ?? '');
   const [downloadError, setDownloadError] = useState('');
   const [notesError, setNotesError] = useState('');
-  const [esignError, setEsignError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
-  const [esignBusy, setEsignBusy] = useState(false);
-  const [signedDocBusy, setSignedDocBusy] = useState(false);
-  const [signingLinkCopied, setSigningLinkCopied] = useState(false);
 
   const documentRef = useRef<HTMLDivElement | null>(null);
-  const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
   const businessStatus = getInvoiceBusinessStatus(invoiceProp);
@@ -64,13 +44,6 @@ export function InvoiceFinalPage({
   const isReadOnly = isIssued;
   const customerTitle = job.customer_name.trim() || 'Customer';
   const invoiceSubline = `Invoice #${String(invoiceProp.invoice_number).padStart(4, '0')}`;
-  const esignProgress = useMemo(
-    () => getEsignProgressModel(invoiceProp.esign_status, 'invoice'),
-    [invoiceProp.esign_status]
-  );
-  const showCopySigningLink = Boolean(
-    invoiceProp.esign_embed_src && invoiceProp.esign_status !== 'completed'
-  );
 
   const {
     viewportRef: previewViewportRef,
@@ -84,44 +57,6 @@ export function InvoiceFinalPage({
   useEffect(() => {
     setNotesDraft(invoiceProp.notes ?? '');
   }, [invoiceProp.id, invoiceProp.notes]);
-
-  useEffect(() => {
-    setSigningLinkCopied(false);
-    if (copySigningLinkTimeoutRef.current !== null) {
-      clearTimeout(copySigningLinkTimeoutRef.current);
-      copySigningLinkTimeoutRef.current = null;
-    }
-  }, [invoiceProp.id, invoiceProp.esign_embed_src]);
-
-  useEffect(() => {
-    return () => {
-      if (copySigningLinkTimeoutRef.current !== null) {
-        clearTimeout(copySigningLinkTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const refreshInvoiceRow = useCallback(async () => {
-    try {
-      const response = await pollInvoiceEsignStatus(invoiceProp.id);
-      const updatedInvoice = mergeEsignResponseIntoInvoice(invoiceProp, response);
-      onInvoiceUpdated(updatedInvoice);
-      return updatedInvoice;
-    } catch {
-      const row = await getInvoice(invoiceProp.id);
-      if (row) onInvoiceUpdated(row);
-      return row;
-    }
-  }, [invoiceProp, onInvoiceUpdated]);
-
-  useEsignPoller({
-    enabled: shouldPollEsignStatus(invoiceProp.esign_status),
-    pollOnce: async () => {
-      const row = await refreshInvoiceRow();
-      if (!row) return false;
-      return shouldPollEsignStatus(row.esign_status);
-    },
-  });
 
   const handleDownload = async () => {
     setDownloadError('');
@@ -140,75 +75,6 @@ export function InvoiceFinalPage({
       setDownloadError(e instanceof Error ? e.message : 'Download failed.');
     } finally {
       setDownloading(false);
-    }
-  };
-
-  const handleSendForSignature = async () => {
-    setEsignError('');
-    if (!(job.customer_email || '').trim()) {
-      setEsignError('Customer email is missing on this work order. Edit the job to add it.');
-      return;
-    }
-    setEsignBusy(true);
-    try {
-      const providerSignatureDataUrl = await buildDocusealProviderSignatureImage(
-        profile?.owner_name?.trim() || profile.business_name.trim()
-      );
-      const payload = buildInvoiceEsignSendPayload(invoiceProp, job, profile, {
-        providerSignatureDataUrl,
-      });
-      const response = await sendInvoiceForSignature(invoiceProp.id, payload);
-      onInvoiceUpdated(mergeEsignResponseIntoInvoice(invoiceProp, response));
-      await refreshInvoiceRow();
-    } catch (e) {
-      setEsignError(e instanceof Error ? e.message : 'Failed to send invoice for signature.');
-    } finally {
-      setEsignBusy(false);
-    }
-  };
-
-  const handleResendSignature = async () => {
-    setEsignError('');
-    setEsignBusy(true);
-    try {
-      const response = await resendInvoiceSignature(
-        invoiceProp.id,
-        buildInvoiceEsignNotificationMessage(invoiceProp, job, profile)
-      );
-      onInvoiceUpdated(mergeEsignResponseIntoInvoice(invoiceProp, response));
-      await refreshInvoiceRow();
-    } catch (e) {
-      setEsignError(e instanceof Error ? e.message : 'Failed to resend invoice signature request.');
-    } finally {
-      setEsignBusy(false);
-    }
-  };
-
-  const handleCopySigningLink = async () => {
-    if (!invoiceProp.esign_embed_src) return;
-    setEsignError('');
-    try {
-      await navigator.clipboard.writeText(invoiceProp.esign_embed_src);
-      setSigningLinkCopied(true);
-      copySigningLinkTimeoutRef.current = setTimeout(() => {
-        copySigningLinkTimeoutRef.current = null;
-        setSigningLinkCopied(false);
-      }, 1000);
-    } catch {
-      setEsignError('Could not copy signing link.');
-    }
-  };
-
-  const handleViewSignedDoc = async () => {
-    if (!invoiceProp.esign_signed_document_url) return;
-    setEsignError('');
-    setSignedDocBusy(true);
-    try {
-      await downloadSignedDocumentFile(invoiceProp.esign_signed_document_url);
-    } catch (e) {
-      setEsignError(e instanceof Error ? e.message : 'Could not load signed document.');
-    } finally {
-      setSignedDocBusy(false);
     }
   };
 
@@ -282,124 +148,17 @@ export function InvoiceFinalPage({
           {downloadError}
         </div>
       ) : null}
-      {esignError ? (
-        <div className="error-banner" role="alert">
-          {esignError}
-        </div>
-      ) : null}
 
-      <section className="wo-esign-card invoice-final-esign-card" aria-labelledby="invoice-esign-heading">
-        <h2 id="invoice-esign-heading" className="wo-esign-heading">
-          Customer signature
+      <section className="invoice-final-payment-card" aria-labelledby="invoice-payment-heading">
+        <h2 id="invoice-payment-heading" className="wo-esign-heading">
+          Send Invoice
         </h2>
-        <div
-          className="wo-esign-timeline"
-          role="group"
-          aria-label={`Customer signature status: ${esignProgress.title}`}
-        >
-          {esignProgress.steps.map((step, index) => (
-            <div
-              key={step.key}
-              className={`wo-esign-step wo-esign-step-${step.tone}`}
-              aria-current={step.tone !== 'inactive' ? 'step' : undefined}
-            >
-              <span
-                className={`wo-esign-step-dot${step.tone === 'inactive' ? '' : ' wo-esign-step-dot-filled'}`}
-                aria-hidden="true"
-              />
-              <span className="wo-esign-step-label">{step.label}</span>
-              {index < esignProgress.steps.length - 1 ? (
-                <span className="wo-esign-step-line" aria-hidden="true" />
-              ) : null}
-            </div>
-          ))}
-        </div>
-        <p className="wo-esign-summary">{esignProgress.summary}</p>
-        <dl className="wo-esign-meta">
-          {invoiceProp.issued_at ? (
-            <div className="wo-esign-meta-row">
-              <dt>Issued</dt>
-              <dd>{formatEsignTimestamp(invoiceProp.issued_at)}</dd>
-            </div>
-          ) : null}
-          {invoiceProp.esign_sent_at ? (
-            <div className="wo-esign-meta-row">
-              <dt>Sent</dt>
-              <dd>{formatEsignTimestamp(invoiceProp.esign_sent_at)}</dd>
-            </div>
-          ) : null}
-          {invoiceProp.esign_opened_at ? (
-            <div className="wo-esign-meta-row">
-              <dt>Opened</dt>
-              <dd>{formatEsignTimestamp(invoiceProp.esign_opened_at)}</dd>
-            </div>
-          ) : null}
-          {invoiceProp.esign_completed_at ? (
-            <div className="wo-esign-meta-row">
-              <dt>Signed</dt>
-              <dd>{formatEsignTimestamp(invoiceProp.esign_completed_at)}</dd>
-            </div>
-          ) : null}
-          {invoiceProp.esign_declined_at ? (
-            <div className="wo-esign-meta-row">
-              <dt>Declined</dt>
-              <dd>{formatEsignTimestamp(invoiceProp.esign_declined_at)}</dd>
-            </div>
-          ) : null}
-          {invoiceProp.esign_decline_reason ? (
-            <div className="wo-esign-meta-row wo-esign-meta-row-reason">
-              <dt>Decline reason</dt>
-              <dd>{invoiceProp.esign_decline_reason}</dd>
-            </div>
-          ) : null}
-        </dl>
-        <div className="wo-esign-actions">
-          {!invoiceProp.esign_submitter_id ? (
-            <button
-              type="button"
-              className="btn-primary btn-action wo-esign-actions-primary"
-              disabled={esignBusy || !job.customer_email?.trim()}
-              title={
-                !job.customer_email?.trim()
-                  ? 'Customer email is required to send for signature'
-                  : undefined
-              }
-              onClick={() => void handleSendForSignature()}
-            >
-              {esignBusy ? 'Sending…' : 'Send Invoice'}
-            </button>
-          ) : invoiceProp.esign_status !== 'completed' ? (
-            <button
-              type="button"
-              className="btn-primary btn-action wo-esign-actions-primary"
-              disabled={esignBusy}
-              onClick={() => void handleResendSignature()}
-            >
-              {esignBusy ? 'Sending…' : 'Resend Invoice'}
-            </button>
-          ) : null}
-          {showCopySigningLink ? (
-            <button
-              type="button"
-              className="btn-secondary btn-action wo-esign-actions-copy"
-              disabled={esignBusy}
-              onClick={() => void handleCopySigningLink()}
-            >
-              <span aria-live="polite">
-                {signingLinkCopied ? 'Copied to clipboard' : 'Copy signing link'}
-              </span>
-            </button>
-          ) : null}
-          {invoiceProp.esign_signed_document_url ? (
-            <button
-              type="button"
-              className="btn-primary btn-action"
-              disabled={signedDocBusy}
-              onClick={() => void handleViewSignedDoc()}
-            >
-              {signedDocBusy ? 'Loading…' : 'Download signed PDF'}
-            </button>
-          ) : null}
+        <p className="invoice-final-payment-text">
+          Payment links coming soon. Download the PDF to share manually in the meantime.
+        </p>
+        <div className="invoice-final-payment-actions">
+          <button disabled className="btn-primary btn-action">Send Invoice (Coming Soon)</button>
+          <button disabled className="btn-secondary btn-action" title="Stripe payment links coming soon">Copy Payment Link</button>
         </div>
       </section>
 
