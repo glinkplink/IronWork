@@ -1382,8 +1382,66 @@ body {
   color: var(--text-muted);
 }
 
+.work-orders-row-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+}
+
+.work-orders-wo-date {
+  font-size: calc(0.8125rem - 1px);
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .work-orders-row-actions {
   flex-shrink: 0;
+}
+
+.esign-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 2px;
+  max-width: 100%;
+  color: var(--text-secondary);
+}
+
+.esign-strip-segment {
+  width: 0.9rem;
+  height: 0.34rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+}
+
+.esign-strip-segment-active {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.esign-strip-segment-success {
+  border-color: #2d6a2e;
+  background: #2d6a2e;
+}
+
+.esign-strip-segment-danger {
+  border-color: #9f2d20;
+  background: #9f2d20;
+}
+
+.esign-strip-segment-warning {
+  border-color: #9a5b16;
+  background: #9a5b16;
+}
+
+.esign-strip-text {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .wo-row-create-invoice-outline {

@@ -49,6 +49,42 @@ import {
 } from '../lib/db/invoices';
 import './WorkOrderDetailPage.css';
 
+const ROW_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+});
+
+function formatRowDate(raw: string | null | undefined): string {
+  const dateOnly = raw?.split('T')[0] || '';
+  if (!dateOnly) return '—';
+  const [y, m, d] = dateOnly.split('-').map(Number);
+  if (!y || !m || !d) return raw ?? '—';
+  return ROW_DATE_FORMATTER.format(new Date(y, m - 1, d));
+}
+
+function renderEsignStrip(status: ChangeOrder['esign_status']) {
+  const progress = getEsignProgressModel(status, 'change_order');
+  if (status === 'not_sent') return null;
+
+  return (
+    <span
+      className="esign-strip"
+      title={`E-signature: ${progress.title}`}
+      aria-label={`E-signature status: ${progress.title}`}
+    >
+      {progress.steps.map((step) => (
+        <span
+          key={step.key}
+          className={`esign-strip-segment esign-strip-segment-${step.tone}`}
+          aria-hidden="true"
+        />
+      ))}
+      <span className="esign-strip-text">{progress.title}</span>
+    </span>
+  );
+}
+
 interface WorkOrderDetailPageProps {
   userId: string;
   jobId: string;
@@ -667,9 +703,13 @@ export function WorkOrderDetailPage({
                       className="work-orders-row-detail-hit"
                       onClick={() => onOpenCODetail(co)}
                     >
-                      <span className="co-list-desc">{co.description || '—'}</span>
+                      <span className="co-list-heading-line">
+                        <span className="co-list-number">CO #{String(co.co_number).padStart(4, '0')}</span>
+                        <span className="co-list-date">{`· ${formatRowDate(co.created_at)}`}</span>
+                      </span>
                       <span className="co-list-amount">${computeCOTotal(co.line_items).toFixed(2)}</span>
-                      <span className="co-list-number">CO #{String(co.co_number).padStart(4, '0')}</span>
+                      <span className="work-orders-customer co-list-desc">{co.description || '—'}</span>
+                      {renderEsignStrip(co.esign_status)}
                     </button>
                   </div>
                   <div className="work-orders-row-actions">

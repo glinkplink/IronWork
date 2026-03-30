@@ -417,6 +417,29 @@ describe('WorkOrdersPage', () => {
     expect(onOpenWorkOrderDetail).toHaveBeenCalledWith('job-a', 'change-orders');
   });
 
+  it('renders the mini e-sign strip below the change-orders link on the work-orders row', async () => {
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        {
+          ...listJobA,
+          esign_status: 'completed',
+          changeOrderCount: 2,
+        },
+      ])
+    );
+
+    renderPage();
+
+    await screen.findByText('Customer A');
+    const row = screen.getByText('Customer A').closest('li');
+    expect(row).toBeTruthy();
+    const rowEl = row as HTMLElement;
+    const link = within(rowEl).getByRole('button', { name: /View & Create Change Orders/i });
+    const strip = within(rowEl).getByLabelText('E-signature status: Signed');
+
+    expect(link.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('renders Draft and Invoiced actions from dashboard invoice fields', async () => {
     listWorkOrdersDashboardPage.mockResolvedValue(
       makePageResult([

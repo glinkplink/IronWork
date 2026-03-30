@@ -295,6 +295,49 @@ describe('WorkOrderDetailPage', () => {
     expect(within(coList as HTMLElement).getAllByRole('button', { name: /^Invoice$/i })).toHaveLength(2);
   });
 
+  it('renders change-order rows with date, amount, description, and shared e-sign strip order', async () => {
+    mockFns.listChangeOrders.mockResolvedValue([
+      {
+        ...makeCO(1, 'Opened change order'),
+        created_at: '2025-01-01T12:00:00Z',
+        esign_status: 'opened',
+      },
+      {
+        ...makeCO(2, 'Draft change order'),
+        created_at: '2025-01-02T12:00:00Z',
+        esign_status: 'not_sent',
+      },
+    ]);
+
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        jobId="job-1"
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+
+    const openedRowText = await screen.findByText('Opened change order');
+    const openedRow = openedRowText.closest('li');
+    expect(openedRow).toBeTruthy();
+    const openedRowEl = openedRow as HTMLElement;
+
+    expect(within(openedRowEl).getByText('CO #0001')).toBeInTheDocument();
+    expect(within(openedRowEl).getByText(/Jan 1, 2025/i)).toBeInTheDocument();
+    expect(within(openedRowEl).getByText('$0.00')).toBeInTheDocument();
+    expect(within(openedRowEl).getByLabelText('E-signature status: Opened')).toBeInTheDocument();
+
+    const draftRowText = screen.getByText('Draft change order');
+    const draftRow = draftRowText.closest('li');
+    expect(draftRow).toBeTruthy();
+    expect(within(draftRow as HTMLElement).queryByLabelText(/E-signature status:/i)).toBeNull();
+  });
+
   it.each([
     ['not_sent', ['Sent', 'Opened', 'Signed'], 'Ready to send for signature.'],
     ['sent', ['Sent', 'Opened', 'Signed'], 'Signature request sent to customer.'],

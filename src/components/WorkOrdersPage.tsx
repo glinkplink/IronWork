@@ -59,18 +59,18 @@ function renderEsignStrip(status: WorkOrderDashboardJob['esign_status']) {
 
   return (
     <span
-      className="work-orders-esign-strip"
+      className="esign-strip"
       title={`E-signature: ${progress.title}`}
       aria-label={`E-signature status: ${progress.title}`}
     >
       {progress.steps.map((step) => (
         <span
           key={step.key}
-          className={`work-orders-esign-segment work-orders-esign-segment-${step.tone}`}
+          className={`esign-strip-segment esign-strip-segment-${step.tone}`}
           aria-hidden="true"
         />
       ))}
-      <span className="work-orders-esign-text">{progress.title}</span>
+      <span className="esign-strip-text">{progress.title}</span>
     </span>
   );
 }
@@ -153,7 +153,6 @@ const WorkOrderRow = memo(function WorkOrderRow({
             <span className="work-orders-wo">{woLabel}</span>
             <span className="work-orders-wo-date">{`· ${jobMetaLabel}`}</span>
           </span>
-          {renderEsignStrip(job.esign_status)}
           <span className="work-orders-customer">{job.customer_name}</span>
         </button>
         {job.changeOrderCount > 0 ? (
@@ -166,6 +165,7 @@ const WorkOrderRow = memo(function WorkOrderRow({
             View & Create Change Orders
           </button>
         ) : null}
+        {renderEsignStrip(job.esign_status)}
       </div>
       <div className="work-orders-row-actions">
         {!invoice ? (

@@ -68,7 +68,7 @@ VITE_GEOAPIFY_API_KEY=...   # optional — job site street autocomplete
 ```
 src/
   App.tsx                    # Root — view state machine, auth-aware shell
-  App.css                    # Global design tokens, app shell/layout, shared utilities, print/PDF globals
+  App.css                    # Global design tokens, app shell/layout, shared utilities (badges, mini e-sign strip), print/PDF globals
   index.css                  # Base reset + font stack
   components/
     AuthPage.tsx             # Sign-in only (email + password); header “Sign In”
@@ -89,7 +89,7 @@ src/
     WorkOrdersPage.tsx       # Paginated work-order dashboard; toolbar “Create Work Order”; invoice actions; opens detail
     WorkOrdersPage.css       # WorkOrdersPage-only list/dashboard chrome + invoice warning banner
     WorkOrderDetailPage.tsx  # Saved job → agreement + job-level invoice strip + change orders + PDFs
-    WorkOrderDetailPage.css  # WO detail invoice strip + CO sublist (e.g. `.co-list-*`)
+    WorkOrderDetailPage.css  # WO detail invoice strip + CO row ordering/sublist (e.g. `.co-list-*`)
     ChangeOrderDetailPage.tsx # Saved change order → HTML/PDF + actions
     ChangeOrderDetailPage.css # CO detail-only chrome (e.g. `.co-detail-*`)
     ChangeOrderWizard.tsx    # Create/edit change order (3 steps)

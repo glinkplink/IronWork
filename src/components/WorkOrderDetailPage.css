@@ -25,7 +25,11 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 4px;
+}
+
+.co-list-item .work-orders-row-main {
+  gap: 8px;
 }
 
 .co-list-heading {
@@ -45,16 +49,29 @@
   border-bottom: 2px solid var(--text-primary);
 }
 
+.co-list-heading-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+}
+
 .co-list-number {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.co-list-date {
+  font-size: calc(0.8125rem - 1px);
+  font-weight: 400;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .co-list-desc {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -65,6 +82,10 @@
   font-size: 14px;
   font-weight: 600;
   color: #2a7a3b;
+}
+
+.co-list-item .esign-strip {
+  margin-top: 0;
 }
 
 .work-orders-empty.wo-co-finalized-block {
