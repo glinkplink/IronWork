@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
+import { fetchWithSupabaseAuth } from '../lib/fetch-with-supabase-auth';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import {
@@ -35,8 +36,12 @@ export function InvoiceFinalPage({
   const [notesError, setNotesError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
+  const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
+  const [paymentLinkError, setPaymentLinkError] = useState('');
+  const [paymentLinkCopied, setPaymentLinkCopied] = useState(false);
 
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const paymentLinkCopiedTimeoutRef = useRef<number | null>(null);
 
   const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
   const businessStatus = getInvoiceBusinessStatus(invoiceProp);
@@ -57,6 +62,84 @@ export function InvoiceFinalPage({
   useEffect(() => {
     setNotesDraft(invoiceProp.notes ?? '');
   }, [invoiceProp.id, invoiceProp.notes]);
+
+  useEffect(() => {
+    return () => {
+      if (paymentLinkCopiedTimeoutRef.current !== null) {
+        window.clearTimeout(paymentLinkCopiedTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const paymentUrl = invoiceProp.stripe_payment_url;
+  const paymentLinkButtonLabel = paymentLinkCopied
+    ? 'Copied!'
+    : paymentUrl
+      ? 'Copy Payment Link'
+      : paymentLinkLoading
+        ? 'Creating...'
+        : 'Create Payment Link';
+
+  const flashPaymentLinkCopied = () => {
+    if (paymentLinkCopiedTimeoutRef.current !== null) {
+      window.clearTimeout(paymentLinkCopiedTimeoutRef.current);
+    }
+    setPaymentLinkCopied(true);
+    paymentLinkCopiedTimeoutRef.current = window.setTimeout(() => {
+      paymentLinkCopiedTimeoutRef.current = null;
+      setPaymentLinkCopied(false);
+    }, 1500);
+  };
+
+  const handleCopyPaymentLink = async () => {
+    setPaymentLinkError('');
+
+    if (paymentUrl) {
+      try {
+        await navigator.clipboard.writeText(paymentUrl);
+        flashPaymentLinkCopied();
+      } catch {
+        setPaymentLinkError('Could not copy payment link.');
+      }
+      return;
+    }
+
+    setPaymentLinkLoading(true);
+    try {
+      const res = await fetchWithSupabaseAuth(`/api/stripe/invoices/${invoiceProp.id}/payment-link`, {
+        method: 'POST',
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        payment_link_id?: string | null;
+        url?: string;
+      };
+      if (!res.ok || !json.url) {
+        setPaymentLinkError(json.error ?? 'Could not create payment link.');
+        return;
+      }
+
+      const updated: Invoice = {
+        ...invoiceProp,
+        stripe_payment_link_id: json.payment_link_id ?? invoiceProp.stripe_payment_link_id,
+        stripe_payment_url: json.url,
+      };
+      onInvoiceUpdated(updated);
+
+      try {
+        await navigator.clipboard.writeText(json.url);
+        flashPaymentLinkCopied();
+      } catch {
+        setPaymentLinkError('Payment link created, but copying it failed.');
+      }
+    } catch (error) {
+      setPaymentLinkError(
+        error instanceof Error ? error.message : 'Could not create payment link.'
+      );
+    } finally {
+      setPaymentLinkLoading(false);
+    }
+  };
 
   const handleDownload = async () => {
     setDownloadError('');
@@ -150,9 +233,7 @@ export function InvoiceFinalPage({
       ) : null}
 
       <section className="invoice-final-payment-card" aria-labelledby="invoice-payment-heading">
-        <h2 id="invoice-payment-heading">
-          Send Invoice
-        </h2>
+        <h2 id="invoice-payment-heading">Send Invoice</h2>
         {invoiceProp.issued_at && (
           <div className="invoice-issued-metadata">
             Issued: {new Date(invoiceProp.issued_at).toLocaleDateString('en-US', {
@@ -163,11 +244,20 @@ export function InvoiceFinalPage({
           </div>
         )}
         <p className="invoice-final-payment-text">
-          Payment links coming soon. Download the PDF to share manually in the meantime.
+          Create a Stripe payment link, then copy and share it manually.
         </p>
+        {paymentLinkError ? (
+          <p className="invoice-final-payment-feedback">{paymentLinkError}</p>
+        ) : null}
         <div className="invoice-final-payment-actions">
           <button disabled className="btn-secondary btn-action">Send Invoice (Coming Soon)</button>
-          <button disabled className="btn-primary btn-action" title="Stripe payment links coming soon">Copy Payment Link</button>
+          <button
+            className="btn-primary btn-action"
+            disabled={paymentLinkLoading}
+            onClick={() => void handleCopyPaymentLink()}
+          >
+            {paymentLinkButtonLabel}
+          </button>
         </div>
       </section>
 

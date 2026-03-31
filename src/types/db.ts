@@ -21,6 +21,8 @@ export interface BusinessProfile {
   default_payment_terms_days: number;
   default_late_fee_rate: number;
   default_card_fee_note: boolean;
+  stripe_account_id: string | null;
+  stripe_onboarding_complete: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -213,6 +215,10 @@ export interface Invoice {
   total: number;
   payment_methods: string[];
   notes: string | null;
+  stripe_payment_link_id: string | null;
+  stripe_payment_url: string | null;
+  payment_status: 'unpaid' | 'paid' | 'offline';
+  paid_at: string | null;
   created_at: string;
   updated_at: string;
 }

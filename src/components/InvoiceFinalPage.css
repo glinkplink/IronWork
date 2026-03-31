@@ -31,6 +31,12 @@
   margin: 0 0 var(--space-md);
 }
 
+.invoice-final-payment-feedback {
+  color: #8b2942;
+  font-size: 0.8125rem;
+  margin: 0 0 var(--space-sm);
+}
+
 .invoice-final-payment-actions {
   display: flex;
   flex-direction: column;
