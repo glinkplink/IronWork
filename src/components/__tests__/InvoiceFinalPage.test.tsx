@@ -118,13 +118,15 @@ function baseProfile(): BusinessProfile {
     default_payment_terms_days: 30,
     default_late_fee_rate: 0,
     default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
   };
 }
 
 function baseInvoice(overrides: Partial<Invoice> = {}): Invoice {
-  return {
+  const invoice: Invoice = {
     id: 'inv-1',
     user_id: 'u1',
     job_id: 'job-1',
@@ -134,6 +136,10 @@ function baseInvoice(overrides: Partial<Invoice> = {}): Invoice {
     status: 'draft',
     issued_at: null,
     line_items: [],
+    stripe_payment_link_id: null,
+    stripe_payment_url: null,
+    payment_status: 'unpaid',
+    paid_at: null,
     subtotal: 250,
     tax_rate: 0,
     tax_amount: 0,
@@ -144,6 +150,11 @@ function baseInvoice(overrides: Partial<Invoice> = {}): Invoice {
     updated_at: '2025-01-01T00:00:00Z',
     ...overrides,
   };
+  invoice.stripe_payment_link_id = overrides.stripe_payment_link_id ?? null;
+  invoice.stripe_payment_url = overrides.stripe_payment_url ?? null;
+  invoice.payment_status = overrides.payment_status ?? 'unpaid';
+  invoice.paid_at = overrides.paid_at ?? null;
+  return invoice;
 }
 
 describe('InvoiceFinalPage', () => {

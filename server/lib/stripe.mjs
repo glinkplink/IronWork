@@ -71,6 +71,31 @@ export async function createAccountOnboardingLink(accountId, returnUrl, refreshU
   }
 }
 
+export async function getConnectedAccount(accountId) {
+  const stripe = getStripe();
+  if (!stripe) {
+    return { data: null, error: 'Stripe not configured' };
+  }
+
+  try {
+    const account = await stripe.accounts.retrieve(accountId);
+    return {
+      data: {
+        id: account.id,
+        details_submitted: Boolean(account.details_submitted),
+        charges_enabled: Boolean(account.charges_enabled),
+        payouts_enabled: Boolean(account.payouts_enabled),
+      },
+      error: null,
+    };
+  } catch (error) {
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'Could not load Stripe account.',
+    };
+  }
+}
+
 export async function createInvoicePaymentLink(input) {
   const stripe = getStripe();
   if (!stripe) {

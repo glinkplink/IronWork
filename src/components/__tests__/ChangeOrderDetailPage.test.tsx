@@ -31,6 +31,8 @@ function minimalProfile(): BusinessProfile {
     default_payment_terms_days: 30,
     default_late_fee_rate: 0,
     default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
   };

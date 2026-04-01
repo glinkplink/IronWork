@@ -59,6 +59,14 @@ A contractor can **start a work order without signing in**. They fill the job fo
 - **DB:** Migration **`0010_jobs_esign.sql`** adds **`jobs.esign_*`** columns; **`0011_jobs_esign_status_check.sql`** adds the status CHECK constraint; **`0012_jobs_inflight_esign_by_user_created_at.sql`** adds an index for in-flight polling; **`0013_change_orders_esign.sql`** adds matching **`change_orders.esign_*`** columns + constraint + index; **`0016_invoices_esign_and_issuance.sql`** adds **`invoices.issued_at`** for business issuance tracking. **`WorkOrderListJob.esign_status`** powers the work-orders list progress strip; work-order and change-order detail surfaces share the same Sent / Opened / Signed timeline card. Invoice business badges derive from `issued_at` (no e-sign tracking).
 - **Hosted deploys (e.g. Render):** The Node process must have **`DOCUSEAL_API_KEY`**, **`SUPABASE_URL`**, **`SUPABASE_SERVICE_ROLE_KEY`**, and webhook header secrets in the **runtime** environment (dashboard env vars—not only `VITE_*` at build). Blueprint/`render.yaml` sync can overwrite dashboard-only vars if the YAML omits them. **End-to-end DocuSeal checks** (inbound email copy, signed PDF appearance, webhook delivery) use the **deployed** public URL and that environment; localhost can still run e-sign when `.env.local` is complete.
 
+### Stripe Connect / payments
+
+- **Routes (same app server as PDFs):** `POST /api/stripe/connect/start`, `GET /api/stripe/connect/status`, `POST /api/stripe/invoices/:invoiceId/payment-link`, and `POST /api/stripe/webhook`.
+- **Auth:** Connect start/status and invoice payment-link routes require `Authorization: Bearer <Supabase access_token>`; the server verifies the JWT and loads the caller’s `business_profiles` row via the Supabase service role. The webhook does **not** use Supabase auth; it verifies the Stripe signature with `STRIPE_WEBHOOK_SECRET`.
+- **Profile integration:** `business_profiles.stripe_account_id` stores the connected account id. `business_profiles.stripe_onboarding_complete` is reconciled from Stripe account state by `GET /api/stripe/connect/status` when the user returns from onboarding.
+- **Return flow:** Stripe onboarding returns to `/?stripe_connect=return` and refresh uses `/?stripe_connect=refresh`. The client moves the user to **Edit Profile**, clears the query param from the URL, reloads profile state, and surfaces a status banner there.
+- **Hosted deploys (e.g. Render):** The runtime environment must include **`STRIPE_SECRET_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, and optionally **`APP_BASE_URL`** if forwarded headers are not sufficient to derive the public origin for Connect return links.
+
 ### PDF vs preview (`server/app-server.mjs` + `AgreementPreview.tsx`)
 - **Web fonts**: PDF HTML includes the same Google Fonts `<link>`s as `index.html` (Barlow + **Dancing
   Script** for the Service Provider signature). The server waits for `document.fonts.ready`, loads
@@ -164,6 +172,7 @@ scope-lock/
 │   │   ├── docuseal-constants.ts          # Shared DocuSeal role name(s)
 │   │   ├── docuseal-signature-image.ts    # Render DocuSeal SP signature image
 │   │   ├── esign-api.ts                   # send/resend WO and CO for signature (app server API)
+│   │   ├── stripe-connect.ts              # Authenticated Stripe Connect start/status helpers
 │   │   ├── esign-labels.ts                # E-sign status strings for UI
 │   │   ├── esign-live.ts                  # Shared polling cadence + in-flight status helpers + timestamp formatting
 │   │   ├── esign-progress.ts              # Shared e-sign step/tone model for detail timeline + list strip
@@ -188,7 +197,9 @@ scope-lock/
 │   ├── App.tsx                       # Root component - view state machine + lazy-loaded document/dashboard screens
 │   └── main.tsx                      # Entry point
 ├── server/
-│   ├── app-server.mjs               # App server + /api/pdf + e-sign + DocuSeal webhook
+│   ├── app-server.mjs               # App server + /api/pdf + e-sign + Stripe routes
+│   ├── stripe-routes.mjs            # Stripe Connect start/status, payment-link, Stripe webhook
+│   ├── lib/stripe.mjs               # Stripe SDK helpers for accounts, payment links, webhook verification
 │   ├── esign-routes.mjs             # JWT send/resend; webhook + service-role e-sign updates
 │   └── docuseal-esign-state.mjs     # DocuSeal submission → shared esign_* patch fields
 ├── supabase/
@@ -248,6 +259,7 @@ Edit profile (gear) → EditProfilePage
 - **Returning users:** **AuthPage** is sign-in only (email + password).
 - **Missing profile row** while signed in: **BusinessProfileForm** blocks the rest of the app until `business_profiles` exists.
 - **Profile data** (defaults, counters, payment methods, tax, etc.) lives in **`business_profiles`**; jobs, clients, invoices, and change orders are separate tables with RLS. See **What Is and Isn't Persisted** below.
+- **Stripe Connect entrypoint:** **Edit Profile** owns the Stripe onboarding CTA. The CTA is a separate `type="button"` action, not a second form submit: it saves the profile first, then starts Stripe onboarding if save succeeds.
 
 ## Domain Logic vs UI Logic
 
@@ -282,7 +294,7 @@ Four tables in Supabase Postgres, all with row-level security:
 
 | Table | Key Columns |
 |---|---|
-| `business_profiles` | user_id (unique), business_name, owner_name, phone, email, address, google_business_profile_url, default_exclusions[], default_assumptions[], default_tax_rate, default_payment_methods[], next_wo_number, next_invoice_number, … |
+| `business_profiles` | user_id (unique), business_name, owner_name, phone, email, address, google_business_profile_url, default_exclusions[], default_assumptions[], default_tax_rate, default_payment_methods[], next_wo_number, next_invoice_number, stripe_account_id, stripe_onboarding_complete, … |
 | `clients` | user_id, name, **name_normalized** (dedup key), phone, email, address, notes |
 | `jobs` | user_id, client_id, all WelderJob fields, status, **esign_submission_id**, **esign_submitter_id**, **esign_embed_src**, **esign_status** (`not_sent`\|`sent`\|`opened`\|`completed`\|`declined`\|`expired`), esign_submission_state, esign_submitter_state, esign_sent/opened/completed/declined_at, esign_decline_reason, esign_signed_document_url |
 | `change_orders` | user_id, job_id, **co_number** (per-job sequence, UNIQUE with job_id), description, reason, status (`draft` \| `pending_approval` \| `approved` \| `rejected`), **line_items** (jsonb), time_amount / time_unit / time_note, requires_approval, **esign_submission_id**, **esign_submitter_id**, **esign_embed_src**, **esign_status** (`not_sent`\|`sent`\|`opened`\|`completed`\|`declined`\|`expired`), esign_* timestamp/state columns — legacy `price_delta` / `time_delta` / `approved` were migrated in **0005** |

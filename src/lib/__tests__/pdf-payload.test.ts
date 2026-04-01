@@ -49,6 +49,8 @@ const baseProfile: BusinessProfile = {
   default_card_fee_note: false,
   next_wo_number: 2,
   next_invoice_number: 1,
+  stripe_account_id: null,
+  stripe_onboarding_complete: false,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 };

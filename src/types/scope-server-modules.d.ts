@@ -7,6 +7,7 @@ declare module '@scope-server/lib/service-supabase.mjs' {
 }
 
 declare module '@scope-server/stripe-routes.mjs' {
+  export function resetStripeServiceSupabaseSingleton(): void;
   export function tryHandleStripeRoute(
     req: unknown,
     res: unknown,

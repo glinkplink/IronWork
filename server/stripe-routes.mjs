@@ -1,7 +1,17 @@
-import { createAccountOnboardingLink, createConnectedAccount, createInvoicePaymentLink, constructWebhookEvent } from './lib/stripe.mjs';
+import {
+  createAccountOnboardingLink,
+  createConnectedAccount,
+  createInvoicePaymentLink,
+  constructWebhookEvent,
+  getConnectedAccount,
+} from './lib/stripe.mjs';
 import { createClient } from '@supabase/supabase-js';
 
 let serviceSupabaseSingleton = null;
+
+export function resetStripeServiceSupabaseSingleton() {
+  serviceSupabaseSingleton = null;
+}
 
 function getServiceSupabase({ errorCode = 'STRIPE_CONFIG', errorMessage } = {}) {
   if (serviceSupabaseSingleton) return serviceSupabaseSingleton;
@@ -61,6 +71,10 @@ function parseStripeRoute(req) {
     return { kind: 'connect-start' };
   }
 
+  if (method === 'GET' && path === '/api/stripe/connect/status') {
+    return { kind: 'connect-status' };
+  }
+
   if (method === 'POST' && path === '/api/stripe/webhook') {
     return { kind: 'webhook' };
   }
@@ -77,6 +91,23 @@ function stripeConfigError(message) {
   const err = new Error(message);
   err.code = 'STRIPE_CONFIG';
   return err;
+}
+
+function stripeConnectionStatus(profile, account = null) {
+  const connected = Boolean(profile?.stripe_account_id);
+  const onboardingComplete = Boolean(profile?.stripe_onboarding_complete);
+  return {
+    accountId: connected ? profile.stripe_account_id : null,
+    onboardingComplete,
+    status: !connected ? 'not_connected' : onboardingComplete ? 'connected' : 'incomplete',
+    detailsSubmitted: Boolean(account?.details_submitted),
+    chargesEnabled: Boolean(account?.charges_enabled),
+    payoutsEnabled: Boolean(account?.payouts_enabled),
+  };
+}
+
+function isStripeOnboardingComplete(account) {
+  return Boolean(account?.details_submitted);
 }
 
 function paymentDateFromEvent(event) {
@@ -115,16 +146,64 @@ async function authenticate(req, sendJson, res) {
   };
 }
 
+async function getProfileByUserId(supabase, userId, columns = '*') {
+  return supabase.from('business_profiles').select(columns).eq('user_id', userId).maybeSingle();
+}
+
+async function reconcileStripeOnboardingStatus(supabase, profile) {
+  if (!profile?.stripe_account_id) {
+    return {
+      profile,
+      account: null,
+      onboardingComplete: false,
+    };
+  }
+
+  const { data: account, error } = await getConnectedAccount(profile.stripe_account_id);
+  if (error || !account) {
+    return { profile: null, account: null, onboardingComplete: false, error };
+  }
+
+  const onboardingComplete = isStripeOnboardingComplete(account);
+  let nextProfile = profile;
+
+  if (Boolean(profile.stripe_onboarding_complete) !== onboardingComplete) {
+    const { data: updatedProfile, error: updateErr } = await supabase
+      .from('business_profiles')
+      .update({ stripe_onboarding_complete: onboardingComplete })
+      .eq('user_id', profile.user_id)
+      .select('*')
+      .maybeSingle();
+
+    if (updateErr) {
+      return {
+        profile: null,
+        account,
+        onboardingComplete,
+        error: updateErr.message,
+      };
+    }
+
+    nextProfile = updatedProfile ?? {
+      ...profile,
+      stripe_onboarding_complete: onboardingComplete,
+    };
+  }
+
+  return {
+    profile: nextProfile,
+    account,
+    onboardingComplete,
+    error: null,
+  };
+}
+
 async function handleConnectStart(req, res, sendJson) {
   const auth = await authenticate(req, sendJson, res);
   if (!auth) return;
 
   const { supabase, userId } = auth;
-  const { data: profile, error: profileErr } = await supabase
-    .from('business_profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
+  const { data: profile, error: profileErr } = await getProfileByUserId(supabase, userId);
 
   if (profileErr) {
     sendJson(res, 500, { error: profileErr.message });
@@ -180,6 +259,40 @@ async function handleConnectStart(req, res, sendJson) {
     accountId: stripeAccountId,
     url: linkData.url,
   });
+}
+
+async function handleConnectStatus(req, res, sendJson) {
+  const auth = await authenticate(req, sendJson, res);
+  if (!auth) return;
+
+  const { supabase, userId } = auth;
+  const { data: profile, error: profileErr } = await getProfileByUserId(supabase, userId);
+
+  if (profileErr) {
+    sendJson(res, 500, { error: profileErr.message });
+    return;
+  }
+  if (!profile) {
+    sendJson(res, 404, { error: 'Business profile not found.' });
+    return;
+  }
+  if (!profile.stripe_account_id) {
+    sendJson(res, 200, stripeConnectionStatus(profile, null));
+    return;
+  }
+
+  const { profile: reconciledProfile, account, error } = await reconcileStripeOnboardingStatus(
+    supabase,
+    profile
+  );
+  if (error || !reconciledProfile) {
+    sendJson(res, isStripeConfigErrorMessage(error) ? 503 : 502, {
+      error: error || 'Could not load Stripe account status.',
+    });
+    return;
+  }
+
+  sendJson(res, 200, stripeConnectionStatus(reconciledProfile, account));
 }
 
 async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
@@ -264,12 +377,6 @@ async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
     sendJson(res, 500, { error: updateErr.message });
     return;
   }
-
-  await supabase
-    .from('business_profiles')
-    .update({ stripe_onboarding_complete: true })
-    .eq('user_id', userId)
-    .eq('stripe_account_id', profile.stripe_account_id);
 
   sendJson(res, 200, {
     url: linkData.url,
@@ -382,6 +489,9 @@ export async function tryHandleStripeRoute(req, res, helpers) {
   switch (route.kind) {
     case 'connect-start':
       await handleConnectStart(req, res, helpers.sendJson);
+      return true;
+    case 'connect-status':
+      await handleConnectStatus(req, res, helpers.sendJson);
       return true;
     case 'payment-link':
       await handleInvoicePaymentLink(req, res, helpers.sendJson, route.invoiceId);

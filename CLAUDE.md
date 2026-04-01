@@ -29,6 +29,7 @@ Work agreement generator for contractors (initially welders). Contractors fill o
 | App Server | Node **`server/app-server.mjs`**: Vite **middleware** (dev) or static **`dist/`** when `NODE_ENV=production`; loads **`.env`** then **`.env.local`** (`dotenv`) for server-only secrets |
 | PDF | Puppeteer Core + **system Chrome**; all document PDFs via **same-origin** `POST /api/pdf` |
 | E-sign | DocuSeal **HTML submissions** from the client; work-order and change-order **send/resend** plus authenticated **`GET .../status`** (DocuSeal sync), **`POST /api/webhooks/docuseal`** (see **ARCHITECTURE.md**) |
+| Payments | Stripe Connect Express onboarding via authenticated **`/api/stripe/connect/start`** + **`/api/stripe/connect/status`**; invoice payment links + **`POST /api/stripe/webhook`** |
 | Styling | Plain CSS (`index.css`, global `App.css`, and co-located component/page CSS files) — no Tailwind |
 | Font | Barlow (+ Dancing Script for agreement signature) — field notebook aesthetic |
 
@@ -51,13 +52,14 @@ VITE_SUPABASE_ANON_KEY=...
 VITE_GEOAPIFY_API_KEY=...   # optional — job site street autocomplete
 ```
 
-**Server env** (read by `app-server.mjs` at runtime from `.env` / `.env.local`, not `VITE_`): `PUPPETEER_EXECUTABLE_PATH` or `CHROME_PATH` if default Chrome path is wrong; `PORT`, `HOST`; `NODE_ENV=production` for static `dist/` mode. For **DocuSeal** e-sign: `DOCUSEAL_API_KEY`, optional `DOCUSEAL_BASE_URL`, **`DOCUSEAL_WEBHOOK_HEADER_NAME`** + **`DOCUSEAL_WEBHOOK_HEADER_VALUE`** (raw secret in env; server compares **SHA-256** digests for fixed-length timing-safe compare — see **ARCHITECTURE.md**), **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`**. Missing DocuSeal/Supabase server keys on the **running** process → send/resend returns **503** with **`E-sign is temporarily unavailable.`** **Hosted** services (e.g. Render) must set these on the **web service** environment, not only `VITE_*` at build. Quick checks: `GET /api/pdf/health` → `{ "ok": true }`; `GET /api/webhooks/docuseal` → `{ "ok": true }`.
+**Server env** (read by `app-server.mjs` at runtime from `.env` / `.env.local`, not `VITE_`): `PUPPETEER_EXECUTABLE_PATH` or `CHROME_PATH` if default Chrome path is wrong; `PORT`, `HOST`; `NODE_ENV=production` for static `dist/` mode. For **DocuSeal** e-sign: `DOCUSEAL_API_KEY`, optional `DOCUSEAL_BASE_URL`, **`DOCUSEAL_WEBHOOK_HEADER_NAME`** + **`DOCUSEAL_WEBHOOK_HEADER_VALUE`** (raw secret in env; server compares **SHA-256** digests for fixed-length timing-safe compare — see **ARCHITECTURE.md**), **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`**. For **Stripe**: **`STRIPE_SECRET_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, and optional **`APP_BASE_URL`** for Connect return URLs. Missing DocuSeal/Supabase server keys on the **running** process → send/resend returns **503** with **`E-sign is temporarily unavailable.`** Missing Stripe server keys surface as **503** from Stripe routes. **Hosted** services (e.g. Render) must set these on the **web service** environment, not only `VITE_*` at build. Quick checks: `GET /api/pdf/health` → `{ "ok": true }`; `GET /api/webhooks/docuseal` → `{ "ok": true }`.
 
 ---
 
 ## Server, PDFs, deployment (reality check)
 
 - **Not static-only hosting:** Work order, invoice, and change-order PDFs all need the **Node server** and a **local Chrome/Chromium** binary. The browser posts HTML to **`/api/pdf`** on the **same origin** as the UI. **DocuSeal** send/resend, **status** polling, and inbound **webhooks** use the same app server (`/api/esign/...`, `/api/webhooks/docuseal`).
+- **Stripe routes live on the same server:** Edit Profile uses authenticated **`POST /api/stripe/connect/start`** and **`GET /api/stripe/connect/status`** for Connect onboarding and reconciliation. Invoice payment links and **`POST /api/stripe/webhook`** also run on this server.
 - **Single entrypoint:** Use `npm run dev` or `npm run preview` / `NODE_ENV=production node server/app-server.mjs` — there is no supported “Vite-only” production path if you want working downloads.
 - **Operator detail:** Env tables, reverse-proxy notes, and common deployment mistakes → **[README.md](./README.md)** and **[ARCHITECTURE.md](./ARCHITECTURE.md)** (Deployment + Portability).
 
@@ -118,6 +120,7 @@ src/
     docuseal-constants.ts      # Shared DocuSeal role name(s)
     docuseal-signature-image.ts # Render DocuSeal SP signature as image in signed documents
     fetch-with-supabase-auth.ts # Same-origin fetch with Bearer from Supabase session
+    stripe-connect.ts        # Authenticated Stripe Connect start/status helpers for the profile UI
     esign-api.ts               # send/resend/status helpers for work orders and change orders
     esign-labels.ts            # E-sign status strings for UI
     esign-progress.ts          # Shared e-sign step/tone model for detail timeline + list strip
@@ -155,7 +158,9 @@ src/
     sample-job.json          # Default/placeholder values for new agreements
 server/
   app-server.mjs             # App server + /api/pdf + e-sign + DocuSeal webhook routes
+  stripe-routes.mjs          # Stripe Connect start/status, invoice payment links, Stripe webhook
   esign-routes.mjs           # JWT send/resend; webhook verify + service-role e-sign updates
+  lib/stripe.mjs             # Stripe SDK helpers for account links, account status, payment links, webhook verification
   docuseal-esign-state.mjs   # Map DocuSeal submission/submitter → shared esign_* patch (shared w/ tests via @scope-server alias)
 ```
 

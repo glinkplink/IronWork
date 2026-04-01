@@ -23,7 +23,7 @@ vi.mock('../../lib/db/profile', () => ({
 }));
 
 function baseProfile(over: Partial<BusinessProfile> = {}): BusinessProfile {
-  return {
+  const profile: BusinessProfile = {
     id: 'p1',
     user_id: 'u1',
     business_name: 'B',
@@ -44,10 +44,15 @@ function baseProfile(over: Partial<BusinessProfile> = {}): BusinessProfile {
     default_payment_terms_days: 30,
     default_late_fee_rate: 0,
     default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
     ...over,
   };
+  profile.stripe_account_id = over.stripe_account_id ?? null;
+  profile.stripe_onboarding_complete = over.stripe_onboarding_complete ?? false;
+  return profile;
 }
 
 describe('useWorkOrderDraft', () => {

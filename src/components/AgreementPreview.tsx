@@ -76,6 +76,8 @@ function buildCapturedProfileStub(result: {
     default_payment_terms_days: 14,
     default_late_fee_rate: 1.5,
     default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
     created_at: '',
     updated_at: '',
   };
