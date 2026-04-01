@@ -234,13 +234,31 @@ export function InvoiceFinalPage({
 
       <section className="invoice-final-payment-card" aria-labelledby="invoice-payment-heading">
         <h2 id="invoice-payment-heading">Send Invoice</h2>
-        {invoiceProp.issued_at && (
+        {(invoiceProp.issued_at || invoiceProp.payment_status === 'paid') && (
           <div className="invoice-issued-metadata">
-            Issued: {new Date(invoiceProp.issued_at).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
-            })}
+            {invoiceProp.issued_at && (
+              <span>
+                Issued: {new Date(invoiceProp.issued_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </span>
+            )}
+            {invoiceProp.payment_status === 'paid' && (
+              <span className="invoice-paid-indicator">
+                <span className="badge-paid">Paid</span>
+                {invoiceProp.paid_at && (
+                  <span className="invoice-paid-date">
+                    {new Date(invoiceProp.paid_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         )}
         <p className="invoice-final-payment-text">

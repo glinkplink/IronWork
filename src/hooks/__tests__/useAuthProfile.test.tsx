@@ -124,8 +124,13 @@ describe('useAuthProfile Stripe connect handling', () => {
     expect(window.location.search).toBe('');
   });
 
-  it('shows an info notice on refresh without calling Stripe status', async () => {
+  it('shows an info notice on refresh when onboarding is incomplete', async () => {
     const replaceView = vi.fn();
+    getStripeConnectStatusMock.mockResolvedValue({
+      accountId: 'acct_123',
+      onboardingComplete: false,
+      status: 'pending',
+    });
     window.history.replaceState({}, '', '/?stripe_connect=refresh');
 
     render(
@@ -136,12 +141,38 @@ describe('useAuthProfile Stripe connect handling', () => {
     );
 
     await waitFor(() => {
+      expect(getStripeConnectStatusMock).toHaveBeenCalledTimes(1);
       expect(replaceView).toHaveBeenCalledWith('profile');
       expect(screen.getByTestId('notice')).toHaveTextContent(
         /info:Stripe setup is still incomplete/i
       );
     });
-    expect(getStripeConnectStatusMock).not.toHaveBeenCalled();
+    expect(window.location.search).toBe('');
+  });
+
+  it('shows a success notice on refresh when onboarding is complete', async () => {
+    const replaceView = vi.fn();
+    getStripeConnectStatusMock.mockResolvedValue({
+      accountId: 'acct_123',
+      onboardingComplete: true,
+      status: 'connected',
+    });
+    window.history.replaceState({}, '', '/?stripe_connect=refresh');
+
+    render(
+      <Harness
+        replaceView={replaceView}
+        setWorkOrdersSuccessBanner={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(getStripeConnectStatusMock).toHaveBeenCalledTimes(1);
+      expect(replaceView).toHaveBeenCalledWith('profile');
+      expect(screen.getByTestId('notice')).toHaveTextContent(
+        /success:Stripe account connected/i
+      );
+    });
     expect(window.location.search).toBe('');
   });
 });

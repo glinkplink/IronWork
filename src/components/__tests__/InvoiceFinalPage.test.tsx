@@ -190,9 +190,9 @@ describe('InvoiceFinalPage', () => {
     renderPage();
 
     expect(screen.getByText('Send Invoice')).toBeInTheDocument();
-    expect(screen.getByText('Payment links coming soon. Download the PDF to share manually in the meantime.')).toBeInTheDocument();
+    expect(screen.getByText('Create a Stripe payment link, then copy and share it manually.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /send invoice \(coming soon\)/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /copy payment link/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /create payment link/i })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /download invoice/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /edit invoice/i })).toBeInTheDocument();
   });

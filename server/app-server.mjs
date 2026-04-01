@@ -23,6 +23,8 @@ const executablePath =
   process.env.CHROME_PATH ||
   '/usr/bin/google-chrome-stable';
 
+const COMMON_HEADERS = { 'X-Content-Type-Options': 'nosniff' };
+
 let browserPromise;
 
 async function getBrowser() {
@@ -46,12 +48,12 @@ async function getBrowser() {
 }
 
 function sendText(res, statusCode, message) {
-  res.writeHead(statusCode, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.writeHead(statusCode, { ...COMMON_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' });
   res.end(message);
 }
 
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(statusCode, { ...COMMON_HEADERS, 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(payload));
 }
 
@@ -199,6 +201,7 @@ async function handlePdfRequest(req, res) {
     });
 
     res.writeHead(200, {
+      ...COMMON_HEADERS,
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename || 'work-order.pdf'}"`,
       'Content-Length': pdf.length,
@@ -296,13 +299,22 @@ async function createAppServer() {
 
     try {
       const mimeType = getMimeType(filePath);
-      res.writeHead(200, { 'Content-Type': mimeType });
+      const isHtml = mimeType.startsWith('text/html');
+      res.writeHead(200, {
+        ...COMMON_HEADERS,
+        ...(isHtml ? { 'X-Frame-Options': 'DENY' } : {}),
+        'Content-Type': mimeType,
+      });
       createReadStream(filePath).pipe(res);
     } catch (error) {
       console.error('Static file serving failed:', error);
       try {
         const indexHtml = await readFile(path.join(distDir, 'index.html'));
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, {
+          ...COMMON_HEADERS,
+          'X-Frame-Options': 'DENY',
+          'Content-Type': 'text/html; charset=utf-8',
+        });
         res.end(indexHtml);
       } catch {
         sendText(res, 500, 'Failed to serve application.');

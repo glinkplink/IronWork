@@ -20,9 +20,37 @@
 }
 
 .invoice-issued-metadata {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
   font-size: 0.875rem;
   color: var(--text-secondary);
   margin-bottom: var(--space-sm);
+}
+
+.badge-paid {
+  display: inline-block;
+  padding: 8px var(--space-md);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: var(--radius);
+  background: #1a5f5a;
+  color: #eef7f7;
+  font-family: inherit;
+}
+
+.invoice-paid-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.invoice-paid-date {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
 }
 
 .invoice-final-payment-text {

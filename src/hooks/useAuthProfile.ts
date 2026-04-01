@@ -231,12 +231,23 @@ export function useAuthProfile({
       syncProfileView();
 
       if (stripeConnectState === 'refresh') {
-        await loadProfile({ silent: true });
-        if (!active) return;
-        setStripeConnectNotice({
-          tone: 'info',
-          message: 'Stripe setup is still incomplete. Continue onboarding to finish connecting your account.',
-        });
+        try {
+          const status = await getStripeConnectStatus();
+          await loadProfile({ silent: true });
+          if (!active) return;
+          setStripeConnectNotice(
+            status.onboardingComplete
+              ? { tone: 'success', message: 'Stripe account connected. You can now use Stripe-backed invoice payments.' }
+              : { tone: 'info', message: 'Stripe setup is still incomplete. Continue onboarding to finish connecting your account.' }
+          );
+        } catch (error) {
+          await loadProfile({ silent: true });
+          if (!active) return;
+          setStripeConnectNotice({
+            tone: 'error',
+            message: error instanceof Error ? error.message : 'Could not refresh Stripe connection status.',
+          });
+        }
         return;
       }
 
