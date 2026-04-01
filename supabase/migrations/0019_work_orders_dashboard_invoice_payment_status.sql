@@ -1,15 +1,15 @@
--- Add payment_status to latest_invoice in list_work_orders_dashboard_page RPC
--- This enables the Paid badge on the Work Orders dashboard
+-- Add payment_status to latest_invoice in list_work_orders_dashboard_page RPC.
+-- Keep the existing function signature/return type unchanged so CREATE OR REPLACE succeeds.
 
 CREATE OR REPLACE FUNCTION public.list_work_orders_dashboard_page(
   p_user_id uuid,
   p_limit integer,
-  p_cursor_created_at timestamptz,
-  p_cursor_id uuid
+  p_cursor_created_at timestamptz DEFAULT NULL,
+  p_cursor_id uuid DEFAULT NULL
 )
 RETURNS TABLE (
   id uuid,
-  wo_number text,
+  wo_number integer,
   customer_name text,
   job_type text,
   other_classification text,
@@ -43,10 +43,14 @@ AS $$
       AND (
         p_cursor_created_at IS NULL
         OR j.created_at < p_cursor_created_at
-        OR (j.created_at = p_cursor_created_at AND j.id < p_cursor_id)
+        OR (
+          j.created_at = p_cursor_created_at
+          AND p_cursor_id IS NOT NULL
+          AND j.id < p_cursor_id
+        )
       )
     ORDER BY j.created_at DESC, j.id DESC
-    LIMIT p_limit + 1
+    LIMIT GREATEST(p_limit, 1)
   ),
   page_change_orders AS (
     SELECT
@@ -55,8 +59,18 @@ AS $$
       co.co_number,
       co.esign_status
     FROM change_orders co
-    JOIN page_jobs j ON j.id = co.job_id
+    INNER JOIN page_jobs j
+      ON j.id = co.job_id
     WHERE co.user_id = p_user_id
+  ),
+  ranked_change_orders AS (
+    SELECT
+      co.id,
+      co.job_id,
+      co.co_number,
+      co.esign_status,
+      row_number() OVER (PARTITION BY co.job_id ORDER BY co.co_number ASC) AS preview_rank
+    FROM page_change_orders co
   ),
   change_order_rollups AS (
     SELECT
@@ -75,30 +89,29 @@ AS $$
         '[]'::jsonb
       ) AS change_orders_preview,
       COALESCE(bool_or(co.esign_status IN ('sent', 'opened')), false) AS has_in_flight_change_orders
-    FROM (
-      SELECT
-        co.*,
-        row_number() OVER (PARTITION BY co.job_id ORDER BY co.co_number ASC) AS preview_rank
-      FROM page_change_orders co
-    ) co
+    FROM ranked_change_orders co
     GROUP BY co.job_id
   ),
   page_job_level_invoices AS (
     SELECT
       i.id,
       i.job_id,
-      i.status,
+      i.issued_at,
       i.invoice_number,
       i.created_at,
-      i.issued_at,
       i.payment_status
     FROM invoices i
-    JOIN page_jobs j ON j.id = i.job_id
+    INNER JOIN page_jobs j
+      ON j.id = i.job_id
     WHERE i.user_id = p_user_id
       AND NOT EXISTS (
         SELECT 1
         FROM jsonb_array_elements(
-          COALESCE(i.line_items, '[]'::jsonb)
+          CASE
+            WHEN jsonb_typeof(COALESCE(i.line_items, '[]'::jsonb)) = 'array'
+              THEN COALESCE(i.line_items, '[]'::jsonb)
+            ELSE '[]'::jsonb
+          END
         ) AS elem
         WHERE COALESCE(elem->>'change_order_id', '') <> ''
       )
@@ -109,10 +122,9 @@ AS $$
       jsonb_build_object(
         'id', i.id,
         'job_id', i.job_id,
-        'status', i.status,
+        'issued_at', i.issued_at,
         'invoice_number', i.invoice_number,
         'created_at', i.created_at,
-        'issued_at', i.issued_at,
         'payment_status', i.payment_status
       ) AS latest_invoice
     FROM page_job_level_invoices i
