@@ -17,20 +17,20 @@ Everything in this section requires action outside the codebase — Stripe dashb
   - Copy the **Webhook Signing Secret** (`whsec_...`) — this is your `STRIPE_WEBHOOK_SECRET`
 - [x] **Get your Secret Key** (Dashboard → Developers → API keys → Secret key `sk_live_...`)
 - [ ] **Verify your Connect branding** (Dashboard → Connect → Settings → Branding) — contractors will see your brand during onboarding
-- [ ] **Enable ACH Debit** if you want to support it (Dashboard → Settings → Payment methods)
+- [x] **Enable ACH Debit** if you want to support it (Dashboard → Settings → Payment methods)
 - [ ] **Complete Stripe's platform profile** if required for Connect activation (business info, website, etc.)
 - [ ] **Test the full payment flow** in test mode first (use `sk_test_...` keys + `whsec_test_...`) before switching to live keys
 
 ### Supabase Dashboard
 
-- [ ] **Apply all migrations** if not already done — paste each file from `supabase/migrations/` into SQL Editor in order, or run `npx supabase db push` from local
+- [x] **Apply all migrations** if not already done — paste each file from `supabase/migrations/` into SQL Editor in order, or run `npx supabase db push` from local
   - Confirm migration `0018_stripe_scaffolding.sql` is applied (adds `stripe_account_id`, `stripe_onboarding_complete` to `business_profiles`)
-- [ ] **Confirm RLS is enabled** on all tables (Dashboard → Table Editor → each table → RLS toggle)
-- [ ] **Set up a backup schedule** if not already configured (Dashboard → Database → Backups)
+- [x] **Confirm RLS is enabled** on all tables (Dashboard → Table Editor → each table → RLS toggle)
+- [ ] **Set up a backup schedule** if not already configured (Dashboard → Database → Backups) (not doing this yet as it requires a paid plan)
 
 ### Render (or your PaaS of choice)
 
-- [ ] **Set all required environment variables** on the web service (not just build vars):
+- [x] **Set all required environment variables** on the web service (not just build vars):
   ```
   NODE_ENV=production
   APP_BASE_URL=https://your-domain.com         # no trailing slash — required for Stripe Connect redirects
@@ -45,19 +45,19 @@ Everything in this section requires action outside the codebase — Stripe dashb
   DOCUSEAL_WEBHOOK_HEADER_VALUE=...            # raw secret, not hashed
   VITE_GEOAPIFY_API_KEY=...                    # optional — job site autocomplete
   ```
-- [ ] **Set `VITE_*` vars as build-time args** (Render: Environment → add to Build env vars) — these are baked into the client bundle at build time, not runtime
-- [ ] **Verify the health check** after first deploy: `curl https://[your-domain]/api/pdf/health` → `{"ok":true}`
+- [x] **Set `VITE_*` vars as build-time args** (Render: Environment → add to Build env vars) — these are baked into the client bundle at build time, not runtime
+- [x] **Verify the health check** after first deploy: `curl https://[your-domain]/api/pdf/health` → `{"ok":true}`
 - [ ] **Set an appropriate plan** — Puppeteer + Chromium needs at least 512MB RAM; 1GB recommended
-- [ ] **Confirm Docker build is used** (the repo has a `Dockerfile` — set Render to use Docker deploy, not static)
+- [x] **Confirm Docker build is used** (the repo has a `Dockerfile` — set Render to use Docker deploy, not static)
 
 ### DNS / Domain
 
-- [ ] **Point your custom domain** to the Render service and update `APP_BASE_URL` accordingly
-- [ ] **Verify HTTPS** is working (Render provides TLS automatically for custom domains)
+- [x] **Point your custom domain** to the Render service and update `APP_BASE_URL` accordingly
+- [x] **Verify HTTPS** is working (Render provides TLS automatically for custom domains)
 
 ### DocuSeal
 
-- [ ] **Register a DocuSeal account** and get an API key
+- [x] **Register a DocuSeal account** and get an API key
 - [ ] **Configure a webhook** in DocuSeal pointing to `https://[your-domain]/api/webhooks/docuseal`
   - Copy the header name and secret value — these are `DOCUSEAL_WEBHOOK_HEADER_NAME` and `DOCUSEAL_WEBHOOK_HEADER_VALUE`
 - [ ] **Test e-sign flow** end-to-end: send a work order, receive the DocuSeal email, sign, verify the work order updates in ScopeLock
