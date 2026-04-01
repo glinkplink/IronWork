@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
 import { fetchWithSupabaseAuth } from '../lib/fetch-with-supabase-auth';
 import { sendInvoice } from '../lib/invoice-send';
+import { getWorkOrderSignatureState } from '../lib/work-order-signature';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import {
@@ -56,6 +57,11 @@ export function InvoiceFinalPage({
   const businessStatus = getInvoiceBusinessStatus(invoiceProp);
   const isIssued = businessStatus === 'invoiced';
   const isReadOnly = isIssued;
+  const signatureState = useMemo(
+    () => getWorkOrderSignatureState(job.esign_status, job.offline_signed_at),
+    [job.esign_status, job.offline_signed_at]
+  );
+  const canIssueInvoice = signatureState.isSignatureSatisfied;
   const customerTitle = job.customer_name.trim() || 'Customer';
   const invoiceSubline = `Invoice #${String(invoiceProp.invoice_number).padStart(4, '0')}`;
 
@@ -307,18 +313,24 @@ export function InvoiceFinalPage({
             {paymentLinkError ? (
               <p className="invoice-final-payment-feedback">{paymentLinkError}</p>
             ) : null}
+            {!canIssueInvoice && (
+              <p className="invoice-gate-message">
+                Invoice drafts can be created before signature. To issue an invoice, the work order
+                must be signed via DocuSeal or marked as signed offline.
+              </p>
+            )}
             {sendError ? <p className="invoice-final-payment-feedback">{sendError}</p> : null}
             <div className="invoice-final-payment-actions">
               <button
                 className="btn-secondary btn-action"
-                disabled={sending || paymentLinkLoading}
+                disabled={sending || paymentLinkLoading || !canIssueInvoice}
                 onClick={() => void handleSendInvoice()}
               >
                 {sending ? 'Sending...' : invoiceProp.issued_at ? 'Resend Invoice' : 'Send Invoice'}
               </button>
               <button
                 className="btn-primary btn-action"
-                disabled={paymentLinkLoading}
+                disabled={paymentLinkLoading || !canIssueInvoice}
                 onClick={() => void handleCopyPaymentLink()}
               >
                 {paymentLinkButtonLabel}

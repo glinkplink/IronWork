@@ -308,6 +308,14 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson, sendText })
     paymentLinkId = result.payment_link_id;
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Could not create payment link';
+    if (msg.includes('not signed')) {
+      sendJson(res, 409, { error: msg });
+      return true;
+    }
+    if (msg.includes('greater than zero')) {
+      sendJson(res, 400, { error: msg });
+      return true;
+    }
     sendJson(res, msg.includes('not configured') ? 503 : 502, { error: msg });
     return true;
   }

@@ -92,6 +92,8 @@ const baseJob: Job = {
   esign_declined_at: null,
   esign_decline_reason: null,
   esign_signed_document_url: null,
+  esign_resent_at: null,
+  offline_signed_at: null,
 };
 
 const baseCo: ChangeOrder = {
@@ -183,6 +185,8 @@ describe('mapInvoiceRow', () => {
       esign_declined_at: null,
       esign_decline_reason: null,
       esign_signed_document_url: null,
+      esign_resent_at: null,
+      offline_signed_at: null,
     });
 
     expect(invoice.line_items[0]).toMatchObject({

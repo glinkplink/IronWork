@@ -4,6 +4,7 @@ import {
   createInvoicePaymentLink,
   constructWebhookEvent,
   getConnectedAccount,
+  createOrReuseInvoicePaymentLink,
 } from './lib/stripe.mjs';
 import { createClient } from '@supabase/supabase-js';
 
@@ -315,13 +316,6 @@ async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
     sendJson(res, 404, { error: 'Invoice not found.' });
     return;
   }
-  if (invoice.stripe_payment_url) {
-    sendJson(res, 200, {
-      url: invoice.stripe_payment_url,
-      payment_link_id: invoice.stripe_payment_link_id ?? null,
-    });
-    return;
-  }
 
   const { data: profile, error: profileErr } = await supabase
     .from('business_profiles')
@@ -340,48 +334,28 @@ async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
     return;
   }
 
-  const totalCents = Math.round(Number(invoice.total) * 100);
-  if (!Number.isFinite(totalCents) || totalCents <= 0) {
-    sendJson(res, 400, { error: 'Invoice total must be greater than zero.' });
-    return;
-  }
-
-  const invoiceNumber = String(invoice.invoice_number ?? '').padStart(4, '0');
-  const { data: linkData, error: linkErr } = await createInvoicePaymentLink({
-    stripeAccountId: profile.stripe_account_id,
-    invoiceId: invoice.id,
-    jobId: invoice.job_id,
-    userId,
-    totalCents,
-    title: `Invoice #${invoiceNumber}`,
-    description: `ScopeLock invoice #${invoiceNumber}`,
-  });
-
-  if (linkErr || !linkData?.url) {
-    sendJson(res, isStripeConfigErrorMessage(linkErr) ? 503 : 502, {
-      error: linkErr || 'Could not create payment link.',
+  try {
+    const result = await createOrReuseInvoicePaymentLink({
+      invoice,
+      userId,
+      supabase,
+      stripeAccountId: profile.stripe_account_id,
     });
-    return;
+    sendJson(res, 200, {
+      url: result.url,
+      payment_link_id: result.payment_link_id ?? null,
+    });
+  } catch (err) {
+    if (err.message.includes('not signed')) {
+      sendJson(res, 409, { error: err.message });
+      return;
+    }
+    if (err.message.includes('greater than zero')) {
+      sendJson(res, 400, { error: err.message });
+      return;
+    }
+    sendJson(res, 502, { error: err.message || 'Could not create payment link.' });
   }
-
-  const { error: updateErr } = await supabase
-    .from('invoices')
-    .update({
-      stripe_payment_link_id: linkData.id,
-      stripe_payment_url: linkData.url,
-    })
-    .eq('id', invoice.id)
-    .eq('user_id', userId);
-
-  if (updateErr) {
-    sendJson(res, 500, { error: updateErr.message });
-    return;
-  }
-
-  sendJson(res, 200, {
-    url: linkData.url,
-    payment_link_id: linkData.id,
-  });
 }
 
 async function markInvoicePaidFromWebhook(supabase, invoiceId, paidAt) {

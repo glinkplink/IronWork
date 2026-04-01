@@ -29,6 +29,7 @@ type BaseInvoiceStatusRow = {
   issued_at: string | null;
   invoice_number: number;
   created_at: string;
+  payment_status: 'unpaid' | 'paid' | 'offline';
 };
 
 export function getInvoiceBusinessStatus(invoice: {
@@ -227,12 +228,16 @@ function mapBaseInvoiceStatusRow(row: Record<string, unknown>): BaseInvoiceStatu
   const created_at = row.created_at;
   if (typeof created_at !== 'string') return null;
   const issued_at = typeof row.issued_at === 'string' && row.issued_at.trim() ? row.issued_at : null;
+  const paymentStatusRaw = row.payment_status;
+  const payment_status: 'unpaid' | 'paid' | 'offline' =
+    paymentStatusRaw === 'paid' || paymentStatusRaw === 'offline' ? paymentStatusRaw : 'unpaid';
   return {
     id,
     job_id,
     issued_at,
     invoice_number,
     created_at,
+    payment_status,
   };
 }
 

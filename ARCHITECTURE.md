@@ -63,6 +63,7 @@ A contractor can **start a work order without signing in**. They fill the job fo
 
 - **Routes (same app server as PDFs):** `POST /api/stripe/connect/start`, `GET /api/stripe/connect/status`, `POST /api/stripe/invoices/:invoiceId/payment-link`, and `POST /api/stripe/webhook`.
 - **Auth:** Connect start/status and invoice payment-link routes require `Authorization: Bearer <Supabase access_token>`; the server verifies the JWT and loads the caller’s `business_profiles` row via the Supabase service role. The webhook does **not** use Supabase auth; it verifies the Stripe signature with `STRIPE_WEBHOOK_SECRET`.
+- **Invoice issuance gate:** New invoice issuance is blocked until the parent work order is signature-satisfied. `createOrReuseInvoicePaymentLink` allows issuance only when `jobs.esign_status = 'completed'` or `jobs.offline_signed_at` is set; already-issued invoices with an existing `stripe_payment_url` still reuse that legacy link.
 - **Profile integration:** `business_profiles.stripe_account_id` stores the connected account id. `business_profiles.stripe_onboarding_complete` is reconciled from Stripe account state by `GET /api/stripe/connect/status` when the user returns from onboarding.
 - **Return flow:** Stripe onboarding returns to `/?stripe_connect=return` and refresh uses `/?stripe_connect=refresh`. The client moves the user to **Edit Profile**, clears the query param from the URL, reloads profile state, and surfaces a status banner there.
 - **Hosted deploys (e.g. Render):** The runtime environment must include **`STRIPE_SECRET_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, and optionally **`APP_BASE_URL`** if forwarded headers are not sufficient to derive the public origin for Connect return links.
@@ -131,12 +132,12 @@ scope-lock/
 │   │   ├── EditProfilePage.tsx       # Edit profile + agreement defaults
 │   │   ├── HomePage.tsx              # Landing; Create Work Order
 │   │   ├── WorkOrdersPage.tsx        # List jobs + invoice actions; row opens detail
-│   │   ├── WorkOrderDetailPage.tsx   # Saved job → agreement + job-level invoice strip + change orders + PDFs + e-sign timeline
+│   │   ├── WorkOrderDetailPage.tsx   # Saved job → agreement + job-level invoice strip + change orders + PDFs + e-sign / offline-sign actions
 │   │   ├── ChangeOrderWizard.tsx     # Create/edit change order (3 steps; saves + sends to DocuSeal on finish)
 │   │   ├── ChangeOrderDetailPage.tsx # Saved CO → HTML/PDF + e-sign actions + timeline
 │   │   ├── AgreementDocumentSections.tsx # Renders AgreementSection[] (preview + detail + PDF body)
 │   │   ├── InvoiceWizard.tsx         # Invoice steps (pricing, due date, payment methods)
-│   │   ├── InvoiceFinalPage.tsx      # Final invoice detail; PDF actions + payment link placeholder
+│   │   ├── InvoiceFinalPage.tsx      # Final invoice detail; PDF actions + send/payment-link issuance gate
 │   │   ├── InvoicePreviewModal.tsx   # Full-screen invoice preview overlay
 │   │   ├── JobForm.tsx               # Work Agreement form (structured job site, Geoapify optional)
 │   │   └── AgreementPreview.tsx      # Preview + Download & Save + PDF; hosts CaptureModal when anonymous
@@ -166,6 +167,7 @@ scope-lock/
 │   │   ├── geoapify-autocomplete.ts  # Job site suggestions (optional API key)
 │   │   ├── job-to-welder-job.ts      # Job row + profile → WelderJob for generator/PDF
 │   │   ├── invoice-generator.ts      # Pure HTML for invoice body (preview + PDF)
+│   │   ├── work-order-signature.ts   # Shared signature-satisfied helper (DocuSeal completed vs offline-signed)
 │   │   ├── docuseal-agreement-html.ts     # DocuSeal HTML for work order (embedded CSS + field tags; esc())
 │   │   ├── docuseal-change-order-html.ts  # DocuSeal HTML for change order (embedded CSS + field tags; esc(); optional SP signature PNG)
 │   │   ├── docuseal-header-footer.ts      # html_header / html_footer strings for DocuSeal submissions
@@ -222,7 +224,11 @@ scope-lock/
 │       ├── 0015_work_orders_dashboard_page.sql # list_work_orders_dashboard_page + get_work_orders_dashboard_summary RPCs
 │       ├── 0016_invoices_esign_and_issuance.sql # invoices.issued_at + legacy DocuSeal esign_* columns
 │       ├── 0017_remove_invoice_esign.sql       # drops invoice-specific esign_* columns; keeps issued_at
-│       └── 0018_stripe_scaffolding.sql         # stripe_account_id + stripe_onboarding_complete on business_profiles; stripe_payment_link_id, stripe_payment_url, payment_status CHECK ('unpaid'|'paid'|'offline'), paid_at on invoices
+│       ├── 0018_stripe_scaffolding.sql         # stripe_account_id + stripe_onboarding_complete on business_profiles; stripe_payment_link_id, stripe_payment_url, payment_status CHECK ('unpaid'|'paid'|'offline'), paid_at on invoices
+│       ├── 0019_work_orders_dashboard_invoice_payment_status.sql # latest_invoice JSON includes payment_status for dashboard actions
+│       ├── 0020_esign_resent_at.sql            # esign_resent_at on jobs and change_orders for durable resend state
+│       ├── 0021_jobs_offline_signed_at.sql     # offline_signed_at on jobs for manual paper signatures
+│       └── 0022_update_work_orders_rpcs_offline_signed.sql # dashboard RPCs expose offline_signed_at for list + row refresh
 ├── public/
 ├── index.html
 ├── package.json
@@ -245,9 +251,9 @@ First Download & Save → CaptureModal → signUp + upsertProfile (+ optional WO
       ↓
 [Signed in + profile] → HomePage; header: Work Orders, Edit profile (gear)
       ↓
-Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + job-level invoice strip + change orders + PDFs)
+Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + job-level invoice strip + change orders + PDFs + offline-sign controls)
                       → Change Order → ChangeOrderWizard → detail (refresh list)
-                      → Invoice → InvoiceWizard (optional CO lines on **new** invoices) → InvoiceFinalPage (PDF + payment link placeholder)
+                      → Invoice → InvoiceWizard (optional CO lines on **new** invoices) → InvoiceFinalPage (PDF + send/payment-link issuance gate)
       ↓
 Create Work Order → JobForm → Preview tab → AgreementPreview (Download & Save / PDF)
       ↓
@@ -300,7 +306,7 @@ Four tables in Supabase Postgres, all with row-level security:
 |---|---|
 | `business_profiles` | user_id (unique), business_name, owner_name, phone, email, address, google_business_profile_url, default_exclusions[], default_assumptions[], default_tax_rate, default_payment_methods[], next_wo_number, next_invoice_number, stripe_account_id, stripe_onboarding_complete, … |
 | `clients` | user_id, name, **name_normalized** (dedup key), phone, email, address, notes |
-| `jobs` | user_id, client_id, all WelderJob fields, status, **esign_submission_id**, **esign_submitter_id**, **esign_embed_src**, **esign_status** (`not_sent`\|`sent`\|`opened`\|`completed`\|`declined`\|`expired`), esign_submission_state, esign_submitter_state, esign_sent/opened/completed/declined_at, esign_decline_reason, esign_signed_document_url |
+| `jobs` | user_id, client_id, all WelderJob fields, status, **esign_submission_id**, **esign_submitter_id**, **esign_embed_src**, **esign_status** (`not_sent`\|`sent`\|`opened`\|`completed`\|`declined`\|`expired`), esign_submission_state, esign_submitter_state, esign_sent/opened/completed/declined_at, esign_decline_reason, esign_signed_document_url, **offline_signed_at** |
 | `change_orders` | user_id, job_id, **co_number** (per-job sequence, UNIQUE with job_id), description, reason, status (`draft` \| `pending_approval` \| `approved` \| `rejected`), **line_items** (jsonb), time_amount / time_unit / time_note, requires_approval, **esign_submission_id**, **esign_submitter_id**, **esign_embed_src**, **esign_status** (`not_sent`\|`sent`\|`opened`\|`completed`\|`declined`\|`expired`), esign_* timestamp/state columns — legacy `price_delta` / `time_delta` / `approved` were migrated in **0005** |
 | `invoices` | user_id, job_id, invoice_number, invoice_date, due_date, legacy `status` (`draft` \| `downloaded`), **issued_at** (business issuance marker; set when first payment link is created), **line_items** (jsonb; each row may include **`source`**: `original_scope` \| `change_order` \| `labor` \| `material` \| `manual` \| `legacy`), tax fields, payment_methods (jsonb snapshot), notes, **stripe_payment_link_id**, **stripe_payment_url**, **payment_status** (`unpaid` \| `paid` \| `offline`; CHECK constraint), **paid_at** (set by Stripe webhook on payment completion) |
 

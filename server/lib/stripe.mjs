@@ -150,9 +150,27 @@ export async function createInvoicePaymentLink(input) {
  * Returns the payment link URL and ID, and updates the invoice if a new link is created.
  */
 export async function createOrReuseInvoicePaymentLink({ invoice, userId, supabase, stripeAccountId }) {
-  // Return existing if already exists
+  // Return existing if already exists (legacy invoices unaffected)
   if (invoice.stripe_payment_url) {
     return { url: invoice.stripe_payment_url, payment_link_id: invoice.stripe_payment_link_id };
+  }
+
+  // Gate: Verify parent work order is signature-satisfied before creating new payment link
+  const { data: parentJob, error: jobErr } = await supabase
+    .from('jobs')
+    .select('esign_status, offline_signed_at')
+    .eq('id', invoice.job_id)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (jobErr) {
+    throw new Error('Could not verify work order signature status');
+  }
+
+  const isSigned = parentJob?.esign_status === 'completed' || parentJob?.offline_signed_at !== null;
+
+  if (!isSigned) {
+    throw new Error('Cannot issue invoice: work order is not signed. Sign via DocuSeal or mark as signed offline.');
   }
 
   // Validate the invoice total

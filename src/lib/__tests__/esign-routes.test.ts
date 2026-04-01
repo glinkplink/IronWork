@@ -106,6 +106,8 @@ function baseJobRow(overrides: Record<string, unknown> = {}) {
     esign_submitter_id: null,
     esign_embed_src: null,
     esign_status: 'not_sent',
+    esign_resent_at: null,
+    offline_signed_at: null,
     ...overrides,
   };
 }

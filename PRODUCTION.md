@@ -24,7 +24,7 @@ Everything in this section requires action outside the codebase — Stripe dashb
 ### Supabase Dashboard
 
 - [x] **Apply all migrations** if not already done — paste each file from `supabase/migrations/` into SQL Editor in order, or run `npx supabase db push` from local
-  - Confirm through `0020_esign_resent_at.sql` (adds `esign_resent_at` to `jobs` and `change_orders`)
+  - Confirm through `0022_update_work_orders_rpcs_offline_signed.sql` (`offline_signed_at` on `jobs` plus dashboard RPC exposure)
 - [x] **Confirm RLS is enabled** on all tables (Dashboard → Table Editor → each table → RLS toggle)
 - [ ] **Set up a backup schedule** if not already configured (Dashboard → Database → Backups) (not doing this yet as it requires a paid plan)
 
@@ -75,6 +75,7 @@ Everything in this section requires action outside the codebase — Stripe dashb
 - [x] **`engines` field in `package.json`** — declares `node: ">=20.0.0"`
 - [x] **`"start"` script in `package.json`** — `"start": "NODE_ENV=production node server/app-server.mjs"`
 - [x] **Persist resent state in database** — `esign_resent_at` column on `jobs` and `change_orders`; "Resent" label and timestamp survive page navigation (migration `0020_esign_resent_at.sql`)
+- [x] **Offline-signed invoice gate** — `jobs.offline_signed_at` column + backend enforcement + UI gating prevents invoice issuance on unsigned work orders unless marked offline-signed
 
 ### Known Gaps
 
@@ -82,7 +83,6 @@ Everything in this section requires action outside the codebase — Stripe dashb
 - [ ] **No structured logging on Stripe webhook** — payment events (paid, failed, amount mismatch) currently log nothing; debugging billing issues in prod requires reading raw Render logs
 - [ ] **Stripe webhook idempotency audit trail** — the `payment_status` DB update is idempotent, but duplicate events from Stripe retries are silently dropped with no log entry
 - [ ] **`Paid` badge not visible on Work Orders dashboard** — `payment_status = 'paid'` only shows on `InvoiceFinalPage`; the list view has no indicator that a job has been paid
-- [ ] **Offline-signed invoice gate not implemented** — contractors can issue invoices on unsigned work orders; the planned `jobs.offline_signed_at` column + backend enforcement + UI gating is unstarted (see `offline-signed-wo-invoice-gate` plan)
 
 ---
 
@@ -107,9 +107,8 @@ Run these manually or automate as integration tests before marking a deploy heal
 
 These are not blockers but are the next logical increments:
 
-1. **Offline-signed invoice gate** — `jobs.offline_signed_at` + backend enforcement + UI gating (plan exists)
-2. **`Paid` badge on Work Orders dashboard** — surface `payment_status = 'paid'` visually on the work order list and detail
-3. **Error tracking (Sentry or equivalent)** — server-side crash visibility, alerting, stack traces
-4. **Structured Stripe webhook logging** — audit trail for payment events
-5. **Change order invoice billing rules** — decide whether paid COs appear as informational rows on final WO invoices
-6. **Stripe payouts visibility** — minimal payouts summary on Edit Profile (not a full dashboard, just "your last payout was $X on DATE")
+1. **`Paid` badge on Work Orders dashboard** — surface `payment_status = 'paid'` visually on the work order list and detail
+2. **Error tracking (Sentry or equivalent)** — server-side crash visibility, alerting, stack traces
+3. **Structured Stripe webhook logging** — audit trail for payment events
+4. **Change order invoice billing rules** — decide whether paid COs appear as informational rows on final WO invoices
+5. **Stripe payouts visibility** — minimal payouts summary on Edit Profile (not a full dashboard, just "your last payout was $X on DATE")

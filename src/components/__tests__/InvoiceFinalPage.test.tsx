@@ -82,6 +82,8 @@ function baseJob(): Job {
     esign_declined_at: null,
     esign_decline_reason: null,
     esign_signed_document_url: null,
+    esign_resent_at: null,
+    offline_signed_at: null,
     wo_number: null,
     agreement_date: null,
     contractor_phone: null,
@@ -162,11 +164,11 @@ describe('InvoiceFinalPage', () => {
   const onEditInvoice = vi.fn();
   const onInvoiceUpdated = vi.fn();
 
-  function renderPage(invoice = baseInvoice()) {
+  function renderPage(invoice = baseInvoice(), job = baseJob()) {
     return render(
       <InvoiceFinalPage
         invoice={invoice}
-        job={baseJob()}
+        job={job}
         profile={baseProfile()}
         onWorkOrders={onWorkOrders}
         onEditInvoice={onEditInvoice}
@@ -187,7 +189,8 @@ describe('InvoiceFinalPage', () => {
   });
 
   it('renders payment card with enabled send button for draft invoice', () => {
-    renderPage();
+    const signedJob = { ...baseJob(), esign_status: 'completed' as const };
+    renderPage(baseInvoice(), signedJob);
 
     expect(screen.getByRole('heading', { name: 'Send Invoice' })).toBeInTheDocument();
     expect(screen.getByText('Send the invoice email to the customer with the PDF attached and payment link.')).toBeInTheDocument();

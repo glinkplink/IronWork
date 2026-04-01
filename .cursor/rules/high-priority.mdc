@@ -20,6 +20,7 @@ alwaysApply: true
 - If a rule is meant to be global, mirror it across the shared rule files or replace duplication with a single explicit pointer.
 - **DocuSeal / e-sign:** Server env on the **running** process (not only `VITE_*` at build); validate webhooks and notification email on the **deployed** URL when checking production parity — **ARCHITECTURE.md** (*E-sign*) and **AGENTS.md**.
 - **Invoice lifecycle:** No row → `Invoice`, `issued_at = null` → `Draft`, `issued_at != null` → `Invoiced` (payment-link creation sets `issued_at`). `payment_status`/`paid_at` set by Stripe webhook. No invoice e-sign tracking.
+- **Invoice issuance gate:** Invoice issuance (payment-link creation and send) is blocked until the parent work order is signature-satisfied (DocuSeal `completed` or `offline_signed_at` set). Invoice drafts can be created regardless of signature state.
 
 ## CSS (mandatory)
 - Co-locate styles: `ComponentName.tsx` + `ComponentName.css`; owner imports its own CSS.

@@ -90,7 +90,7 @@ src/
     EditProfilePage.css      # EditProfilePage-only styles
     WorkOrdersPage.tsx       # Paginated work-order dashboard; toolbar “Create Work Order”; invoice actions; opens detail
     WorkOrdersPage.css       # WorkOrdersPage-only list/dashboard chrome + invoice warning banner
-    WorkOrderDetailPage.tsx  # Saved job → agreement + job-level invoice strip + change orders + PDFs
+    WorkOrderDetailPage.tsx  # Saved job → agreement + job-level invoice strip + change orders + PDFs + offline-sign controls
     WorkOrderDetailPage.css  # WO detail invoice strip + CO row ordering/sublist (e.g. `.co-list-*`)
     ChangeOrderDetailPage.tsx # Saved change order → HTML/PDF + actions
     ChangeOrderDetailPage.css # CO detail-only chrome (e.g. `.co-detail-*`)
@@ -98,7 +98,7 @@ src/
     ChangeOrderWizard.css    # Wizard-only `.co-*` blocks (shared badge/section labels stay in App.css)
     InvoiceWizard.tsx        # Create/edit invoice; CO pickers + line `source` for merge on edit
     InvoiceWizard.css        # Invoice wizard materials/CO picker/payment group (chips stay global)
-    InvoiceFinalPage.tsx     # Invoice preview, PDF actions, and payment link placeholder
+    InvoiceFinalPage.tsx     # Invoice preview, send/resend, payment-link actions, and signature gate messaging
     InvoiceFinalPage.css     # Invoice final page-only chrome (nav/headings shared in App.css)
     InvoicePreviewModal.tsx  # Full-screen invoice HTML preview
     InvoicePreviewModal.css  # Invoice preview modal overlay/scroll/sheet
@@ -112,6 +112,7 @@ src/
     geoapify-autocomplete.ts # Job site address suggestions (optional API key)
     job-to-welder-job.ts     # Job row + profile → WelderJob
     invoice-generator.ts     # Invoice HTML string
+    work-order-signature.ts  # Shared signature-satisfied helper for DocuSeal vs offline-signed state
     agreement-sections-html.ts # Agreement sections → HTML string (combined PDFs)
     docuseal-agreement-html.ts # DocuSeal HTML document for WO (embedded CSS + field tags; uses esc())
     docuseal-change-order-html.ts # DocuSeal HTML document for CO (embedded CSS + field tags; uses esc()); optional `providerSignatureDataUrl` for SP signature image (same canvas PNG as WO)
@@ -197,6 +198,7 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 - Invoice business state: no invoice row shows **Invoice**, an existing invoice with `issued_at = null` shows **Draft**, `issued_at != null` shows **Invoiced** (payment-link creation sets `issued_at`), and `payment_status = 'paid'` shows a **Paid** badge on `InvoiceFinalPage` (set by Stripe webhook; no in-page polling).
 - `ChangeOrderWizard` now saves the CO, sends the DocuSeal request immediately, then routes to `ChangeOrderDetailPage`; CO business `status` tracks approval lifecycle (`pending_approval` after send/open, `approved` on completed signature, `rejected` on decline).
 - **`jobs.esign_*` and `change_orders.esign_*`:** detail surfaces show e-sign progress, signing actions, and signed artifacts. While e-sign is in-flight, detail pages call **`GET /api/esign/work-orders/:id/status`** or **`GET /api/esign/change-orders/:id/status`** (authenticated) to reconcile DocuSeal into the row; webhooks update the same fields. **Email** subject/body for DocuSeal notifications and **signed PDF** layout are best verified on the **deployed** app (public URL + production-like env), not assumed identical to every local setup.
+- **Offline signature:** Work orders can be manually marked as signed offline via `jobs.offline_signed_at`. This is a signature-satisfied state alongside DocuSeal `completed`. Invoice issuance (payment-link creation and send) is blocked until the parent work order is signature-satisfied. Invoice drafts can be created regardless of signature state.
 
 **`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).
 - `App.tsx` lazy-loads preview, Work Orders, detail, change-order, and invoice screens. The initial shell stays eager; heavy document/dashboard flows load on demand, and the Work Orders chunk is idle-prefetched after sign-in.

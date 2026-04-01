@@ -41,6 +41,7 @@ The following are **living documents**, not one-time setup notes:
 ## Related hard rules
 
 - **HTML string generators:** User-controlled text in HTML builders must use `esc()` from `src/lib/html-escape.ts` (see CLAUDE.md → “Generated HTML strings”).
+- **Invoice issuance gate:** Invoice issuance (`POST /api/stripe/invoices/:id/payment-link` and `POST /api/invoices/:id/send`) is blocked until the parent work order is signature-satisfied (DocuSeal `completed` or `jobs.offline_signed_at` set). Invoice drafts can still be created before signature.
 - **Shared rules stay shared:** If you add or tighten a repo-wide rule here, mirror it in `CLAUDE.md` and the Cursor rule files in the same change.
 - **Domain vs UI, minimal diffs, no mystery dependencies:** See **ScopeLock-Project-Rules.mdc** and **high-priority.mdc**.
 

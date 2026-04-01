@@ -99,6 +99,8 @@ export interface Job {
   esign_declined_at: string | null;
   esign_decline_reason: string | null;
   esign_signed_document_url: string | null;
+  /** Manual paper signature tracking (null = not offline-signed). */
+  offline_signed_at: string | null;
 }
 
 /** Normalized e-sign lifecycle for UI (stored on `jobs.esign_status`). */
@@ -130,6 +132,7 @@ export interface WorkOrderListJob {
   created_at: string;
   price: number;
   esign_status: EsignJobStatus;
+  offline_signed_at: string | null;
   changeOrders: WorkOrderListChangeOrderPreview[];
 }
 
@@ -143,6 +146,7 @@ export interface WorkOrderDashboardJob {
   created_at: string;
   price: number;
   esign_status: EsignJobStatus;
+  offline_signed_at: string | null;
   changeOrderCount: number;
   changeOrderPreview: WorkOrderListChangeOrderPreview[];
   hasInFlightChangeOrders: boolean;
