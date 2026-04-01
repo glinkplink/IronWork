@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import puppeteer from 'puppeteer-core';
 import { tryHandleEsignRoute } from './esign-routes.mjs';
 import { tryHandleStripeRoute } from './stripe-routes.mjs';
+import { tryHandleInvoiceRoute } from './invoice-routes.mjs';
 import { checkRateLimit, getClientIp } from './lib/rate-limit.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +29,7 @@ const COMMON_HEADERS = { 'X-Content-Type-Options': 'nosniff' };
 
 let browserPromise;
 
-async function getBrowser() {
+export async function getBrowser() {
   if (!browserPromise) {
     browserPromise = puppeteer.launch({
       executablePath,
@@ -272,6 +273,22 @@ async function createAppServer() {
         return;
       }
     }
+
+    // Rate limit: 5 req/min per IP for invoice send
+    if (req.method === 'POST' && /^\/api\/invoices\/[\w-]+\/send$/.test(req.url)) {
+      const clientIp = getClientIp(req);
+      if (!checkRateLimit(`invoice:${clientIp}`, 5, 60 * 1000)) {
+        sendJson(res, 429, { error: 'Too many requests.' });
+        return;
+      }
+    }
+
+    const handledInvoice = await tryHandleInvoiceRoute(req, res, {
+      readJsonBody,
+      sendJson,
+      sendText,
+    });
+    if (handledInvoice) return;
 
     const handledStripe = await tryHandleStripeRoute(req, res, {
       readJsonBody,

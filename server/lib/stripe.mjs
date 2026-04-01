@@ -145,6 +145,54 @@ export async function createInvoicePaymentLink(input) {
   }
 }
 
+/**
+ * Create or reuse a Stripe payment link for an invoice.
+ * Returns the payment link URL and ID, and updates the invoice if a new link is created.
+ */
+export async function createOrReuseInvoicePaymentLink({ invoice, userId, supabase, stripeAccountId }) {
+  // Return existing if already exists
+  if (invoice.stripe_payment_url) {
+    return { url: invoice.stripe_payment_url, payment_link_id: invoice.stripe_payment_link_id };
+  }
+
+  // Validate the invoice total
+  const totalCents = Math.round(Number(invoice.total) * 100);
+  if (!Number.isFinite(totalCents) || totalCents <= 0) {
+    throw new Error('Invoice total must be greater than zero.');
+  }
+
+  const invoiceNumber = String(invoice.invoice_number ?? '').padStart(4, '0');
+  const { data: linkData, error } = await createInvoicePaymentLink({
+    stripeAccountId,
+    invoiceId: invoice.id,
+    jobId: invoice.job_id,
+    userId,
+    totalCents,
+    title: `Invoice #${invoiceNumber}`,
+    description: `ScopeLock invoice #${invoiceNumber}`,
+  });
+
+  if (error || !linkData?.url) {
+    throw new Error(error || 'Could not create payment link');
+  }
+
+  // Update invoice with payment link info
+  const { error: updateErr } = await supabase
+    .from('invoices')
+    .update({
+      stripe_payment_link_id: linkData.id,
+      stripe_payment_url: linkData.url,
+    })
+    .eq('id', invoice.id)
+    .eq('user_id', userId);
+
+  if (updateErr) {
+    throw updateErr;
+  }
+
+  return { url: linkData.url, payment_link_id: linkData.id };
+}
+
 export function constructWebhookEvent(payload, signature, secret) {
   const stripe = getStripe();
   if (!stripe) {

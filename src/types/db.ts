@@ -166,6 +166,7 @@ export interface WorkOrderInvoiceStatus {
   issued_at: string | null;
   invoice_number: number;
   created_at: string;
+  payment_status: 'unpaid' | 'paid' | 'offline';
 }
 
 export interface ChangeOrderInvoiceStatus {

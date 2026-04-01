@@ -3,6 +3,7 @@ import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
 import { fetchWithSupabaseAuth } from '../lib/fetch-with-supabase-auth';
+import { sendInvoice } from '../lib/invoice-send';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import {
@@ -43,6 +44,8 @@ export function InvoiceFinalPage({
   const [downloading, setDownloading] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
   const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   const [paymentLinkError, setPaymentLinkError] = useState('');
   const [paymentLinkCopied, setPaymentLinkCopied] = useState(false);
 
@@ -144,6 +147,29 @@ export function InvoiceFinalPage({
       );
     } finally {
       setPaymentLinkLoading(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    setSendError('');
+    setSending(true);
+
+    try {
+      const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
+      const { data, error } = await sendInvoice(invoiceProp.id, previewHtml);
+
+      if (error) {
+        setSendError(error.message);
+        return;
+      }
+
+      if (data) {
+        onInvoiceUpdated(data);
+      }
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Could not send invoice');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -267,22 +293,39 @@ export function InvoiceFinalPage({
             )}
           </div>
         )}
-        <p className="invoice-final-payment-text">
-          Create a Stripe payment link, then copy and share it manually.
-        </p>
-        {paymentLinkError ? (
-          <p className="invoice-final-payment-feedback">{paymentLinkError}</p>
-        ) : null}
-        <div className="invoice-final-payment-actions">
-          <button disabled className="btn-secondary btn-action">Send Invoice (Coming Soon)</button>
-          <button
-            className="btn-primary btn-action"
-            disabled={paymentLinkLoading}
-            onClick={() => void handleCopyPaymentLink()}
-          >
-            {paymentLinkButtonLabel}
-          </button>
-        </div>
+        {invoiceProp.payment_status === 'paid' ? (
+          <p className="invoice-final-payment-text">
+            This invoice has been paid.
+          </p>
+        ) : (
+          <>
+            <p className="invoice-final-payment-text">
+              {invoiceProp.issued_at
+                ? 'Resend the invoice email to the customer with the PDF attached and payment link.'
+                : 'Send the invoice email to the customer with the PDF attached and payment link.'}
+            </p>
+            {paymentLinkError ? (
+              <p className="invoice-final-payment-feedback">{paymentLinkError}</p>
+            ) : null}
+            {sendError ? <p className="invoice-final-payment-feedback">{sendError}</p> : null}
+            <div className="invoice-final-payment-actions">
+              <button
+                className="btn-secondary btn-action"
+                disabled={sending || paymentLinkLoading}
+                onClick={() => void handleSendInvoice()}
+              >
+                {sending ? 'Sending...' : invoiceProp.issued_at ? 'Resend Invoice' : 'Send Invoice'}
+              </button>
+              <button
+                className="btn-primary btn-action"
+                disabled={paymentLinkLoading}
+                onClick={() => void handleCopyPaymentLink()}
+              >
+                {paymentLinkButtonLabel}
+              </button>
+            </div>
+          </>
+        )}
       </section>
 
       <div

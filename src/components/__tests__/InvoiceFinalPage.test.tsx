@@ -186,12 +186,12 @@ describe('InvoiceFinalPage', () => {
     cleanup();
   });
 
-  it('renders payment card with disabled buttons for draft invoice', () => {
+  it('renders payment card with enabled send button for draft invoice', () => {
     renderPage();
 
-    expect(screen.getByText('Send Invoice')).toBeInTheDocument();
-    expect(screen.getByText('Create a Stripe payment link, then copy and share it manually.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /send invoice \(coming soon\)/i })).toBeDisabled();
+    expect(screen.getByRole('heading', { name: 'Send Invoice' })).toBeInTheDocument();
+    expect(screen.getByText('Send the invoice email to the customer with the PDF attached and payment link.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Send Invoice$/i })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /create payment link/i })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /download invoice/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /edit invoice/i })).toBeInTheDocument();

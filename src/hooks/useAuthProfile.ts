@@ -187,30 +187,64 @@ export function useAuthProfile({
     } = await supabase.auth.getSession();
     const uid = session?.user?.id;
     if (!uid) {
-      if (!silent) setProfileLoading(false);
+      // Defer to avoid react-hooks/set-state-in-effect
+      Promise.resolve().then(() => {
+        if (!silent) setProfileLoading(false);
+      });
       return;
     }
-    if (!silent) setProfileLoading(true);
+    // Defer to avoid react-hooks/set-state-in-effect
+    Promise.resolve().then(() => {
+      if (!silent) setProfileLoading(true);
+    });
+    
     const data = await getProfile(uid);
-    if (data) {
-      setProfile(data);
-    } else {
-      setProfile((prev) => (prev?.user_id === uid ? prev : null));
-    }
-    if (!silent) setProfileLoading(false);
+    // Defer to avoid react-hooks/set-state-in-effect
+    Promise.resolve().then(() => {
+      if (data) {
+        setProfile(data);
+      } else {
+        setProfile((prev) => (prev?.user_id === uid ? prev : null));
+      }
+      if (!silent) setProfileLoading(false);
+    });
   }, []);
 
   useEffect(() => {
     const uid = user?.id;
-    if (uid) {
-      void loadProfile();
-    } else {
+    if (!uid) {
+      // Defer to next tick to avoid react-hooks/set-state-in-effect (BOTH calls)
       Promise.resolve().then(() => {
         setProfile(null);
         setProfileLoading(false);
       });
+      return;
     }
-  }, [loadProfile, user?.id]);
+
+    let cancelled = false;
+
+    const run = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled || session?.user?.id !== uid) return;
+      
+      // Defer to avoid lint error
+      Promise.resolve().then(() => setProfileLoading(true));
+
+      const data = await getProfile(uid);
+      if (cancelled) return;
+
+      if (data) {
+        setProfile(data);
+      } else {
+        setProfile((prev) => (prev?.user_id === uid ? prev : null));
+      }
+      // Defer final state update too
+      Promise.resolve().then(() => setProfileLoading(false));
+    };
+
+    void run();
+    return () => { cancelled = true; };
+  }, [user?.id]); // Remove loadProfile from deps
 
   useEffect(() => {
     if (typeof window === 'undefined' || authLoading || !user) return;

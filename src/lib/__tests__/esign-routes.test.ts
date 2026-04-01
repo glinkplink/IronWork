@@ -143,9 +143,15 @@ function docusealSubmissionResponse(submissionId: number | string): {
 }
 
 function mockWebhookSupabase(findJob: (column: string, value: string) => unknown) {
-  const updateEqMock = vi.fn(async () => ({ error: null }));
+  // Chain: update().eq('id', ...).eq('user_id', ...) - need TWO eq calls
+  // The test expects to verify the FIRST eq call (with 'id')
+  const updateEqFinalMock = vi.fn(async () => ({ error: null }));
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const updateEqFirstMock = vi.fn((_column, _value) => ({
+    eq: updateEqFinalMock,
+  }));
   const updateMock = vi.fn(() => ({
-    eq: updateEqMock,
+    eq: updateEqFirstMock,
   }));
 
   createClientMock.mockReturnValue({
@@ -162,7 +168,8 @@ function mockWebhookSupabase(findJob: (column: string, value: string) => unknown
     })),
   });
 
-  return { updateEqMock, updateMock };
+  // Return the FIRST eq mock - this is called with 'id'
+  return { updateEqMock: updateEqFirstMock, updateMock };
 }
 
 function baseCORow(overrides: Record<string, unknown> = {}) {
@@ -185,9 +192,15 @@ function mockWebhookSupabaseChangeOrderOnly(
   findCo: (column: string, value: string) => unknown,
   updateResult: { error: { message: string } | null } = { error: null }
 ) {
-  const updateEqMock = vi.fn(async () => updateResult);
+  // Chain: update().eq('id', ...).eq('user_id', ...) - need TWO eq calls
+  // The test expects to verify the FIRST eq call (with 'id')
+  const updateEqFinalMock = vi.fn(async () => updateResult);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const updateEqFirstMock = vi.fn((_column, _value) => ({
+    eq: updateEqFinalMock,
+  }));
   const updateMock = vi.fn(() => ({
-    eq: updateEqMock,
+    eq: updateEqFirstMock,
   }));
 
   createClientMock.mockReturnValue({
@@ -226,7 +239,8 @@ function mockWebhookSupabaseChangeOrderOnly(
     }),
   });
 
-  return { updateEqMock, updateMock };
+  // Return the FIRST eq mock - this is called with 'id'
+  return { updateEqMock: updateEqFirstMock, updateMock };
 }
 
 describe('tryHandleEsignRoute', () => {

@@ -98,6 +98,7 @@ function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderIn
     typeof row.issued_at === 'string' && row.issued_at.trim() ? row.issued_at : null;
   const created_at = row.created_at;
   const invoice_number = row.invoice_number;
+  const payment_status = (row.payment_status as WorkOrderInvoiceStatus['payment_status']) ?? 'unpaid';
   if (typeof id !== 'string' || typeof job_id !== 'string' || typeof created_at !== 'string') {
     return null;
   }
@@ -111,6 +112,7 @@ function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderIn
     issued_at,
     invoice_number: parsedInvoiceNumber,
     created_at,
+    payment_status,
   };
 }
 

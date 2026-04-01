@@ -177,6 +177,15 @@ const WorkOrderRow = memo(function WorkOrderRow({
           >
             Invoice
           </button>
+        ) : invoice.payment_status === 'paid' ? (
+          <button
+            type="button"
+            className="badge-paid"
+            disabled={rowBusy}
+            onClick={() => onOpenPendingInvoice(job)}
+          >
+            Paid
+          </button>
         ) : getInvoiceBusinessStatus(invoice) === 'draft' ? (
           <button
             type="button"
