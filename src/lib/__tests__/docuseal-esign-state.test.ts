@@ -41,4 +41,24 @@ describe('docuseal-esign-state', () => {
   it('returns null when there are no submitters', () => {
     expect(buildEsignRowFromSubmission({ id: 1, status: 'pending', submitters: [] })).toBeNull();
   });
+
+  it('includes esign_resent_at when isResend is true', () => {
+    const row = buildEsignRowFromSubmission({
+      id: 99,
+      status: 'pending',
+      submitters: [{ id: 1, role: 'Customer', status: 'sent' }],
+    }, true);
+    expect(row).not.toBeNull();
+    expect(row!.esign_resent_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('omits esign_resent_at when isResend is false', () => {
+    const row = buildEsignRowFromSubmission({
+      id: 99,
+      status: 'pending',
+      submitters: [{ id: 1, role: 'Customer', status: 'sent' }],
+    }, false);
+    expect(row).not.toBeNull();
+    expect(row!.esign_resent_at).toBeUndefined();
+  });
 });

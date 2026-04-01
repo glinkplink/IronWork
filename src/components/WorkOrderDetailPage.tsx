@@ -122,7 +122,6 @@ export function WorkOrderDetailPage({
   const [pdfError, setPdfError] = useState('');
   const [esignError, setEsignError] = useState('');
   const [esignBusy, setEsignBusy] = useState(false);
-  const [esignWasResent, setEsignWasResent] = useState(false);
   const [signedDocBusy, setSignedDocBusy] = useState(false);
   const [esignSigningLinkCopied, setEsignSigningLinkCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -193,6 +192,7 @@ export function WorkOrderDetailPage({
   const woLabel =
     job?.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : 'WO (no #)';
   const customerTitle = job?.customer_name.trim() || 'Customer';
+  const esignWasResent = Boolean(job?.esign_resent_at);
   const esignProgress = useMemo(
     () => getEsignProgressModel(job?.esign_status ?? 'not_sent', 'work_order', esignWasResent),
     [job?.esign_status, esignWasResent]
@@ -440,7 +440,6 @@ export function WorkOrderDetailPage({
       const r = await resendWorkOrderSignature(job.id);
       onJobUpdated?.(mergeEsignResponseIntoJob(job, r));
       await refreshJobRow();
-      setEsignWasResent(true);
     } catch (e) {
       setEsignError(e instanceof Error ? e.message : 'Resend failed.');
     } finally {
@@ -586,7 +585,7 @@ export function WorkOrderDetailPage({
           {job.esign_sent_at ? (
             <div className="wo-esign-meta-row" data-testid="wo-esign-meta-sent">
               <dt>{esignWasResent && job.esign_status === 'sent' ? 'Resent' : 'Sent'}</dt>
-              <dd>{formatEsignTimestamp(job.esign_sent_at)}</dd>
+              <dd>{formatEsignTimestamp(job.esign_resent_at || job.esign_sent_at)}</dd>
             </div>
           ) : null}
           {job.esign_opened_at ? (

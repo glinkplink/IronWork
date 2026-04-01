@@ -163,6 +163,7 @@ function publicEsignPayload(row) {
     esign_submission_state: row.esign_submission_state,
     esign_submitter_state: row.esign_submitter_state,
     esign_sent_at: row.esign_sent_at,
+    esign_resent_at: row.esign_resent_at,
     esign_opened_at: row.esign_opened_at,
     esign_completed_at: row.esign_completed_at,
     esign_declined_at: row.esign_declined_at,
@@ -657,6 +658,7 @@ async function handleResend(req, res, readJsonBody, sendJson, jobId) {
     : {
         esign_status: 'sent',
         esign_sent_at: new Date().toISOString(),
+        esign_resent_at: new Date().toISOString(),
         esign_submission_state: 'sent',
         esign_submitter_state: 'sent',
         esign_opened_at: null,
@@ -691,7 +693,7 @@ async function handleResend(req, res, readJsonBody, sendJson, jobId) {
   }
 
   if (submission) {
-    const patch = buildEsignRowFromSubmission(submission);
+    const patch = buildEsignRowFromSubmission(submission, true);
     if (patch) {
       const { data: updated, error: upErr } = await supabase
         .from('jobs')
@@ -892,6 +894,7 @@ function publicCoEsignPayload(row) {
     esign_submission_state: row.esign_submission_state,
     esign_submitter_state: row.esign_submitter_state,
     esign_sent_at: row.esign_sent_at,
+    esign_resent_at: row.esign_resent_at,
     esign_opened_at: row.esign_opened_at,
     esign_completed_at: row.esign_completed_at,
     esign_declined_at: row.esign_declined_at,
@@ -925,8 +928,8 @@ function deriveChangeOrderStatusFromEsignStatus(currentStatus, esignStatus) {
   }
 }
 
-function buildChangeOrderPatchFromSubmission(submission, currentStatus) {
-  const patch = buildEsignRowFromSubmission(submission);
+function buildChangeOrderPatchFromSubmission(submission, currentStatus, isResend = false) {
+  const patch = buildEsignRowFromSubmission(submission, isResend);
   if (!patch) return null;
   return {
     ...patch,
@@ -1127,6 +1130,7 @@ async function handleCoResend(req, res, readJsonBody, sendJson, coId) {
         status: deriveChangeOrderStatusFromEsignStatus(co.status, 'sent'),
         esign_status: 'sent',
         esign_sent_at: new Date().toISOString(),
+        esign_resent_at: new Date().toISOString(),
         esign_submission_state: 'sent',
         esign_submitter_state: 'sent',
         esign_opened_at: null,
@@ -1163,7 +1167,7 @@ async function handleCoResend(req, res, readJsonBody, sendJson, coId) {
   const coJobId = co.job_id;
 
   if (submission) {
-    const patch = buildChangeOrderPatchFromSubmission(submission, co.status);
+    const patch = buildChangeOrderPatchFromSubmission(submission, co.status, true);
     if (patch) {
       // DocuSeal GET /submissions often keeps the same submitter.sent_at after a resend;
       // bump locally so the UI and list reflect that a new email went out.

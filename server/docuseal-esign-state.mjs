@@ -25,7 +25,7 @@ export function pickSignedDocumentUrl(submission, submitter) {
   return null;
 }
 
-export function buildEsignRowFromSubmission(submission) {
+export function buildEsignRowFromSubmission(submission, isResend = false) {
   const submitter = pickCustomerSubmitter(submission);
   if (!submitter) {
     return null;
@@ -45,6 +45,7 @@ export function buildEsignRowFromSubmission(submission) {
     esign_submission_state: submission.status ?? null,
     esign_submitter_state: submitter.status ?? null,
     esign_sent_at: submitter.sent_at ?? null,
+    ...(isResend ? { esign_resent_at: new Date().toISOString() } : {}),
     esign_opened_at: submitter.opened_at ?? null,
     esign_completed_at: submitter.completed_at ?? submission.completed_at ?? null,
     esign_declined_at: submitter.declined_at ?? null,

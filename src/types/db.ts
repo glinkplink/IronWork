@@ -93,6 +93,7 @@ export interface Job {
   esign_submission_state: string | null;
   esign_submitter_state: string | null;
   esign_sent_at: string | null;
+  esign_resent_at: string | null;
   esign_opened_at: string | null;
   esign_completed_at: string | null;
   esign_declined_at: string | null;
@@ -254,6 +255,7 @@ export interface ChangeOrder {
   esign_submission_state?: string | null;
   esign_submitter_state?: string | null;
   esign_sent_at?: string | null;
+  esign_resent_at?: string | null;
   esign_opened_at?: string | null;
   esign_completed_at?: string | null;
   esign_declined_at?: string | null;

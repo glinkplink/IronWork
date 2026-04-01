@@ -24,7 +24,7 @@ Everything in this section requires action outside the codebase — Stripe dashb
 ### Supabase Dashboard
 
 - [x] **Apply all migrations** if not already done — paste each file from `supabase/migrations/` into SQL Editor in order, or run `npx supabase db push` from local
-  - Confirm migration `0018_stripe_scaffolding.sql` is applied (adds `stripe_account_id`, `stripe_onboarding_complete` to `business_profiles`)
+  - Confirm through `0020_esign_resent_at.sql` (adds `esign_resent_at` to `jobs` and `change_orders`)
 - [x] **Confirm RLS is enabled** on all tables (Dashboard → Table Editor → each table → RLS toggle)
 - [ ] **Set up a backup schedule** if not already configured (Dashboard → Database → Backups) (not doing this yet as it requires a paid plan)
 
@@ -58,7 +58,7 @@ Everything in this section requires action outside the codebase — Stripe dashb
 ### DocuSeal
 
 - [x] **Register a DocuSeal account** and get an API key
-- [ ] **Configure a webhook** in DocuSeal pointing to `https://[your-domain]/api/webhooks/docuseal`
+- [x] **Configure a webhook** in DocuSeal pointing to `https://[your-domain]/api/webhooks/docuseal`
   - Copy the header name and secret value — these are `DOCUSEAL_WEBHOOK_HEADER_NAME` and `DOCUSEAL_WEBHOOK_HEADER_VALUE`
 - [ ] **Test e-sign flow** end-to-end: send a work order, receive the DocuSeal email, sign, verify the work order updates in ScopeLock
 
@@ -66,26 +66,23 @@ Everything in this section requires action outside the codebase — Stripe dashb
 
 ## Code / Configuration Work Remaining
 
-### Incomplete Features
+### Completed Features
 
-- [ ] **"Send Invoice" button is disabled** — `InvoiceFinalPage.tsx` line 253 hardcodes `disabled` with "Coming Soon" label
-  - Payment **link generation and copying** is functional; email delivery is not yet wired
-  - Unblock this when email sending is implemented (see roadmap below)
-- [x] **`stripe_connect=refresh` flow reconciles status** — `useAuthProfile.ts` handles the `refresh` state by calling `getStripeConnectStatus()` then `loadProfile({ silent: true })`, and sets a success/info/error notice. Verified complete.
+- [x] **"Send Invoice" button implemented** — `InvoiceFinalPage.tsx` has working "Send Invoice" / "Resend Invoice" button with `handleSendInvoice()` handler; uses `resend` package for email delivery
+- [x] **`stripe_connect=refresh` flow reconciles status** — `useAuthProfile.ts` handles the `refresh` state by calling `getStripeConnectStatus()` then `loadProfile({ silent: true })`, and sets a success/info/error notice
+- [x] **Security headers** — `app-server.mjs` sets `X-Content-Type-Options: nosniff` on all responses (via `COMMON_HEADERS`) and `X-Frame-Options: DENY` on HTML responses
+- [x] **Rate limiting** — per-IP throttle on `/api/pdf` (10/min), `/api/stripe/connect/start` (5/min), `/api/esign/*/send|resend` (5/min), `/api/invoices/*/send` (5/min) via `server/lib/rate-limit.mjs`
+- [x] **`engines` field in `package.json`** — declares `node: ">=20.0.0"`
+- [x] **`"start"` script in `package.json`** — `"start": "NODE_ENV=production node server/app-server.mjs"`
+- [x] **Persist resent state in database** — `esign_resent_at` column on `jobs` and `change_orders`; "Resent" label and timestamp survive page navigation (migration `0020_esign_resent_at.sql`)
 
-### Missing Hardening
+### Known Gaps
 
-- [x] **Security headers** — `app-server.mjs` sets `X-Content-Type-Options: nosniff` on all responses (via `COMMON_HEADERS`) and `X-Frame-Options: DENY` on HTML responses. CSP is not set but the minimum is covered.
-- [ ] **Rate limiting** — no throttle on `/api/pdf`, `/api/stripe/connect/start`, or `/api/esign/*`
-  - PDF generation is CPU/memory-heavy; unthrottled it can be exhausted by a single abusive user
-  - Minimum viable: per-IP or per-user cap on `/api/pdf` (e.g. 10 req/min)
-- [ ] **`engines` field in `package.json`** — no minimum Node version declared; Dockerfile uses `node:20-slim` but package.json doesn't enforce this
-
-### Nice-to-Have Before GA
-
-- [ ] **Structured logging on Stripe webhook** — payment events (invoice paid, failed, amount mismatch) currently log nothing; hard to debug billing issues without a trail
-- [ ] **`"start"` script in `package.json`** — production deployments typically expect `npm start`; currently only `preview` sets `NODE_ENV=production`
-- [ ] **Stripe webhook idempotency** — if Stripe retries a webhook, the DB `payment_status` update is idempotent, but logging a duplicate event silently is fine only if there's a way to audit it later
+- [ ] **No error tracking (Sentry or equivalent)** — server-side Puppeteer crashes, Stripe API errors, and DocuSeal failures are silent. No alerting, no stack traces in a dashboard. You'll only notice problems when users report them or you check logs manually.
+- [ ] **No structured logging on Stripe webhook** — payment events (paid, failed, amount mismatch) currently log nothing; debugging billing issues in prod requires reading raw Render logs
+- [ ] **Stripe webhook idempotency audit trail** — the `payment_status` DB update is idempotent, but duplicate events from Stripe retries are silently dropped with no log entry
+- [ ] **`Paid` badge not visible on Work Orders dashboard** — `payment_status = 'paid'` only shows on `InvoiceFinalPage`; the list view has no indicator that a job has been paid
+- [ ] **Offline-signed invoice gate not implemented** — contractors can issue invoices on unsigned work orders; the planned `jobs.offline_signed_at` column + backend enforcement + UI gating is unstarted (see `offline-signed-wo-invoice-gate` plan)
 
 ---
 
@@ -110,9 +107,9 @@ Run these manually or automate as integration tests before marking a deploy heal
 
 These are not blockers but are the next logical increments:
 
-1. **Email invoice delivery** — wire `sendgrid` / `AWS SES` / `resend` to the disabled "Send Invoice" button; inject payment link into the email body
+1. **Offline-signed invoice gate** — `jobs.offline_signed_at` + backend enforcement + UI gating (plan exists)
 2. **`Paid` badge on Work Orders dashboard** — surface `payment_status = 'paid'` visually on the work order list and detail
-3. **Change order invoice billing rules** — decide whether paid COs appear as informational rows on final WO invoices (see `stripe_integration.md`)
-4. **Stripe payouts visibility** — minimal payouts summary on Edit Profile (not a full dashboard, just "your last payout was $X on DATE")
-5. **Rate limiting middleware** — shared rate limiter across all `/api/*` routes
-6. **Sentry or equivalent** — error tracking for server-side crashes (Puppeteer, Stripe API errors, DocuSeal failures)
+3. **Error tracking (Sentry or equivalent)** — server-side crash visibility, alerting, stack traces
+4. **Structured Stripe webhook logging** — audit trail for payment events
+5. **Change order invoice billing rules** — decide whether paid COs appear as informational rows on final WO invoices
+6. **Stripe payouts visibility** — minimal payouts summary on Edit Profile (not a full dashboard, just "your last payout was $X on DATE")

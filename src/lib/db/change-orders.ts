@@ -85,6 +85,7 @@ function mapChangeOrderRow(data: Record<string, unknown>): ChangeOrder {
     esign_submission_state: optStringCol(data.esign_submission_state),
     esign_submitter_state: optStringCol(data.esign_submitter_state),
     esign_sent_at: optStringCol(data.esign_sent_at),
+    esign_resent_at: optStringCol(data.esign_resent_at),
     esign_opened_at: optStringCol(data.esign_opened_at),
     esign_completed_at: optStringCol(data.esign_completed_at),
     esign_declined_at: optStringCol(data.esign_declined_at),

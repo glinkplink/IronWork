@@ -88,10 +88,10 @@ export function ChangeOrderDetailPage({
   const [signedDocBusy, setSignedDocBusy] = useState(false);
   const [coSigningLinkCopied, setCoSigningLinkCopied] = useState(false);
   const [coEsignResendNotice, setCoEsignResendNotice] = useState(false);
-  const [coEsignWasResent, setCoEsignWasResent] = useState(false);
   const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resendNoticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const coEsignWasResent = Boolean(co?.esign_resent_at);
   const esignProgress = useMemo(
     () => getEsignProgressModel(co.esign_status, 'change_order', coEsignWasResent),
     [co.esign_status, coEsignWasResent]
@@ -139,7 +139,6 @@ export function ChangeOrderDetailPage({
   useEffect(() => {
     setCoSigningLinkCopied(false);
     setCoEsignResendNotice(false);
-    setCoEsignWasResent(false);
     if (copySigningLinkTimeoutRef.current !== null) {
       clearTimeout(copySigningLinkTimeoutRef.current);
       copySigningLinkTimeoutRef.current = null;
@@ -191,7 +190,6 @@ export function ChangeOrderDetailPage({
       const r = await resendChangeOrderSignature(co.id, message);
       onCoUpdated?.(mergeEsignResponseIntoChangeOrder(co, r));
       await refreshCoRow();
-      setCoEsignWasResent(true);
       setCoEsignResendNotice(true);
       resendNoticeTimeoutRef.current = setTimeout(() => {
         setCoEsignResendNotice(false);
@@ -294,7 +292,7 @@ export function ChangeOrderDetailPage({
           {co.esign_sent_at ? (
             <div className="wo-esign-meta-row">
               <dt>{coEsignWasResent && co.esign_status === 'sent' ? 'Resent' : 'Sent'}</dt>
-              <dd>{formatEsignTimestamp(co.esign_sent_at)}</dd>
+              <dd>{formatEsignTimestamp(co.esign_resent_at || co.esign_sent_at)}</dd>
             </div>
           ) : null}
           {co.esign_opened_at ? (
