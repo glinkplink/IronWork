@@ -22,7 +22,8 @@ function buildBaseSteps(): [EsignProgressStep, EsignProgressStep, EsignProgressS
 
 export function getEsignProgressModel(
   status: EsignJobStatus,
-  documentKind: 'work_order' | 'change_order' = 'work_order'
+  documentKind: 'work_order' | 'change_order' = 'work_order',
+  wasResent = false
 ): EsignProgressModel {
   const steps = buildBaseSteps();
   const docCompleted = documentKind === 'change_order'
@@ -35,6 +36,10 @@ export function getEsignProgressModel(
   switch (status) {
     case 'sent':
       steps[0].tone = 'active';
+      if (wasResent) {
+        steps[0].label = 'Resent';
+        return { title: 'Resent', summary: 'Signature request resent to customer.', steps };
+      }
       return { title: 'Sent', summary: 'Signature request sent to customer.', steps };
     case 'opened':
       steps[0].tone = 'active';
