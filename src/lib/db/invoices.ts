@@ -29,6 +29,7 @@ type BaseInvoiceStatusRow = {
   issued_at: string | null;
   invoice_number: number;
   created_at: string;
+  payment_status: 'unpaid' | 'paid' | 'offline';
 };
 
 export function getInvoiceBusinessStatus(invoice: {
@@ -88,6 +89,10 @@ export function mapInvoiceRow(data: Record<string, unknown>): Invoice {
     status: data.status as Invoice['status'],
     issued_at: (data.issued_at as string | null) ?? null,
     line_items,
+    stripe_payment_link_id: (data.stripe_payment_link_id as string | null) ?? null,
+    stripe_payment_url: (data.stripe_payment_url as string | null) ?? null,
+    payment_status: (data.payment_status as Invoice['payment_status']) ?? 'unpaid',
+    paid_at: (data.paid_at as string | null) ?? null,
     subtotal: Number(data.subtotal),
     tax_rate: Number(data.tax_rate),
     tax_amount: Number(data.tax_amount),
@@ -223,12 +228,16 @@ function mapBaseInvoiceStatusRow(row: Record<string, unknown>): BaseInvoiceStatu
   const created_at = row.created_at;
   if (typeof created_at !== 'string') return null;
   const issued_at = typeof row.issued_at === 'string' && row.issued_at.trim() ? row.issued_at : null;
+  const paymentStatusRaw = row.payment_status;
+  const payment_status: 'unpaid' | 'paid' | 'offline' =
+    paymentStatusRaw === 'paid' || paymentStatusRaw === 'offline' ? paymentStatusRaw : 'unpaid';
   return {
     id,
     job_id,
     issued_at,
     invoice_number,
     created_at,
+    payment_status,
   };
 }
 
@@ -328,7 +337,7 @@ export const listInvoiceStatusByJob = async (
 ): Promise<ListInvoiceStatusByJobResult> => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, job_id, issued_at, invoice_number, created_at, line_items')
+    .select('id, job_id, issued_at, invoice_number, created_at, line_items, payment_status')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 

@@ -50,6 +50,7 @@ const listJobA: WorkOrderDashboardJob = {
   created_at: '2025-01-01T12:00:00Z',
   price: 100,
   esign_status: 'not_sent',
+  offline_signed_at: null,
   changeOrderCount: 0,
   changeOrderPreview: [],
   hasInFlightChangeOrders: false,
@@ -66,6 +67,7 @@ const listJobB: WorkOrderDashboardJob = {
   created_at: '2025-01-02T12:00:00Z',
   price: 200,
   esign_status: 'sent',
+  offline_signed_at: null,
   changeOrderCount: 0,
   changeOrderPreview: [],
   hasInFlightChangeOrders: false,
@@ -140,6 +142,8 @@ function minimalFullJob(id: string, customer: string): Job {
     esign_declined_at: null,
     esign_decline_reason: null,
     esign_signed_document_url: null,
+    esign_resent_at: null,
+    offline_signed_at: null,
   };
 }
 
@@ -154,6 +158,10 @@ function minimalInvoice(id: string): Invoice {
     status: 'draft',
     issued_at: null,
     line_items: [],
+    stripe_payment_link_id: null,
+    stripe_payment_url: null,
+    payment_status: 'unpaid',
+    paid_at: null,
     subtotal: 100,
     tax_rate: 0,
     tax_amount: 0,
@@ -321,7 +329,7 @@ describe('WorkOrdersPage', () => {
     await flushAsync();
 
     expect(listWorkOrdersDashboard).toHaveBeenCalledWith('u1', ['job-b']);
-    expect(screen.getByLabelText('E-signature status: Signed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Signature status: Signed')).toBeInTheDocument();
     expect(screen.getByText('Customer A')).toBeInTheDocument();
   });
 
@@ -423,7 +431,7 @@ describe('WorkOrdersPage', () => {
     expect(row).toBeTruthy();
     const rowEl = row as HTMLElement;
     const link = within(rowEl).getByRole('button', { name: /View & Create Change Orders/i });
-    const strip = within(rowEl).getByLabelText('E-signature status: Signed');
+    const strip = within(rowEl).getByLabelText('Signature status: Signed');
 
     expect(link.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -439,6 +447,7 @@ describe('WorkOrdersPage', () => {
             issued_at: null,
             invoice_number: 1,
             created_at: '2025-01-03T00:00:00Z',
+            payment_status: 'unpaid',
           },
         },
         {
@@ -449,6 +458,7 @@ describe('WorkOrdersPage', () => {
             issued_at: '2025-01-04T00:00:00Z',
             invoice_number: 2,
             created_at: '2025-01-04T00:00:00Z',
+            payment_status: 'unpaid',
           },
         },
       ])
@@ -474,6 +484,7 @@ describe('WorkOrdersPage', () => {
             issued_at: null,
             invoice_number: 1,
             created_at: '2025-01-03T00:00:00Z',
+            payment_status: 'unpaid',
           },
         },
       ])

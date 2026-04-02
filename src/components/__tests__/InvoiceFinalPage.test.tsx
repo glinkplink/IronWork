@@ -82,6 +82,8 @@ function baseJob(): Job {
     esign_declined_at: null,
     esign_decline_reason: null,
     esign_signed_document_url: null,
+    esign_resent_at: null,
+    offline_signed_at: null,
     wo_number: null,
     agreement_date: null,
     contractor_phone: null,
@@ -118,13 +120,15 @@ function baseProfile(): BusinessProfile {
     default_payment_terms_days: 30,
     default_late_fee_rate: 0,
     default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
   };
 }
 
 function baseInvoice(overrides: Partial<Invoice> = {}): Invoice {
-  return {
+  const invoice: Invoice = {
     id: 'inv-1',
     user_id: 'u1',
     job_id: 'job-1',
@@ -134,6 +138,10 @@ function baseInvoice(overrides: Partial<Invoice> = {}): Invoice {
     status: 'draft',
     issued_at: null,
     line_items: [],
+    stripe_payment_link_id: null,
+    stripe_payment_url: null,
+    payment_status: 'unpaid',
+    paid_at: null,
     subtotal: 250,
     tax_rate: 0,
     tax_amount: 0,
@@ -144,6 +152,11 @@ function baseInvoice(overrides: Partial<Invoice> = {}): Invoice {
     updated_at: '2025-01-01T00:00:00Z',
     ...overrides,
   };
+  invoice.stripe_payment_link_id = overrides.stripe_payment_link_id ?? null;
+  invoice.stripe_payment_url = overrides.stripe_payment_url ?? null;
+  invoice.payment_status = overrides.payment_status ?? 'unpaid';
+  invoice.paid_at = overrides.paid_at ?? null;
+  return invoice;
 }
 
 describe('InvoiceFinalPage', () => {
@@ -151,11 +164,11 @@ describe('InvoiceFinalPage', () => {
   const onEditInvoice = vi.fn();
   const onInvoiceUpdated = vi.fn();
 
-  function renderPage(invoice = baseInvoice()) {
+  function renderPage(invoice = baseInvoice(), job = baseJob()) {
     return render(
       <InvoiceFinalPage
         invoice={invoice}
-        job={baseJob()}
+        job={job}
         profile={baseProfile()}
         onWorkOrders={onWorkOrders}
         onEditInvoice={onEditInvoice}
@@ -175,13 +188,14 @@ describe('InvoiceFinalPage', () => {
     cleanup();
   });
 
-  it('renders payment card with disabled buttons for draft invoice', () => {
-    renderPage();
+  it('renders payment card with enabled send button for draft invoice', () => {
+    const signedJob = { ...baseJob(), esign_status: 'completed' as const };
+    renderPage(baseInvoice(), signedJob);
 
-    expect(screen.getByText('Send Invoice')).toBeInTheDocument();
-    expect(screen.getByText('Payment links coming soon. Download the PDF to share manually in the meantime.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /send invoice \(coming soon\)/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /copy payment link/i })).toBeDisabled();
+    expect(screen.getByRole('heading', { name: 'Send Invoice' })).toBeInTheDocument();
+    expect(screen.getByText('Send the invoice email to the customer with the PDF attached and payment link.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Send Invoice$/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /create payment link/i })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /download invoice/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /edit invoice/i })).toBeInTheDocument();
   });

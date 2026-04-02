@@ -21,6 +21,7 @@ const WORK_ORDER_LIST_SELECT = `
   created_at,
   price,
   esign_status,
+  offline_signed_at,
   change_orders (
     id,
     job_id,
@@ -77,6 +78,12 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
     .map((value) => mapWorkOrderListChangeOrderRow(value))
     .sort((a, b) => a.co_number - b.co_number);
 
+  const offlineSignedAtRaw = row.offline_signed_at;
+  const offline_signed_at =
+    typeof offlineSignedAtRaw === 'string' && offlineSignedAtRaw.trim()
+      ? offlineSignedAtRaw.trim()
+      : null;
+
   return {
     id: String(row.id),
     wo_number: row.wo_number != null ? Number(row.wo_number) : null,
@@ -87,6 +94,7 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
     created_at: String(row.created_at ?? ''),
     price,
     esign_status,
+    offline_signed_at,
     changeOrders,
   };
 }
@@ -98,6 +106,7 @@ function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderIn
     typeof row.issued_at === 'string' && row.issued_at.trim() ? row.issued_at : null;
   const created_at = row.created_at;
   const invoice_number = row.invoice_number;
+  const payment_status = (row.payment_status as WorkOrderInvoiceStatus['payment_status']) ?? 'unpaid';
   if (typeof id !== 'string' || typeof job_id !== 'string' || typeof created_at !== 'string') {
     return null;
   }
@@ -111,6 +120,7 @@ function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderIn
     issued_at,
     invoice_number: parsedInvoiceNumber,
     created_at,
+    payment_status,
   };
 }
 
@@ -152,6 +162,12 @@ function mapWorkOrderDashboardRow(row: Record<string, unknown>): WorkOrderDashbo
           changeOrder.esign_status === 'sent' || changeOrder.esign_status === 'opened'
         );
 
+  const offlineSignedAtRaw = row.offline_signed_at;
+  const offline_signed_at =
+    typeof offlineSignedAtRaw === 'string' && offlineSignedAtRaw.trim()
+      ? offlineSignedAtRaw.trim()
+      : null;
+
   return {
     id: String(row.id),
     wo_number: row.wo_number != null ? Number(row.wo_number) : null,
@@ -162,6 +178,7 @@ function mapWorkOrderDashboardRow(row: Record<string, unknown>): WorkOrderDashbo
     created_at: String(row.created_at ?? ''),
     price,
     esign_status,
+    offline_signed_at,
     changeOrderCount,
     changeOrderPreview: fullChangeOrders.slice(0, 2),
     hasInFlightChangeOrders,

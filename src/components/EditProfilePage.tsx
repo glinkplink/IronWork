@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { upsertProfile } from '../lib/db/profile';
 import { signOut } from '../lib/auth';
 import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defaults';
@@ -15,6 +15,8 @@ import {
   validateLateFeeRate,
   validatePaymentTermsDays,
 } from '../lib/payment-terms';
+import { redirectToStripeConnect, startStripeConnect } from '../lib/stripe-connect';
+import type { StripeConnectNotice } from '../hooks/useAuthProfile';
 import './EditProfilePage.css';
 
 interface EditProfilePageProps {
@@ -22,9 +24,15 @@ interface EditProfilePageProps {
   /** Called with the row returned from upsert so parent state updates before any refetch race. */
   onSave: (savedProfile: BusinessProfile | null) => void | Promise<void>;
   onCancel: () => void;
+  stripeConnectNotice?: StripeConnectNotice | null;
 }
 
-export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePageProps) {
+export function EditProfilePage({
+  profile,
+  onSave,
+  onCancel,
+  stripeConnectNotice = null,
+}: EditProfilePageProps) {
   const [businessName, setBusinessName] = useState(profile.business_name);
   const [ownerName, setOwnerName] = useState(profile.owner_name ?? '');
   const [phone, setPhone] = useState(() => formatUsPhoneInput(profile.phone ?? ''));
@@ -64,7 +72,13 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeNotice, setStripeNotice] = useState<StripeConnectNotice | null>(stripeConnectNotice);
+
+  useEffect(() => {
+    setStripeNotice(stripeConnectNotice);
+  }, [stripeConnectNotice]);
 
   const addExclusion = () => setDefaultExclusions([...defaultExclusions, '']);
   const updateExclusion = (index: number, value: string) => {
@@ -90,11 +104,14 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
     );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveProfile = async (options?: { showSuccess?: boolean }) => {
+    const showSuccess = options?.showSuccess !== false;
+
     setError('');
-    setSuccess(false);
-    setLoading(true);
+    if (showSuccess) {
+      setSuccess(false);
+    }
+    setSaving(true);
 
     const exclusionsArray = defaultExclusions.filter((s) => s.trim().length > 0);
     const obligationsArray = defaultCustomerObligations.filter((s) => s.trim().length > 0);
@@ -103,11 +120,11 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
     const lateFeeErr = validateLateFeeRate(defaultLateFeeRate);
     if (paymentTermsErr || lateFeeErr) {
       setError(paymentTermsErr || lateFeeErr || 'Invalid payment settings');
-      setLoading(false);
-      return;
+      setSaving(false);
+      return null;
     }
 
-    const { data: savedProfile, error } = await upsertProfile({
+    const { data: savedProfile, error: saveError } = await upsertProfile({
       user_id: profile.user_id,
       business_name: businessName,
       owner_name: ownerName || null,
@@ -126,15 +143,71 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
       default_card_fee_note: defaultCardFeeNote,
     });
 
-    setLoading(false);
+    setSaving(false);
 
-    if (error) {
-      setError(error.message);
-    } else {
+    if (saveError) {
+      setError(saveError.message);
+      return null;
+    }
+
+    if (showSuccess) {
       setSuccess(true);
-      await Promise.resolve(onSave(savedProfile ?? null));
+    }
+    await Promise.resolve(onSave(savedProfile ?? null));
+    return savedProfile ?? null;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await saveProfile({ showSuccess: true });
+  };
+
+  const handleStripeConnect = async () => {
+    setStripeNotice(null);
+    const savedProfile = await saveProfile({ showSuccess: false });
+    if (!savedProfile) return;
+
+    setStripeLoading(true);
+    try {
+      const { url } = await startStripeConnect();
+      redirectToStripeConnect(url);
+    } catch (connectError) {
+      setStripeLoading(false);
+      setStripeNotice({
+        tone: 'error',
+        message:
+          connectError instanceof Error
+            ? connectError.message
+            : 'Could not start Stripe onboarding.',
+      });
     }
   };
+
+  const stripeStatus =
+    !profile.stripe_account_id
+      ? 'not_connected'
+      : profile.stripe_onboarding_complete
+        ? 'connected'
+        : 'incomplete';
+  const stripeButtonLabel =
+    stripeStatus === 'connected'
+      ? 'Update Stripe Setup'
+      : stripeStatus === 'incomplete'
+        ? 'Continue Stripe Setup'
+        : 'Connect Stripe';
+  const stripeStatusLabel =
+    stripeStatus === 'connected'
+      ? 'Connected'
+      : stripeStatus === 'incomplete'
+        ? 'Setup in progress'
+        : 'Not connected';
+  const stripeStatusDescription =
+    stripeStatus === 'connected'
+      ? 'Stripe onboarding is complete and this account is ready for invoice payment links.'
+      : stripeStatus === 'incomplete'
+        ? 'Stripe setup has started, but onboarding is not finished yet.'
+        : 'Connect Stripe so customers can pay invoice links directly to your account.';
+  const busy = saving || stripeLoading;
 
   return (
     <div className="edit-profile-page">
@@ -394,12 +467,41 @@ export function EditProfilePage({ profile, onSave, onCancel }: EditProfilePagePr
               </div>
             </section>
 
+            <section className="form-section edit-profile-stripe-section">
+              <h2>Stripe Connect</h2>
+              <p className="section-description">
+                Connect your Stripe account here when you are ready to accept invoice payments through ScopeLock.
+              </p>
+
+              <div className="edit-profile-stripe-status-row">
+                <div>
+                  <p className="edit-profile-stripe-status-label">Status</p>
+                  <p className="edit-profile-stripe-status-value">{stripeStatusLabel}</p>
+                  <p className="edit-profile-stripe-status-description">{stripeStatusDescription}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary edit-profile-stripe-button"
+                  onClick={handleStripeConnect}
+                  disabled={busy}
+                >
+                  {stripeLoading ? 'Opening Stripe...' : stripeButtonLabel}
+                </button>
+              </div>
+
+              {stripeNotice && (
+                <div className={`stripe-notice stripe-notice--${stripeNotice.tone}`}>
+                  {stripeNotice.message}
+                </div>
+              )}
+            </section>
+
             {error && <div className="error-banner">{error}</div>}
 
             <div className="form-actions">
               <div className="form-actions-row">
-                <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? 'Saving...' : 'Save Changes'}
+                <button type="submit" className="btn-primary" disabled={busy}>
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button type="button" className="btn-secondary" onClick={onCancel}>
                   Home

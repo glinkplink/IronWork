@@ -41,9 +41,9 @@ curl -s http://127.0.0.1:3000/api/pdf/health
 
 | Command | What runs |
 |--------|-----------|
-| `npm run dev` | **`node server/app-server.mjs`** with `NODE_ENV` ≠ `production`: Vite in **middleware mode** (hot reload) + **`POST /api/pdf`** + work-order/change-order e-sign send-resend routes + **`POST /api/webhooks/docuseal`** |
+| `npm run dev` | **`node server/app-server.mjs`** with `NODE_ENV` ≠ `production`: Vite in **middleware mode** (hot reload) + **`POST /api/pdf`** + work-order/change-order e-sign routes + Stripe Connect/payment routes + **`POST /api/webhooks/docuseal`** + **`POST /api/stripe/webhook`** |
 | `npm run build` | TypeScript project references + Vite production bundle → `dist/` |
-| `npm run preview` | **`NODE_ENV=production node server/app-server.mjs`**: serves **`dist/`** as static files + **`POST /api/pdf`** and the same e-sign/webhook routes. **Run `npm run build` first** or the app shell will be missing/outdated. |
+| `npm run preview` | **`NODE_ENV=production node server/app-server.mjs`**: serves **`dist/`** as static files + **`POST /api/pdf`** and the same e-sign/Stripe/webhook routes. **Run `npm run build` first** or the app shell will be missing/outdated. |
 | `npm run lint` | ESLint |
 
 There is **no** `vite preview` workflow as the primary way to run the product: the supported path is **always** the custom app server so PDFs work.
@@ -78,6 +78,9 @@ The server loads **`.env`** then **`.env.local`** (override) via `dotenv` so Doc
 | `DOCUSEAL_WEBHOOK_HEADER_VALUE` | Secret value paired with that header. |
 | `SUPABASE_URL` | Same project URL as `VITE_SUPABASE_URL`; used by the server with the service role. |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Server only.** Used to update work-order and change-order `esign_*` fields after send/resend and on webhooks. Send/resend still require a valid user **JWT**; each update checks the owned row before writing (webhooks use DocuSeal submission correlation, not Supabase JWT). |
+| `APP_BASE_URL` | Optional absolute app origin used for Stripe Connect return/refresh links. If unset, the server derives it from forwarded headers and `Host`. |
+| `STRIPE_SECRET_KEY` | **Server only.** Used for Stripe Connect account creation, onboarding links, payment links, and webhook verification. |
+| `STRIPE_WEBHOOK_SECRET` | **Server only.** Used to verify `POST /api/stripe/webhook` events. |
 
 ---
 
@@ -86,6 +89,13 @@ The server loads **`.env`** then **`.env.local`** (override) via `dotenv` so Doc
 - The **browser** builds HTML strings (agreement, invoice, change order, or combined body) and sends them in the **JSON body** of **`POST /api/pdf`**.
 - The **server** loads fonts, sets viewport, runs Puppeteer, returns a PDF blob. Work order / invoice headers (e.g. WO #, Invoice #, CO #) come from fields in that JSON (e.g. `marginHeaderLeft`, `workOrderNumber`), matching `server/app-server.mjs` + `agreement-pdf.ts`.
 - **Same origin:** the frontend posts to a relative URL (`/api/pdf`), so production deployments should put the SPA and this API behind **one** host (or a reverse proxy that makes them look like one host).
+
+## Stripe routes
+
+- `POST /api/stripe/connect/start`: authenticated; creates or reuses the user’s connected Stripe account and returns an onboarding link.
+- `GET /api/stripe/connect/status`: authenticated; inspects the connected account, reconciles `business_profiles.stripe_onboarding_complete`, and returns the current connect status used by Edit Profile.
+- `POST /api/stripe/invoices/:invoiceId/payment-link`: authenticated; creates or reuses an invoice payment link for the connected account.
+- `POST /api/stripe/webhook`: unauthenticated Stripe webhook endpoint for invoice payment reconciliation; requires `STRIPE_WEBHOOK_SECRET`.
 
 ---
 
@@ -172,6 +182,7 @@ src/
     supabase.ts, auth.ts
     agreement-generator.ts, agreement-sections-html.ts, change-order-generator.ts
     agreement-pdf.ts, invoice-generator.ts, html-escape.ts
+    stripe-connect.ts          # Authenticated Stripe Connect/payment-link helpers
     job-site-address.ts, us-phone-input.ts, geoapify-autocomplete.ts
     job-to-welder-job.ts
     db/                      # profile, clients, jobs, invoices, change-orders
@@ -179,7 +190,8 @@ src/
   types/                     # WelderJob, DB row types
   data/sample-job.json
 server/
-  app-server.mjs             # HTTP server: Vite (dev) or dist (prod) + POST /api/pdf
+  app-server.mjs             # HTTP server: Vite (dev) or dist (prod) + PDF + e-sign + Stripe routes
+  stripe-routes.mjs          # Stripe Connect, payment-link, and webhook routes
 supabase/migrations/       # Apply via CLI or dashboard SQL editor
 ```
 

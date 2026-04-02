@@ -21,6 +21,8 @@ export interface BusinessProfile {
   default_payment_terms_days: number;
   default_late_fee_rate: number;
   default_card_fee_note: boolean;
+  stripe_account_id: string | null;
+  stripe_onboarding_complete: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -91,11 +93,14 @@ export interface Job {
   esign_submission_state: string | null;
   esign_submitter_state: string | null;
   esign_sent_at: string | null;
+  esign_resent_at: string | null;
   esign_opened_at: string | null;
   esign_completed_at: string | null;
   esign_declined_at: string | null;
   esign_decline_reason: string | null;
   esign_signed_document_url: string | null;
+  /** Manual paper signature tracking (null = not offline-signed). */
+  offline_signed_at: string | null;
 }
 
 /** Normalized e-sign lifecycle for UI (stored on `jobs.esign_status`). */
@@ -127,6 +132,7 @@ export interface WorkOrderListJob {
   created_at: string;
   price: number;
   esign_status: EsignJobStatus;
+  offline_signed_at: string | null;
   changeOrders: WorkOrderListChangeOrderPreview[];
 }
 
@@ -140,6 +146,7 @@ export interface WorkOrderDashboardJob {
   created_at: string;
   price: number;
   esign_status: EsignJobStatus;
+  offline_signed_at: string | null;
   changeOrderCount: number;
   changeOrderPreview: WorkOrderListChangeOrderPreview[];
   hasInFlightChangeOrders: boolean;
@@ -164,6 +171,7 @@ export interface WorkOrderInvoiceStatus {
   issued_at: string | null;
   invoice_number: number;
   created_at: string;
+  payment_status: 'unpaid' | 'paid' | 'offline';
 }
 
 export interface ChangeOrderInvoiceStatus {
@@ -213,6 +221,10 @@ export interface Invoice {
   total: number;
   payment_methods: string[];
   notes: string | null;
+  stripe_payment_link_id: string | null;
+  stripe_payment_url: string | null;
+  payment_status: 'unpaid' | 'paid' | 'offline';
+  paid_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -247,6 +259,7 @@ export interface ChangeOrder {
   esign_submission_state?: string | null;
   esign_submitter_state?: string | null;
   esign_sent_at?: string | null;
+  esign_resent_at?: string | null;
   esign_opened_at?: string | null;
   esign_completed_at?: string | null;
   esign_declined_at?: string | null;

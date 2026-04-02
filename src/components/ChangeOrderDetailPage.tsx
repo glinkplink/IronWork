@@ -91,9 +91,10 @@ export function ChangeOrderDetailPage({
   const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resendNoticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const coEsignWasResent = Boolean(co?.esign_resent_at);
   const esignProgress = useMemo(
-    () => getEsignProgressModel(co.esign_status, 'change_order'),
-    [co.esign_status]
+    () => getEsignProgressModel(co.esign_status, 'change_order', coEsignWasResent),
+    [co.esign_status, coEsignWasResent]
   );
   const showCopySigningLink = Boolean(
     co.esign_embed_src &&
@@ -290,8 +291,8 @@ export function ChangeOrderDetailPage({
         <dl className="wo-esign-meta">
           {co.esign_sent_at ? (
             <div className="wo-esign-meta-row">
-              <dt>Sent</dt>
-              <dd>{formatEsignTimestamp(co.esign_sent_at)}</dd>
+              <dt>{coEsignWasResent && co.esign_status === 'sent' ? 'Resent' : 'Sent'}</dt>
+              <dd>{formatEsignTimestamp(co.esign_resent_at || co.esign_sent_at)}</dd>
             </div>
           ) : null}
           {co.esign_opened_at ? (

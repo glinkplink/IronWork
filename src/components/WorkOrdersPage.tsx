@@ -18,6 +18,7 @@ import { useEsignPoller } from '../hooks/useEsignPoller';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
 import { shouldPollEsignStatus } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
+import { getWorkOrderSignatureState } from '../lib/work-order-signature';
 import './WorkOrdersPage.css';
 
 const HIDE_COMPLETE_PROFILE_CTA_PREFIX = 'scope-lock-hide-complete-profile-cta:';
@@ -53,10 +54,29 @@ function formatRowDate(job: WorkOrderDashboardJob): string {
   return ROW_DATE_FORMATTER.format(new Date(y, m - 1, d));
 }
 
-function renderEsignStrip(status: WorkOrderDashboardJob['esign_status']) {
-  const progress = getEsignProgressModel(status);
-  if (status === 'not_sent') return null;
+function renderEsignStrip(
+  status: WorkOrderDashboardJob['esign_status'],
+  offlineSignedAt: string | null
+) {
+  const { displayLabel, isSignatureSatisfied } = getWorkOrderSignatureState(status, offlineSignedAt);
+  if (!isSignatureSatisfied && status === 'not_sent') return null;
 
+  if (displayLabel === 'Signed offline' || displayLabel === 'Signed') {
+    return (
+      <span
+        className="esign-strip"
+        title={`Signature: ${displayLabel}`}
+        aria-label={`Signature status: ${displayLabel}`}
+      >
+        <span className="esign-strip-segment esign-strip-segment-success" aria-hidden="true" />
+        <span className="esign-strip-segment esign-strip-segment-success" aria-hidden="true" />
+        <span className="esign-strip-segment esign-strip-segment-success" aria-hidden="true" />
+        <span className="esign-strip-text">{displayLabel}</span>
+      </span>
+    );
+  }
+
+  const progress = getEsignProgressModel(status);
   return (
     <span
       className="esign-strip"
@@ -165,7 +185,7 @@ const WorkOrderRow = memo(function WorkOrderRow({
             View & Create Change Orders
           </button>
         ) : null}
-        {renderEsignStrip(job.esign_status)}
+        {renderEsignStrip(job.esign_status, job.offline_signed_at)}
       </div>
       <div className="work-orders-row-actions">
         {!invoice ? (
@@ -176,6 +196,15 @@ const WorkOrderRow = memo(function WorkOrderRow({
             onClick={() => onStartInvoice(job)}
           >
             Invoice
+          </button>
+        ) : invoice.payment_status === 'paid' ? (
+          <button
+            type="button"
+            className="badge-paid"
+            disabled={rowBusy}
+            onClick={() => onOpenPendingInvoice(job)}
+          >
+            Paid
           </button>
         ) : getInvoiceBusinessStatus(invoice) === 'draft' ? (
           <button

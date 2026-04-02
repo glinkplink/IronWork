@@ -32,6 +32,8 @@ const profile: BusinessProfile = {
   default_card_fee_note: false,
   next_wo_number: 1,
   next_invoice_number: 1,
+  stripe_account_id: null,
+  stripe_onboarding_complete: false,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 };
@@ -90,6 +92,8 @@ const baseJob: Job = {
   esign_declined_at: null,
   esign_decline_reason: null,
   esign_signed_document_url: null,
+  esign_resent_at: null,
+  offline_signed_at: null,
 };
 
 const baseCo: ChangeOrder = {
@@ -122,6 +126,10 @@ function baseInvoice(line_items: Invoice['line_items']): Invoice {
     status: 'draft',
     issued_at: null,
     line_items,
+    stripe_payment_link_id: null,
+    stripe_payment_url: null,
+    payment_status: 'unpaid',
+    paid_at: null,
     subtotal: 100,
     tax_rate: 0,
     tax_amount: 0,
@@ -177,6 +185,8 @@ describe('mapInvoiceRow', () => {
       esign_declined_at: null,
       esign_decline_reason: null,
       esign_signed_document_url: null,
+      esign_resent_at: null,
+      offline_signed_at: null,
     });
 
     expect(invoice.line_items[0]).toMatchObject({

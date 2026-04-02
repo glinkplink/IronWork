@@ -52,6 +52,7 @@ describe('invoiceStatusMapFromRows', () => {
         issued_at: null,
         invoice_number: 2,
         created_at: '2025-02-02T00:00:00Z',
+        payment_status: 'unpaid',
       },
       {
         id: 'inv-old',
@@ -59,6 +60,7 @@ describe('invoiceStatusMapFromRows', () => {
         issued_at: '2025-01-01T00:00:00Z',
         invoice_number: 1,
         created_at: '2025-01-01T00:00:00Z',
+        payment_status: 'paid',
       },
     ]);
     expect(map.get('j1')?.id).toBe('inv-new');
@@ -108,6 +110,7 @@ describe('listInvoiceStatusByJob', () => {
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
         line_items: [],
+        payment_status: 'unpaid',
       },
     ];
     const result = await listInvoiceStatusByJob('user-1');
@@ -120,6 +123,7 @@ describe('listInvoiceStatusByJob', () => {
         issued_at: null,
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
+        payment_status: 'unpaid',
       },
     ]);
   });
@@ -142,6 +146,7 @@ describe('listInvoiceStatusByJob', () => {
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
         line_items: [],
+        payment_status: 'unpaid',
       },
       {
         id: 'i-bad',
@@ -150,6 +155,7 @@ describe('listInvoiceStatusByJob', () => {
         invoice_number: 'nope',
         created_at: '2025-01-01T00:00:00Z',
         line_items: [],
+        payment_status: 'unpaid',
       },
     ];
     const result = await listInvoiceStatusByJob('user-1');
@@ -161,6 +167,7 @@ describe('listInvoiceStatusByJob', () => {
         issued_at: null,
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
+        payment_status: 'unpaid',
       },
     ]);
     expect(result.warning).toMatch(/skipped/i);
@@ -177,6 +184,7 @@ describe('listInvoiceStatusByJob', () => {
         invoice_number: 2,
         created_at: '2025-01-03T00:00:00Z',
         line_items: [{ change_order_id: 'co-1' }],
+        payment_status: 'paid',
       },
       {
         id: 'i-wo',
@@ -185,6 +193,7 @@ describe('listInvoiceStatusByJob', () => {
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
         line_items: [{ description: 'Original scope' }],
+        payment_status: 'unpaid',
       },
     ];
     const result = await listInvoiceStatusByJob('user-1');
@@ -197,6 +206,7 @@ describe('listInvoiceStatusByJob', () => {
         issued_at: null,
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
+        payment_status: 'unpaid',
       },
     ]);
   });
@@ -217,6 +227,7 @@ describe('listInvoiceStatusByChangeOrder', () => {
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
         line_items: [{ change_order_id: 'co-1' }],
+        payment_status: 'unpaid',
       },
     ];
     const result = await listInvoiceStatusByChangeOrder('user-1', 'j1');
@@ -230,6 +241,7 @@ describe('listInvoiceStatusByChangeOrder', () => {
         issued_at: null,
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
+        payment_status: 'unpaid',
       },
     ]);
   });
@@ -244,6 +256,7 @@ describe('listInvoiceStatusByChangeOrder', () => {
         invoice_number: 2,
         created_at: '2025-01-03T00:00:00Z',
         line_items: [{ change_order_id: 'co-1' }],
+        payment_status: 'paid',
       },
       {
         id: 'i-bad',
@@ -252,6 +265,7 @@ describe('listInvoiceStatusByChangeOrder', () => {
         invoice_number: 1,
         created_at: '2025-01-02T00:00:00Z',
         line_items: [{ change_order_id: 'co-1' }, { change_order_id: 'co-2' }],
+        payment_status: 'unpaid',
       },
     ];
     const result = await listInvoiceStatusByChangeOrder('user-1', 'j1');
@@ -264,6 +278,7 @@ describe('listInvoiceStatusByChangeOrder', () => {
         issued_at: '2025-01-03T00:00:00Z',
         invoice_number: 2,
         created_at: '2025-01-03T00:00:00Z',
+        payment_status: 'paid',
       },
     ]);
     expect(result.warning).toMatch(/skipped/i);

@@ -26,6 +26,7 @@ export interface EsignApiResponse {
   esign_submission_state: string | null;
   esign_submitter_state: string | null;
   esign_sent_at: string | null;
+  esign_resent_at: string | null;
   esign_opened_at: string | null;
   esign_completed_at: string | null;
   esign_declined_at: string | null;
@@ -107,6 +108,7 @@ export function mergeEsignResponseIntoJob(job: Job, r: EsignApiResponse): Job {
     esign_submission_state: r.esign_submission_state,
     esign_submitter_state: r.esign_submitter_state,
     esign_sent_at: r.esign_sent_at,
+    esign_resent_at: r.esign_resent_at,
     esign_opened_at: r.esign_opened_at,
     esign_completed_at: r.esign_completed_at,
     esign_declined_at: r.esign_declined_at,
@@ -145,6 +147,7 @@ export function mergeEsignResponseIntoChangeOrder(co: ChangeOrder, r: EsignApiRe
     esign_submission_state: r.esign_submission_state,
     esign_submitter_state: r.esign_submitter_state,
     esign_sent_at: r.esign_sent_at,
+    esign_resent_at: r.esign_resent_at,
     esign_opened_at: r.esign_opened_at,
     esign_completed_at: r.esign_completed_at,
     esign_declined_at: r.esign_declined_at,

@@ -81,6 +81,7 @@ function App() {
     setProfile,
     loadProfile,
     handleCaptureFlowFinished,
+    stripeConnectNotice,
   } = useAuthProfile({
     replaceView,
     setWorkOrdersSuccessBanner,
@@ -264,6 +265,7 @@ function App() {
         <EditProfilePage
           profile={profile}
           onSave={handleEditProfileSaved}
+          stripeConnectNotice={stripeConnectNotice}
           onCancel={() => {
             if (profileEntrySource === 'work-orders') {
               setProfileEntrySource(null);
@@ -281,7 +283,7 @@ function App() {
     if (view === 'work-orders' && user) {
       return renderLazyPage(
         <WorkOrdersPage
-          key={user.id}
+          key={`${user.id}-inv-${invoice.refreshKey}`}
           userId={user.id}
           profile={profile}
           successBanner={workOrdersSuccessBanner}

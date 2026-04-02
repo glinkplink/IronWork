@@ -8,6 +8,9 @@ import dotenv from 'dotenv';
 import puppeteer from 'puppeteer-core';
 import { tryHandleEsignRoute } from './esign-routes.mjs';
 import { tryHandleStripeRoute } from './stripe-routes.mjs';
+import { tryHandleInvoiceRoute } from './invoice-routes.mjs';
+import { checkRateLimit, getClientIp } from './lib/rate-limit.mjs';
+import { log } from './lib/logger.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,27 +26,37 @@ const executablePath =
   process.env.CHROME_PATH ||
   '/usr/bin/google-chrome-stable';
 
+const COMMON_HEADERS = { 'X-Content-Type-Options': 'nosniff' };
+
 let browserPromise;
 
-async function getBrowser() {
+export async function getBrowser() {
   if (!browserPromise) {
     browserPromise = puppeteer.launch({
       executablePath,
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    }).catch((err) => {
+      browserPromise = null;
+      throw err;
     });
   }
 
-  return browserPromise;
+  const browser = await browserPromise;
+  if (!browser.isConnected()) {
+    browserPromise = null;
+    return getBrowser();
+  }
+  return browser;
 }
 
 function sendText(res, statusCode, message) {
-  res.writeHead(statusCode, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.writeHead(statusCode, { ...COMMON_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' });
   res.end(message);
 }
 
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(statusCode, { ...COMMON_HEADERS, 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(payload));
 }
 
@@ -158,7 +171,9 @@ async function handlePdfRequest(req, res) {
     page = await browser.newPage();
     /* Letter width at 96dpi — layout matches desktop PDF regardless of client screen */
     await page.setViewport({ width: 816, height: 1056 });
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setDefaultNavigationTimeout(20_000);
+    await page.setDefaultTimeout(20_000);
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 20_000 });
     await page.emulateMediaType('screen');
     await page.evaluate(async () => {
       if (!('fonts' in document) || !document.fonts) return;
@@ -185,9 +200,11 @@ async function handlePdfRequest(req, res) {
         bottom: '70px',
         left: '60px',
       },
+      timeout: 30_000,
     });
 
     res.writeHead(200, {
+      ...COMMON_HEADERS,
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename || 'work-order.pdf'}"`,
       'Content-Length': pdf.length,
@@ -195,7 +212,7 @@ async function handlePdfRequest(req, res) {
     res.end(pdf);
     return true;
   } catch (error) {
-    console.error('PDF generation failed:', error);
+    log.error('PDF generation failed', log.errCtx(error));
     const message = error instanceof Error ? error.message : 'Failed to generate PDF.';
     sendText(res, 500, message);
     return true;
@@ -240,6 +257,40 @@ async function createAppServer() {
       return;
     }
 
+    // Rate limit: 5 req/min per IP for Stripe Connect start
+    if (req.method === 'POST' && req.url === '/api/stripe/connect/start') {
+      const clientIp = getClientIp(req);
+      if (!checkRateLimit(`stripe-connect:${clientIp}`, 5, 60 * 1000)) {
+        sendJson(res, 429, { error: 'Too many requests.' });
+        return;
+      }
+    }
+
+    // Rate limit: 5 req/min per IP for esign send/resend
+    if (req.method === 'POST' && /^\/api\/esign\/(work-orders|change-orders)\/[\w-]+\/(send|resend)$/.test(req.url)) {
+      const clientIp = getClientIp(req);
+      if (!checkRateLimit(`esign:${clientIp}`, 5, 60 * 1000)) {
+        sendJson(res, 429, { error: 'Too many requests.' });
+        return;
+      }
+    }
+
+    // Rate limit: 5 req/min per IP for invoice send
+    if (req.method === 'POST' && /^\/api\/invoices\/[\w-]+\/send$/.test(req.url)) {
+      const clientIp = getClientIp(req);
+      if (!checkRateLimit(`invoice:${clientIp}`, 5, 60 * 1000)) {
+        sendJson(res, 429, { error: 'Too many requests.' });
+        return;
+      }
+    }
+
+    const handledInvoice = await tryHandleInvoiceRoute(req, res, {
+      readJsonBody,
+      sendJson,
+      sendText,
+    });
+    if (handledInvoice) return;
+
     const handledStripe = await tryHandleStripeRoute(req, res, {
       readJsonBody,
       readRawBody,
@@ -251,6 +302,12 @@ async function createAppServer() {
     }
 
     if (req.method === 'POST' && req.url === '/api/pdf') {
+      // Rate limit: 10 req/min per IP
+      const clientIp = getClientIp(req);
+      if (!checkRateLimit(`pdf:${clientIp}`, 10, 60 * 1000)) {
+        sendJson(res, 429, { error: 'Too many requests.' });
+        return;
+      }
       await handlePdfRequest(req, res);
       return;
     }
@@ -259,7 +316,7 @@ async function createAppServer() {
       vite.middlewares(req, res, (err) => {
         if (err) {
           vite.ssrFixStacktrace(err);
-          console.error(err);
+          log.error('Vite SSR error', log.errCtx(err));
           sendText(res, 500, err.message);
         }
       });
@@ -268,7 +325,16 @@ async function createAppServer() {
 
     const requestPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
     const normalizedPath = path.normalize(requestPath).replace(/^(\.\.[/\\])+/, '');
-    let filePath = path.join(distDir, normalizedPath);
+    // Strip leading slash so path.join works correctly
+    const safePath = normalizedPath.startsWith('/') ? normalizedPath.slice(1) : normalizedPath;
+    let filePath = path.join(distDir, safePath);
+
+    // Containment check to prevent path traversal
+    const resolvedDistDir = path.resolve(distDir);
+    if (!filePath.startsWith(resolvedDistDir + path.sep) && filePath !== resolvedDistDir) {
+      sendText(res, 403, 'Forbidden');
+      return;
+    }
 
     if (!existsSync(filePath) || filePath.endsWith(path.sep)) {
       filePath = path.join(distDir, 'index.html');
@@ -276,13 +342,22 @@ async function createAppServer() {
 
     try {
       const mimeType = getMimeType(filePath);
-      res.writeHead(200, { 'Content-Type': mimeType });
+      const isHtml = mimeType.startsWith('text/html');
+      res.writeHead(200, {
+        ...COMMON_HEADERS,
+        ...(isHtml ? { 'X-Frame-Options': 'DENY' } : {}),
+        'Content-Type': mimeType,
+      });
       createReadStream(filePath).pipe(res);
     } catch (error) {
-      console.error('Static file serving failed:', error);
+      log.error('Static file serving failed', log.errCtx(error));
       try {
         const indexHtml = await readFile(path.join(distDir, 'index.html'));
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, {
+          ...COMMON_HEADERS,
+          'X-Frame-Options': 'DENY',
+          'Content-Type': 'text/html; charset=utf-8',
+        });
         res.end(indexHtml);
       } catch {
         sendText(res, 500, 'Failed to serve application.');
@@ -291,12 +366,12 @@ async function createAppServer() {
   });
 
   server.listen(port, host, () => {
-    console.log(`App server listening on http://${host}:${port}`);
-    console.log(`PDF rendering uses Chrome at ${executablePath}`);
+    log.info('app server listening', { host, port });
+    log.info('PDF rendering uses Chrome', { executablePath });
   });
 
   async function shutdown(signal) {
-    console.log(`Received ${signal}, shutting down app server...`);
+    log.info('shutting down app server', { signal });
     server.close();
 
     if (vite) {

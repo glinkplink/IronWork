@@ -7,9 +7,16 @@ import { EditProfilePage } from '../EditProfilePage';
 import type { BusinessProfile } from '../../types/db';
 
 const upsertProfile = vi.fn();
+const startStripeConnect = vi.fn();
+const redirectToStripeConnect = vi.fn();
 
 vi.mock('../../lib/db/profile', () => ({
   upsertProfile: (...args: unknown[]) => upsertProfile(...args),
+}));
+
+vi.mock('../../lib/stripe-connect', () => ({
+  startStripeConnect: (...args: unknown[]) => startStripeConnect(...args),
+  redirectToStripeConnect: (...args: unknown[]) => redirectToStripeConnect(...args),
 }));
 
 vi.mock('../../lib/auth', () => ({
@@ -38,6 +45,8 @@ function profileFixture(overrides: Partial<BusinessProfile> = {}): BusinessProfi
     default_payment_terms_days: 14,
     default_late_fee_rate: 1.5,
     default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
     created_at: '',
     updated_at: '',
     ...overrides,
@@ -51,6 +60,8 @@ afterEach(() => {
 describe('EditProfilePage payment validation', () => {
   beforeEach(() => {
     upsertProfile.mockReset();
+    startStripeConnect.mockReset();
+    redirectToStripeConnect.mockReset();
   });
 
   it('shows error banner and does not call upsert when payment terms days are invalid', async () => {
@@ -100,6 +111,95 @@ describe('EditProfilePage payment validation', () => {
 
     await waitFor(() => {
       expect(upsertProfile).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('renders Stripe status states from the profile', () => {
+    const { rerender } = render(
+      <EditProfilePage
+        profile={profileFixture()}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Not connected')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Connect Stripe/i })).toHaveAttribute('type', 'button');
+
+    rerender(
+      <EditProfilePage
+        profile={profileFixture({ stripe_account_id: 'acct_123', stripe_onboarding_complete: false })}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Setup in progress')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Continue Stripe Setup/i })).toBeInTheDocument();
+
+    rerender(
+      <EditProfilePage
+        profile={profileFixture({ stripe_account_id: 'acct_123', stripe_onboarding_complete: true })}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Connected')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Update Stripe Setup/i })).toBeInTheDocument();
+  });
+
+  it('saves first, then starts Stripe onboarding from the separate CTA', async () => {
+    const user = userEvent.setup();
+    const savedProfile = profileFixture({ business_name: 'Updated Co' });
+    const onSave = vi.fn();
+
+    upsertProfile.mockResolvedValue({
+      data: savedProfile,
+      error: null,
+    });
+    startStripeConnect.mockResolvedValue({
+      accountId: 'acct_123',
+      url: 'https://connect.stripe.test/onboarding',
+    });
+    render(
+      <EditProfilePage
+        profile={profileFixture()}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />
+    );
+
+    await user.clear(screen.getByLabelText(/Business Name/i));
+    await user.type(screen.getByLabelText(/Business Name/i), 'Updated Co');
+    await user.click(screen.getByRole('button', { name: /Connect Stripe/i }));
+
+    await waitFor(() => {
+      expect(upsertProfile).toHaveBeenCalledTimes(1);
+      expect(startStripeConnect).toHaveBeenCalledTimes(1);
+      expect(onSave).toHaveBeenCalledWith(savedProfile);
+      expect(redirectToStripeConnect).toHaveBeenCalledWith('https://connect.stripe.test/onboarding');
+    });
+  });
+
+  it('does not start Stripe onboarding when save fails', async () => {
+    const user = userEvent.setup();
+    upsertProfile.mockResolvedValue({
+      data: null,
+      error: { message: 'Save failed' },
+    });
+
+    render(
+      <EditProfilePage
+        profile={profileFixture()}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Connect Stripe/i }));
+
+    await waitFor(() => {
+      expect(startStripeConnect).not.toHaveBeenCalled();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
   });
 });

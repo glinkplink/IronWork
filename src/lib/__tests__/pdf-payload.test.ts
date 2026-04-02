@@ -49,6 +49,8 @@ const baseProfile: BusinessProfile = {
   default_card_fee_note: false,
   next_wo_number: 2,
   next_invoice_number: 1,
+  stripe_account_id: null,
+  stripe_onboarding_complete: false,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 };
@@ -144,6 +146,8 @@ const baseDbJob: Job = {
   esign_declined_at: null,
   esign_decline_reason: null,
   esign_signed_document_url: null,
+  esign_resent_at: null,
+  offline_signed_at: null,
 };
 
 const baseCo: ChangeOrder = {

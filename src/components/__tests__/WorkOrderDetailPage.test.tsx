@@ -14,6 +14,7 @@ const mockFns = vi.hoisted(() => {
   const sendWorkOrderForSignature = vi.fn();
   const resendWorkOrderSignature = vi.fn();
   const coBlockState = { blocks: false, error: null as Error | null };
+  const jobInvoiceState = { data: null as { job_id: string; payment_status: 'unpaid' | 'paid' | 'offline'; invoice_number: number; issued_at: string | null }[] | null, error: null as Error | null };
   const getBlocksNewChangeOrdersForJob: ReturnType<typeof vi.fn<(userId: string, jobId: string) => Promise<{ blocks: boolean; error: Error | null }>>> = vi.fn(async () => ({
     blocks: coBlockState.blocks,
     error: coBlockState.error,
@@ -21,6 +22,12 @@ const mockFns = vi.hoisted(() => {
   return {
     listChangeOrders,
     listInvoiceStatusByChangeOrder,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    listInvoiceStatusByJob: vi.fn(async (_userId: string) => ({
+      data: jobInvoiceState.data,
+      error: jobInvoiceState.error,
+      warning: null,
+    })),
     getJobById,
     sendWorkOrderForSignature,
     resendWorkOrderSignature,
@@ -28,6 +35,10 @@ const mockFns = vi.hoisted(() => {
     setCoBlockResult(next: { blocks: boolean; error: Error | null }) {
       coBlockState.blocks = next.blocks;
       coBlockState.error = next.error;
+    },
+    setJobInvoiceResult(next: { data: { job_id: string; payment_status: 'unpaid' | 'paid' | 'offline'; invoice_number: number; issued_at: string | null }[] | null; error: Error | null }) {
+      jobInvoiceState.data = next.data;
+      jobInvoiceState.error = next.error;
     },
   };
 });
@@ -45,6 +56,7 @@ vi.mock('../../lib/db/invoices', async (importOriginal) => {
   return {
     ...actual,
     listInvoiceStatusByChangeOrder: (jobId: string) => mockFns.listInvoiceStatusByChangeOrder(jobId),
+    listInvoiceStatusByJob: (userId: string) => mockFns.listInvoiceStatusByJob(userId),
     getBlocksNewChangeOrdersForJob: (userId: string, jobId: string) => mockFns.getBlocksNewChangeOrdersForJob(userId, jobId),
   };
 });
@@ -123,6 +135,8 @@ function minimalJob(): Job {
     esign_declined_at: null,
     esign_decline_reason: null,
     esign_signed_document_url: null,
+    esign_resent_at: null,
+    offline_signed_at: null,
   };
 }
 
@@ -148,6 +162,8 @@ function minimalProfile(): BusinessProfile {
     default_payment_terms_days: 30,
     default_late_fee_rate: 0,
     default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
   };
@@ -266,7 +282,10 @@ describe('WorkOrderDetailPage', () => {
     mockFns.setCoBlockResult({ blocks: false, error: null });
   });
 
-  it('shows one invoice control per change-order row and no job-level invoice strip', async () => {
+  it('shows one invoice control per change-order row and job-level invoice status when present', async () => {
+    // Set up job invoice status to null (no invoice yet)
+    mockFns.setJobInvoiceResult({ data: null, error: null });
+
     render(
       <WorkOrderDetailPage
         userId="u1"
@@ -285,6 +304,7 @@ describe('WorkOrderDetailPage', () => {
       expect(screen.getAllByRole('button', { name: /^Invoice$/i })).toHaveLength(2);
     });
 
+    // No invoice number shown when no job invoice exists
     expect(screen.queryByText(/^Invoice #/i)).toBeNull();
 
     const coList = document.querySelector('ul.work-orders-list');
@@ -293,6 +313,43 @@ describe('WorkOrderDetailPage', () => {
       expect(within(coList as HTMLElement).getAllByRole('listitem')).toHaveLength(2);
     });
     expect(within(coList as HTMLElement).getAllByRole('button', { name: /^Invoice$/i })).toHaveLength(2);
+  });
+
+  it('shows paid badge when job invoice has payment_status=paid', async () => {
+    // Set up a paid invoice for this job
+    mockFns.setJobInvoiceResult({
+      data: [
+        {
+          job_id: 'job-1',
+          payment_status: 'paid',
+          invoice_number: 1,
+          issued_at: '2024-01-15T00:00:00Z',
+        },
+      ],
+      error: null,
+    });
+
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        jobId="job-1"
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.queryByText('Loading invoice...')).toBeNull();
+    });
+
+    // Paid badge should be visible
+    expect(screen.getByText('Paid')).toBeTruthy();
+    expect(screen.getByText('Invoice #0001')).toBeTruthy();
   });
 
   it('renders change-order rows with date, amount, description, and shared e-sign strip order', async () => {

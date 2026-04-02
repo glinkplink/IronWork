@@ -29,6 +29,7 @@ Work agreement generator for contractors (initially welders). Contractors fill o
 | App Server | Node **`server/app-server.mjs`**: Vite **middleware** (dev) or static **`dist/`** when `NODE_ENV=production`; loads **`.env`** then **`.env.local`** (`dotenv`) for server-only secrets |
 | PDF | Puppeteer Core + **system Chrome**; all document PDFs via **same-origin** `POST /api/pdf` |
 | E-sign | DocuSeal **HTML submissions** from the client; work-order and change-order **send/resend** plus authenticated **`GET .../status`** (DocuSeal sync), **`POST /api/webhooks/docuseal`** (see **ARCHITECTURE.md**) |
+| Payments | Stripe Connect Express onboarding via authenticated **`/api/stripe/connect/start`** + **`/api/stripe/connect/status`**; invoice payment links + **`POST /api/stripe/webhook`** |
 | Styling | Plain CSS (`index.css`, global `App.css`, and co-located component/page CSS files) — no Tailwind |
 | Font | Barlow (+ Dancing Script for agreement signature) — field notebook aesthetic |
 
@@ -51,13 +52,14 @@ VITE_SUPABASE_ANON_KEY=...
 VITE_GEOAPIFY_API_KEY=...   # optional — job site street autocomplete
 ```
 
-**Server env** (read by `app-server.mjs` at runtime from `.env` / `.env.local`, not `VITE_`): `PUPPETEER_EXECUTABLE_PATH` or `CHROME_PATH` if default Chrome path is wrong; `PORT`, `HOST`; `NODE_ENV=production` for static `dist/` mode. For **DocuSeal** e-sign: `DOCUSEAL_API_KEY`, optional `DOCUSEAL_BASE_URL`, **`DOCUSEAL_WEBHOOK_HEADER_NAME`** + **`DOCUSEAL_WEBHOOK_HEADER_VALUE`** (raw secret in env; server compares **SHA-256** digests for fixed-length timing-safe compare — see **ARCHITECTURE.md**), **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`**. Missing DocuSeal/Supabase server keys on the **running** process → send/resend returns **503** with **`E-sign is temporarily unavailable.`** **Hosted** services (e.g. Render) must set these on the **web service** environment, not only `VITE_*` at build. Quick checks: `GET /api/pdf/health` → `{ "ok": true }`; `GET /api/webhooks/docuseal` → `{ "ok": true }`.
+**Server env** (read by `app-server.mjs` at runtime from `.env` / `.env.local`, not `VITE_`): `PUPPETEER_EXECUTABLE_PATH` or `CHROME_PATH` if default Chrome path is wrong; `PORT`, `HOST`; `NODE_ENV=production` for static `dist/` mode. For **DocuSeal** e-sign: `DOCUSEAL_API_KEY`, optional `DOCUSEAL_BASE_URL`, **`DOCUSEAL_WEBHOOK_HEADER_NAME`** + **`DOCUSEAL_WEBHOOK_HEADER_VALUE`** (raw secret in env; server compares **SHA-256** digests for fixed-length timing-safe compare — see **ARCHITECTURE.md**), **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`**. For **Stripe**: **`STRIPE_SECRET_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, and optional **`APP_BASE_URL`** for Connect return URLs. Missing DocuSeal/Supabase server keys on the **running** process → send/resend returns **503** with **`E-sign is temporarily unavailable.`** Missing Stripe server keys surface as **503** from Stripe routes. **Hosted** services (e.g. Render) must set these on the **web service** environment, not only `VITE_*` at build. Quick checks: `GET /api/pdf/health` → `{ "ok": true }`; `GET /api/webhooks/docuseal` → `{ "ok": true }`.
 
 ---
 
 ## Server, PDFs, deployment (reality check)
 
 - **Not static-only hosting:** Work order, invoice, and change-order PDFs all need the **Node server** and a **local Chrome/Chromium** binary. The browser posts HTML to **`/api/pdf`** on the **same origin** as the UI. **DocuSeal** send/resend, **status** polling, and inbound **webhooks** use the same app server (`/api/esign/...`, `/api/webhooks/docuseal`).
+- **Stripe routes live on the same server:** Edit Profile uses authenticated **`POST /api/stripe/connect/start`** and **`GET /api/stripe/connect/status`** for Connect onboarding and reconciliation. Invoice payment links and **`POST /api/stripe/webhook`** also run on this server.
 - **Single entrypoint:** Use `npm run dev` or `npm run preview` / `NODE_ENV=production node server/app-server.mjs` — there is no supported “Vite-only” production path if you want working downloads.
 - **Operator detail:** Env tables, reverse-proxy notes, and common deployment mistakes → **[README.md](./README.md)** and **[ARCHITECTURE.md](./ARCHITECTURE.md)** (Deployment + Portability).
 
@@ -88,7 +90,7 @@ src/
     EditProfilePage.css      # EditProfilePage-only styles
     WorkOrdersPage.tsx       # Paginated work-order dashboard; toolbar “Create Work Order”; invoice actions; opens detail
     WorkOrdersPage.css       # WorkOrdersPage-only list/dashboard chrome + invoice warning banner
-    WorkOrderDetailPage.tsx  # Saved job → agreement + job-level invoice strip + change orders + PDFs
+    WorkOrderDetailPage.tsx  # Saved job → agreement + change orders + PDFs + offline-sign controls
     WorkOrderDetailPage.css  # WO detail invoice strip + CO row ordering/sublist (e.g. `.co-list-*`)
     ChangeOrderDetailPage.tsx # Saved change order → HTML/PDF + actions
     ChangeOrderDetailPage.css # CO detail-only chrome (e.g. `.co-detail-*`)
@@ -96,7 +98,7 @@ src/
     ChangeOrderWizard.css    # Wizard-only `.co-*` blocks (shared badge/section labels stay in App.css)
     InvoiceWizard.tsx        # Create/edit invoice; CO pickers + line `source` for merge on edit
     InvoiceWizard.css        # Invoice wizard materials/CO picker/payment group (chips stay global)
-    InvoiceFinalPage.tsx     # Invoice preview, PDF actions, and payment link placeholder
+    InvoiceFinalPage.tsx     # Invoice preview, send/resend, payment-link actions, and signature gate messaging
     InvoiceFinalPage.css     # Invoice final page-only chrome (nav/headings shared in App.css)
     InvoicePreviewModal.tsx  # Full-screen invoice HTML preview
     InvoicePreviewModal.css  # Invoice preview modal overlay/scroll/sheet
@@ -110,6 +112,7 @@ src/
     geoapify-autocomplete.ts # Job site address suggestions (optional API key)
     job-to-welder-job.ts     # Job row + profile → WelderJob
     invoice-generator.ts     # Invoice HTML string
+    work-order-signature.ts  # Shared signature-satisfied helper for DocuSeal vs offline-signed state
     agreement-sections-html.ts # Agreement sections → HTML string (combined PDFs)
     docuseal-agreement-html.ts # DocuSeal HTML document for WO (embedded CSS + field tags; uses esc())
     docuseal-change-order-html.ts # DocuSeal HTML document for CO (embedded CSS + field tags; uses esc()); optional `providerSignatureDataUrl` for SP signature image (same canvas PNG as WO)
@@ -118,6 +121,7 @@ src/
     docuseal-constants.ts      # Shared DocuSeal role name(s)
     docuseal-signature-image.ts # Render DocuSeal SP signature as image in signed documents
     fetch-with-supabase-auth.ts # Same-origin fetch with Bearer from Supabase session
+    stripe-connect.ts        # Authenticated Stripe Connect start/status helpers for the profile UI
     esign-api.ts               # send/resend/status helpers for work orders and change orders
     esign-labels.ts            # E-sign status strings for UI
     esign-progress.ts          # Shared e-sign step/tone model for detail timeline + list strip
@@ -155,7 +159,9 @@ src/
     sample-job.json          # Default/placeholder values for new agreements
 server/
   app-server.mjs             # App server + /api/pdf + e-sign + DocuSeal webhook routes
+  stripe-routes.mjs          # Stripe Connect start/status, invoice payment links, Stripe webhook
   esign-routes.mjs           # JWT send/resend; webhook verify + service-role e-sign updates
+  lib/stripe.mjs             # Stripe SDK helpers for account links, account status, payment links, webhook verification
   docuseal-esign-state.mjs   # Map DocuSeal submission/submitter → shared esign_* patch (shared w/ tests via @scope-server alias)
 ```
 
@@ -188,10 +194,11 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 - `WorkOrdersPage` shows a **View & Create Change Orders** link under the client name when `changeOrderCount > 0`, opening work-order detail with scroll to the Change Orders section (no per-CO chips on the list).
 - Work Orders e-sign polling refreshes only loaded in-flight rows; targeted row refresh can still use the older `list_work_orders_dashboard` RPC because `0014` is already applied.
 - Clicking a work-order row navigates immediately with `jobId`; `WorkOrderDetailPage` loads the full job row locally and shows a loading state while hydrating.
-- `WorkOrderDetailPage` has a single **job-level** invoice strip; invoice actions are not rendered per change-order row.
-- Invoice business state: no invoice row shows **Invoice**, an existing invoice with `issued_at = null` shows **Draft**, and `issued_at != null` shows **Invoiced**.
+- `WorkOrderDetailPage` renders a job-level invoice status strip (issued invoice number + paid/offline/invoiced badge) when an invoice exists; CO-level invoice controls are a separate section.
+- Invoice business state: no invoice row shows **Invoice**, an existing invoice with `issued_at = null` shows **Draft**, `issued_at != null` shows **Invoiced** (payment-link creation sets `issued_at`), and `payment_status = 'paid'` shows a **Paid** badge on `InvoiceFinalPage`, `WorkOrdersPage`, and `WorkOrderDetailPage` (set by Stripe webhook; no in-page polling).
 - `ChangeOrderWizard` now saves the CO, sends the DocuSeal request immediately, then routes to `ChangeOrderDetailPage`; CO business `status` tracks approval lifecycle (`pending_approval` after send/open, `approved` on completed signature, `rejected` on decline).
 - **`jobs.esign_*` and `change_orders.esign_*`:** detail surfaces show e-sign progress, signing actions, and signed artifacts. While e-sign is in-flight, detail pages call **`GET /api/esign/work-orders/:id/status`** or **`GET /api/esign/change-orders/:id/status`** (authenticated) to reconcile DocuSeal into the row; webhooks update the same fields. **Email** subject/body for DocuSeal notifications and **signed PDF** layout are best verified on the **deployed** app (public URL + production-like env), not assumed identical to every local setup.
+- **Offline signature:** Work orders can be manually marked as signed offline via `jobs.offline_signed_at`. This is a signature-satisfied state alongside DocuSeal `completed`. Invoice issuance (payment-link creation and send) is blocked until the parent work order is signature-satisfied. Invoice drafts can be created regardless of signature state.
 
 **`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).
 - `App.tsx` lazy-loads preview, Work Orders, detail, change-order, and invoice screens. The initial shell stays eager; heavy document/dashboard flows load on demand, and the Work Orders chunk is idle-prefetched after sign-in.
@@ -223,7 +230,7 @@ Migrations are in `supabase/migrations/` — apply via Supabase CLI (`npx supaba
 | Current work order **draft** (form state) | No — in-memory until **Download & Save** |
 | Jobs | Yes — on **Download & Save** (`saveWorkOrder`); listed on **Work Orders** |
 | Clients | Yes — upserted on **Download & Save** keyed by `name_normalized`; **JobForm** can search/suggest when `userId` is set |
-| Invoices | Yes — wizard + final page; business state derives from `issued_at` (Stripe payment links set this in future) |
+| Invoices | Yes — wizard + final page; business state derives from `issued_at` (set when first Stripe payment link is created) and `payment_status` / `paid_at` (set by Stripe webhook). `payment_status = 'paid'` drives the Work Orders dashboard badge, `InvoiceFinalPage`, and `WorkOrderDetailPage`. |
 | Change orders | Yes — wizard + detail; `create_change_order` RPC + migration **0006_change_order_creation_lock.sql** for atomic numbering |
 
 ---

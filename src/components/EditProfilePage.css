@@ -187,6 +187,70 @@
   margin-top: var(--space-lg);
 }
 
+.edit-profile-stripe-section {
+  border-style: solid;
+}
+
+.edit-profile-stripe-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.edit-profile-stripe-status-label {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.edit-profile-stripe-status-value {
+  margin: 0 0 6px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.edit-profile-stripe-status-description {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.edit-profile-stripe-button {
+  flex-shrink: 0;
+  min-width: 220px;
+}
+
+.stripe-notice {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.stripe-notice--success {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #86efac;
+}
+
+.stripe-notice--info {
+  background: #eff6ff;
+  color: #1e3a8a;
+  border-color: #bfdbfe;
+}
+
+.stripe-notice--error {
+  background: var(--danger-light);
+  color: var(--danger);
+  border-color: rgba(185, 28, 28, 0.22);
+}
+
 .edit-profile-page .form-actions-row {
   display: flex;
   gap: var(--space-md);
@@ -254,4 +318,17 @@
   text-align: center;
   font-size: 0.875rem;
   margin-bottom: var(--space-lg);
+}
+
+@media (max-width: 720px) {
+  .edit-profile-stripe-status-row,
+  .edit-profile-page .form-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edit-profile-stripe-button {
+    min-width: 0;
+    width: 100%;
+  }
 }

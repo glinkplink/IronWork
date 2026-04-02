@@ -30,11 +30,12 @@ import {
   sendWorkOrderForSignature,
   downloadSignedDocumentFile,
 } from '../lib/esign-api';
-import { getJobById } from '../lib/db/jobs';
+import { getJobById, updateJob } from '../lib/db/jobs';
 import { jobLocationSingleLine } from '../lib/job-site-address';
 import { formatEsignTimestamp, shouldPollEsignStatus } from '../lib/esign-live';
 import { useEsignPoller } from '../hooks/useEsignPoller';
 import { getEsignProgressModel } from '../lib/esign-progress';
+import { getWorkOrderSignatureState } from '../lib/work-order-signature';
 import { agreementSectionsToHtml } from '../lib/agreement-sections-html';
 import { buildCombinedWorkOrderAndChangeOrdersHtml } from '../lib/change-order-generator';
 import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-image';
@@ -46,6 +47,8 @@ import {
   getInvoiceBusinessStatus,
   getBlocksNewChangeOrdersForJob,
   listInvoiceStatusByChangeOrder,
+  listInvoiceStatusByJob,
+  WorkOrderInvoiceStatus,
 } from '../lib/db/invoices';
 import './WorkOrderDetailPage.css';
 
@@ -122,6 +125,8 @@ export function WorkOrderDetailPage({
   const [pdfError, setPdfError] = useState('');
   const [esignError, setEsignError] = useState('');
   const [esignBusy, setEsignBusy] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saveBusy, setSaveBusy] = useState(false);
   const [signedDocBusy, setSignedDocBusy] = useState(false);
   const [esignSigningLinkCopied, setEsignSigningLinkCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -139,6 +144,11 @@ export function WorkOrderDetailPage({
   const [coNewCoBlockLoading, setCoNewCoBlockLoading] = useState(true);
   const [coNewCoBlockError, setCoNewCoBlockError] = useState<string | null>(null);
   const [coNewCoBlockedByInvoice, setCoNewCoBlockedByInvoice] = useState(false);
+
+  // Job-level invoice status
+  const [jobInvoiceStatus, setJobInvoiceStatus] = useState<WorkOrderInvoiceStatus | null>(null);
+  const [jobInvoiceLoading, setJobInvoiceLoading] = useState(true);
+  const [jobInvoiceError, setJobInvoiceError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!initialJob || initialJob.id !== jobId) return;
@@ -192,10 +202,16 @@ export function WorkOrderDetailPage({
   const woLabel =
     job?.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : 'WO (no #)';
   const customerTitle = job?.customer_name.trim() || 'Customer';
+  const esignWasResent = Boolean(job?.esign_resent_at);
   const esignProgress = useMemo(
-    () => getEsignProgressModel(job?.esign_status ?? 'not_sent'),
-    [job?.esign_status]
+    () => getEsignProgressModel(job?.esign_status ?? 'not_sent', 'work_order', esignWasResent),
+    [job?.esign_status, esignWasResent]
   );
+  const signatureState = useMemo(
+    () => getWorkOrderSignatureState(job?.esign_status ?? null, job?.offline_signed_at ?? null),
+    [job?.esign_status, job?.offline_signed_at]
+  );
+  const isOfflineMarked = Boolean(job?.offline_signed_at && job?.esign_status !== 'completed');
   const showCopySigningLink = Boolean(
     job?.esign_embed_src &&
     job.esign_status !== 'not_sent' &&
@@ -288,6 +304,32 @@ export function WorkOrderDetailPage({
       cancelled = true;
     };
   }, [job, userId, changeOrderListVersion]);
+
+  // Load job-level invoice status
+  useEffect(() => {
+    if (!job) return;
+    let cancelled = false;
+    setJobInvoiceLoading(true);
+    setJobInvoiceError(null);
+    setJobInvoiceStatus(null);
+
+    void (async () => {
+      const result = await listInvoiceStatusByJob(userId);
+      if (cancelled) return;
+      setJobInvoiceLoading(false);
+      if (result.error) {
+        setJobInvoiceError(`Could not load invoice status (${result.error.message}).`);
+      } else if (result.data) {
+        // Find invoice for this job
+        const jobInv = result.data.find(inv => inv.job_id === job.id);
+        setJobInvoiceStatus(jobInv || null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [job, userId]);
 
   const createChangeOrderDisabled =
     downloading || coNewCoBlockLoading || coNewCoBlockError !== null || coNewCoBlockedByInvoice;
@@ -480,6 +522,46 @@ export function WorkOrderDetailPage({
     }
   };
 
+  const handleMarkSignedOffline = async () => {
+    if (!job) return;
+    setSaveError('');
+    setSaveBusy(true);
+    try {
+      const { data, error } = await updateJob(job.id, { offline_signed_at: new Date().toISOString() });
+      setSaveBusy(false);
+      if (error) throw error;
+      if (data && onJobUpdated) {
+        onJobUpdated(data);
+      }
+      if (data) {
+        setHydratedJob(data);
+      }
+    } catch (e) {
+      setSaveBusy(false);
+      setSaveError(e instanceof Error ? e.message : 'Could not mark as signed offline.');
+    }
+  };
+
+  const handleUndoOfflineMark = async () => {
+    if (!job) return;
+    setSaveError('');
+    setSaveBusy(true);
+    try {
+      const { data, error } = await updateJob(job.id, { offline_signed_at: null });
+      setSaveBusy(false);
+      if (error) throw error;
+      if (data && onJobUpdated) {
+        onJobUpdated(data);
+      }
+      if (data) {
+        setHydratedJob(data);
+      }
+    } catch (e) {
+      setSaveBusy(false);
+      setSaveError(e instanceof Error ? e.message : 'Could not undo offline mark.');
+    }
+  };
+
   const downloadCombinedPdf = async () => {
     if (!job || !welderJob || !sections) return;
     setPdfError('');
@@ -542,6 +624,26 @@ export function WorkOrderDetailPage({
         <p className="invoice-final-heading-sub">{woLabel}</p>
       </hgroup>
 
+      {/* Job-level invoice status */}
+      {jobInvoiceStatus ? (
+        <div className="wo-invoice-status">
+          {jobInvoiceStatus.payment_status === 'paid' ? (
+            <span className="badge-paid">Paid</span>
+          ) : jobInvoiceStatus.payment_status === 'offline' ? (
+            <span className="badge-offline">Paid Offline</span>
+          ) : jobInvoiceStatus.issued_at ? (
+            <span className="badge-invoiced">Invoiced</span>
+          ) : (
+            <span className="badge-draft">Draft</span>
+          )}
+          <span className="wo-invoice-number">Invoice #{String(jobInvoiceStatus.invoice_number).padStart(4, '0')}</span>
+        </div>
+      ) : jobInvoiceLoading ? (
+        <div className="wo-invoice-status wo-invoice-status-loading">Loading invoice...</div>
+      ) : jobInvoiceError ? (
+        <div className="wo-invoice-status wo-invoice-status-error">{jobInvoiceError}</div>
+      ) : null}
+
       {pdfError ? (
         <div className="error-banner" role="alert">
           {pdfError}
@@ -552,10 +654,15 @@ export function WorkOrderDetailPage({
           {esignError}
         </div>
       ) : null}
+      {saveError ? (
+        <div className="error-banner" role="alert">
+          {saveError}
+        </div>
+      ) : null}
 
       <section className="wo-esign-card" aria-labelledby="wo-esign-heading">
         <h2 id="wo-esign-heading" className="wo-esign-heading">
-          Customer signature
+          {signatureState.displayLabel === 'Signed offline' ? 'Signature (offline)' : 'Customer signature'}
         </h2>
         <div
           className="wo-esign-timeline"
@@ -579,12 +686,18 @@ export function WorkOrderDetailPage({
             </div>
           ))}
         </div>
-        <p className="wo-esign-summary">{esignProgress.summary}</p>
+        <p className="wo-esign-summary">{signatureState.summary}</p>
         <dl className="wo-esign-meta">
+          {job.offline_signed_at ? (
+            <div className="wo-esign-meta-row" data-testid="wo-esign-meta-offline-signed">
+              <dt>Signed offline</dt>
+              <dd>{formatEsignTimestamp(job.offline_signed_at)}</dd>
+            </div>
+          ) : null}
           {job.esign_sent_at ? (
             <div className="wo-esign-meta-row" data-testid="wo-esign-meta-sent">
-              <dt>Sent</dt>
-              <dd>{formatEsignTimestamp(job.esign_sent_at)}</dd>
+              <dt>{esignWasResent && job.esign_status === 'sent' ? 'Resent' : 'Sent'}</dt>
+              <dd>{formatEsignTimestamp(job.esign_resent_at || job.esign_sent_at)}</dd>
             </div>
           ) : null}
           {job.esign_opened_at ? (
@@ -613,39 +726,43 @@ export function WorkOrderDetailPage({
           ) : null}
         </dl>
         <div className="wo-esign-actions">
-          {!job.esign_submitter_id ? (
-            <button
-              type="button"
-              className="btn-primary btn-action wo-esign-actions-primary"
-              disabled={esignBusy || !job.customer_email?.trim()}
-              title={
-                !job.customer_email?.trim() ? 'Customer email is required to send for signature' : undefined
-              }
-              onClick={() => void handleEsignSend()}
-            >
-              {esignBusy ? 'Sending…' : 'Send for signature'}
-            </button>
-          ) : job.esign_status !== 'completed' ? (
-            <button
-              type="button"
-              className="btn-primary btn-action wo-esign-actions-primary"
-              disabled={esignBusy}
-              onClick={() => void handleEsignResend()}
-            >
-              {esignBusy ? 'Sending…' : 'Resend Work Order'}
-            </button>
-          ) : null}
-          {showCopySigningLink ? (
-            <button
-              type="button"
-              className="btn-secondary btn-action wo-esign-actions-copy"
-              disabled={esignBusy}
-              onClick={() => void handleCopySigningLink()}
-            >
-              <span aria-live="polite">
-                {esignSigningLinkCopied ? 'Copied to clipboard' : 'Copy signing link'}
-              </span>
-            </button>
+          {!isOfflineMarked ? (
+            <>
+              {!job.esign_submitter_id ? (
+                <button
+                  type="button"
+                  className="btn-primary btn-action wo-esign-actions-primary"
+                  disabled={esignBusy || !job.customer_email?.trim()}
+                  title={
+                    !job.customer_email?.trim() ? 'Customer email is required to send for signature' : undefined
+                  }
+                  onClick={() => void handleEsignSend()}
+                >
+                  {esignBusy ? 'Sending…' : 'Send for signature'}
+                </button>
+              ) : job.esign_status !== 'completed' ? (
+                <button
+                  type="button"
+                  className="btn-primary btn-action wo-esign-actions-primary"
+                  disabled={esignBusy}
+                  onClick={() => void handleEsignResend()}
+                >
+                  {esignBusy ? 'Sending…' : 'Resend Work Order'}
+                </button>
+              ) : null}
+              {showCopySigningLink ? (
+                <button
+                  type="button"
+                  className="btn-secondary btn-action wo-esign-actions-copy"
+                  disabled={esignBusy}
+                  onClick={() => void handleCopySigningLink()}
+                >
+                  <span aria-live="polite">
+                    {esignSigningLinkCopied ? 'Copied to clipboard' : 'Copy signing link'}
+                  </span>
+                </button>
+              ) : null}
+            </>
           ) : null}
           {job.esign_signed_document_url ? (
             <button
@@ -655,6 +772,25 @@ export function WorkOrderDetailPage({
               onClick={() => void handleViewSignedDoc()}
             >
               {signedDocBusy ? 'Loading…' : 'Download signed PDF'}
+            </button>
+          ) : null}
+          {isOfflineMarked ? (
+            <button
+              type="button"
+              className="btn-secondary btn-action"
+              disabled={saveBusy}
+              onClick={() => void handleUndoOfflineMark()}
+            >
+              {saveBusy ? 'Removing…' : 'Undo offline mark'}
+            </button>
+          ) : !signatureState.isSignatureSatisfied ? (
+            <button
+              type="button"
+              className="btn-secondary btn-action"
+              disabled={saveBusy}
+              onClick={() => void handleMarkSignedOffline()}
+            >
+              {saveBusy ? 'Marking…' : 'Mark signed offline'}
             </button>
           ) : null}
         </div>

@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
+import { fetchWithSupabaseAuth } from '../lib/fetch-with-supabase-auth';
+import { sendInvoice } from '../lib/invoice-send';
+import { getWorkOrderSignatureState } from '../lib/work-order-signature';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import {
@@ -20,6 +23,12 @@ interface InvoiceFinalPageProps {
   onInvoiceUpdated: (invoice: Invoice) => void;
 }
 
+// NOTE: payment_status and paid_at are rendered from the invoiceProp passed by the parent.
+// These fields are only updated via the Stripe webhook handler on the server. A user sitting
+// on this page after a payment completes will not see the Paid badge until they navigate away
+// and back. There is no polling or realtime subscription here. If real-time payment confirmation
+// becomes a priority, add a polling interval or a Supabase realtime channel subscription on
+// the invoices row keyed by invoice.id.
 export function InvoiceFinalPage({
   invoice: invoiceProp,
   job,
@@ -35,13 +44,24 @@ export function InvoiceFinalPage({
   const [notesError, setNotesError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
+  const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [paymentLinkError, setPaymentLinkError] = useState('');
+  const [paymentLinkCopied, setPaymentLinkCopied] = useState(false);
 
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const paymentLinkCopiedTimeoutRef = useRef<number | null>(null);
 
   const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
   const businessStatus = getInvoiceBusinessStatus(invoiceProp);
   const isIssued = businessStatus === 'invoiced';
   const isReadOnly = isIssued;
+  const signatureState = useMemo(
+    () => getWorkOrderSignatureState(job.esign_status, job.offline_signed_at),
+    [job.esign_status, job.offline_signed_at]
+  );
+  const canIssueInvoice = signatureState.isSignatureSatisfied;
   const customerTitle = job.customer_name.trim() || 'Customer';
   const invoiceSubline = `Invoice #${String(invoiceProp.invoice_number).padStart(4, '0')}`;
 
@@ -57,6 +77,107 @@ export function InvoiceFinalPage({
   useEffect(() => {
     setNotesDraft(invoiceProp.notes ?? '');
   }, [invoiceProp.id, invoiceProp.notes]);
+
+  useEffect(() => {
+    return () => {
+      if (paymentLinkCopiedTimeoutRef.current !== null) {
+        window.clearTimeout(paymentLinkCopiedTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const paymentUrl = invoiceProp.stripe_payment_url;
+  const paymentLinkButtonLabel = paymentLinkCopied
+    ? 'Copied!'
+    : paymentUrl
+      ? 'Copy Payment Link'
+      : paymentLinkLoading
+        ? 'Creating...'
+        : 'Create Payment Link';
+
+  const flashPaymentLinkCopied = () => {
+    if (paymentLinkCopiedTimeoutRef.current !== null) {
+      window.clearTimeout(paymentLinkCopiedTimeoutRef.current);
+    }
+    setPaymentLinkCopied(true);
+    paymentLinkCopiedTimeoutRef.current = window.setTimeout(() => {
+      paymentLinkCopiedTimeoutRef.current = null;
+      setPaymentLinkCopied(false);
+    }, 1500);
+  };
+
+  const handleCopyPaymentLink = async () => {
+    setPaymentLinkError('');
+
+    if (paymentUrl) {
+      try {
+        await navigator.clipboard.writeText(paymentUrl);
+        flashPaymentLinkCopied();
+      } catch {
+        setPaymentLinkError('Could not copy payment link.');
+      }
+      return;
+    }
+
+    setPaymentLinkLoading(true);
+    try {
+      const res = await fetchWithSupabaseAuth(`/api/stripe/invoices/${invoiceProp.id}/payment-link`, {
+        method: 'POST',
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        payment_link_id?: string | null;
+        url?: string;
+      };
+      if (!res.ok || !json.url) {
+        setPaymentLinkError(json.error ?? 'Could not create payment link.');
+        return;
+      }
+
+      const updated: Invoice = {
+        ...invoiceProp,
+        stripe_payment_link_id: json.payment_link_id ?? invoiceProp.stripe_payment_link_id,
+        stripe_payment_url: json.url,
+      };
+      onInvoiceUpdated(updated);
+
+      try {
+        await navigator.clipboard.writeText(json.url);
+        flashPaymentLinkCopied();
+      } catch {
+        setPaymentLinkError('Payment link created, but copying it failed.');
+      }
+    } catch (error) {
+      setPaymentLinkError(
+        error instanceof Error ? error.message : 'Could not create payment link.'
+      );
+    } finally {
+      setPaymentLinkLoading(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    setSendError('');
+    setSending(true);
+
+    try {
+      const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
+      const { data, error } = await sendInvoice(invoiceProp.id, previewHtml);
+
+      if (error) {
+        setSendError(error.message);
+        return;
+      }
+
+      if (data) {
+        onInvoiceUpdated(data);
+      }
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Could not send invoice');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const handleDownload = async () => {
     setDownloadError('');
@@ -150,25 +271,73 @@ export function InvoiceFinalPage({
       ) : null}
 
       <section className="invoice-final-payment-card" aria-labelledby="invoice-payment-heading">
-        <h2 id="invoice-payment-heading">
-          Send Invoice
-        </h2>
-        {invoiceProp.issued_at && (
+        <h2 id="invoice-payment-heading">Send Invoice</h2>
+        {(invoiceProp.issued_at || invoiceProp.payment_status === 'paid') && (
           <div className="invoice-issued-metadata">
-            Issued: {new Date(invoiceProp.issued_at).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
-            })}
+            {invoiceProp.issued_at && (
+              <span>
+                Issued: {new Date(invoiceProp.issued_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </span>
+            )}
+            {invoiceProp.payment_status === 'paid' && (
+              <span className="invoice-paid-indicator">
+                <span className="badge-paid">Paid</span>
+                {invoiceProp.paid_at && (
+                  <span className="invoice-paid-date">
+                    {new Date(invoiceProp.paid_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         )}
-        <p className="invoice-final-payment-text">
-          Payment links coming soon. Download the PDF to share manually in the meantime.
-        </p>
-        <div className="invoice-final-payment-actions">
-          <button disabled className="btn-secondary btn-action">Send Invoice (Coming Soon)</button>
-          <button disabled className="btn-primary btn-action" title="Stripe payment links coming soon">Copy Payment Link</button>
-        </div>
+        {invoiceProp.payment_status === 'paid' ? (
+          <p className="invoice-final-payment-text">
+            This invoice has been paid.
+          </p>
+        ) : (
+          <>
+            <p className="invoice-final-payment-text">
+              {invoiceProp.issued_at
+                ? 'Resend the invoice email to the customer with the PDF attached and payment link.'
+                : 'Send the invoice email to the customer with the PDF attached and payment link.'}
+            </p>
+            {paymentLinkError ? (
+              <p className="invoice-final-payment-feedback">{paymentLinkError}</p>
+            ) : null}
+            {!canIssueInvoice && (
+              <p className="invoice-gate-message">
+                Invoice drafts can be created before signature. To issue an invoice, the work order
+                must be signed via DocuSeal or marked as signed offline.
+              </p>
+            )}
+            {sendError ? <p className="invoice-final-payment-feedback">{sendError}</p> : null}
+            <div className="invoice-final-payment-actions">
+              <button
+                className="btn-secondary btn-action"
+                disabled={sending || paymentLinkLoading || !canIssueInvoice}
+                onClick={() => void handleSendInvoice()}
+              >
+                {sending ? 'Sending...' : invoiceProp.issued_at ? 'Resend Invoice' : 'Send Invoice'}
+              </button>
+              <button
+                className="btn-primary btn-action"
+                disabled={paymentLinkLoading || !canIssueInvoice}
+                onClick={() => void handleCopyPaymentLink()}
+              >
+                {paymentLinkButtonLabel}
+              </button>
+            </div>
+          </>
+        )}
       </section>
 
       <div

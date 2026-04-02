@@ -7,7 +7,8 @@ declare module '@scope-server/docuseal-esign-state.mjs' {
     submitter: unknown
   ): string | null;
   export function buildEsignRowFromSubmission(
-    submission: unknown
+    submission: unknown,
+    isResend?: boolean
   ): Record<string, unknown> | null;
 }
 

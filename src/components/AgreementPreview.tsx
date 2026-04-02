@@ -76,6 +76,8 @@ function buildCapturedProfileStub(result: {
     default_payment_terms_days: 14,
     default_late_fee_rate: 1.5,
     default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
     created_at: '',
     updated_at: '',
   };
@@ -127,6 +129,8 @@ export function AgreementPreview({
   const [esignError, setEsignError] = useState('');
   /** True after the user has completed one successful Download & Save (or Download PDF) this mount — further clicks skip DB. */
   const [hasPersistedViaDownloadOnce, setHasPersistedViaDownloadOnce] = useState(false);
+  /** Ref for synchronous race-condition guard in async handlers */
+  const hasPersistedRef = useRef(false);
   const documentRef = useRef<HTMLDivElement | null>(null);
   const captureAfterIntentRef = useRef<CaptureAfterIntent>('pdf');
 
@@ -320,10 +324,12 @@ export function AgreementPreview({
 
     let wroteToDb = false;
 
-    if (!hasPersistedViaDownloadOnce) {
+    if (!hasPersistedRef.current) {
+      hasPersistedRef.current = true;
       const { data, error } = await saveWorkOrder(profile.user_id, job, existingJobId);
 
       if (error || !data) {
+        hasPersistedRef.current = false;
         setSaving(false);
         setSaveError(error?.message || 'Failed to save work order.');
         return;
@@ -403,9 +409,11 @@ export function AgreementPreview({
 
     try {
       let jobId = existingJobId;
-      if (!hasPersistedViaDownloadOnce) {
+      if (!hasPersistedRef.current) {
+        hasPersistedRef.current = true;
         const { data, error } = await saveWorkOrder(profile.user_id, job, existingJobId);
         if (error || !data) {
+          hasPersistedRef.current = false;
           setEsignError(error?.message || 'Failed to save work order.');
           return;
         }

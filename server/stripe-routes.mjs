@@ -1,5 +1,32 @@
-import { createAccountOnboardingLink, createConnectedAccount, createInvoicePaymentLink, constructWebhookEvent } from './lib/stripe.mjs';
-import { getServiceSupabase } from './lib/service-supabase.mjs';
+import {
+  createAccountOnboardingLink,
+  createConnectedAccount,
+  createInvoicePaymentLink,
+  constructWebhookEvent,
+  getConnectedAccount,
+  createOrReuseInvoicePaymentLink,
+} from './lib/stripe.mjs';
+import { log } from './lib/logger.mjs';
+import { createClient } from '@supabase/supabase-js';
+
+let serviceSupabaseSingleton = null;
+
+export function resetStripeServiceSupabaseSingleton() {
+  serviceSupabaseSingleton = null;
+}
+
+function getServiceSupabase({ errorCode = 'STRIPE_CONFIG', errorMessage } = {}) {
+  if (serviceSupabaseSingleton) return serviceSupabaseSingleton;
+  const url = env('SUPABASE_URL');
+  const key = env('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !key) {
+    const err = new Error(errorMessage || 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for Stripe routes.');
+    err.code = errorCode;
+    throw err;
+  }
+  serviceSupabaseSingleton = createClient(url, key);
+  return serviceSupabaseSingleton;
+}
 
 function env(name, fallback = '') {
   const value = process.env[name];
@@ -46,6 +73,10 @@ function parseStripeRoute(req) {
     return { kind: 'connect-start' };
   }
 
+  if (method === 'GET' && path === '/api/stripe/connect/status') {
+    return { kind: 'connect-status' };
+  }
+
   if (method === 'POST' && path === '/api/stripe/webhook') {
     return { kind: 'webhook' };
   }
@@ -62,6 +93,25 @@ function stripeConfigError(message) {
   const err = new Error(message);
   err.code = 'STRIPE_CONFIG';
   return err;
+}
+
+function stripeConnectionStatus(profile, account = null) {
+  const connected = Boolean(profile?.stripe_account_id);
+  const onboardingComplete = Boolean(profile?.stripe_onboarding_complete);
+  return {
+    accountId: connected ? profile.stripe_account_id : null,
+    onboardingComplete,
+    status: !connected ? 'not_connected' : onboardingComplete ? 'connected' : 'incomplete',
+    detailsSubmitted: Boolean(account?.details_submitted),
+    chargesEnabled: Boolean(account?.charges_enabled),
+    payoutsEnabled: Boolean(account?.payouts_enabled),
+  };
+}
+
+function isStripeOnboardingComplete(account) {
+  // details_submitted can be true even when required fields are past_due and charges are disabled.
+  // charges_enabled is the reliable signal that Stripe has actually verified the account.
+  return Boolean(account?.charges_enabled);
 }
 
 function paymentDateFromEvent(event) {
@@ -100,16 +150,64 @@ async function authenticate(req, sendJson, res) {
   };
 }
 
+async function getProfileByUserId(supabase, userId, columns = '*') {
+  return supabase.from('business_profiles').select(columns).eq('user_id', userId).maybeSingle();
+}
+
+async function reconcileStripeOnboardingStatus(supabase, profile) {
+  if (!profile?.stripe_account_id) {
+    return {
+      profile,
+      account: null,
+      onboardingComplete: false,
+    };
+  }
+
+  const { data: account, error } = await getConnectedAccount(profile.stripe_account_id);
+  if (error || !account) {
+    return { profile: null, account: null, onboardingComplete: false, error };
+  }
+
+  const onboardingComplete = isStripeOnboardingComplete(account);
+  let nextProfile = profile;
+
+  if (Boolean(profile.stripe_onboarding_complete) !== onboardingComplete) {
+    const { data: updatedProfile, error: updateErr } = await supabase
+      .from('business_profiles')
+      .update({ stripe_onboarding_complete: onboardingComplete })
+      .eq('user_id', profile.user_id)
+      .select('*')
+      .maybeSingle();
+
+    if (updateErr) {
+      return {
+        profile: null,
+        account,
+        onboardingComplete,
+        error: updateErr.message,
+      };
+    }
+
+    nextProfile = updatedProfile ?? {
+      ...profile,
+      stripe_onboarding_complete: onboardingComplete,
+    };
+  }
+
+  return {
+    profile: nextProfile,
+    account,
+    onboardingComplete,
+    error: null,
+  };
+}
+
 async function handleConnectStart(req, res, sendJson) {
   const auth = await authenticate(req, sendJson, res);
   if (!auth) return;
 
   const { supabase, userId } = auth;
-  const { data: profile, error: profileErr } = await supabase
-    .from('business_profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
+  const { data: profile, error: profileErr } = await getProfileByUserId(supabase, userId);
 
   if (profileErr) {
     sendJson(res, 500, { error: profileErr.message });
@@ -167,6 +265,40 @@ async function handleConnectStart(req, res, sendJson) {
   });
 }
 
+async function handleConnectStatus(req, res, sendJson) {
+  const auth = await authenticate(req, sendJson, res);
+  if (!auth) return;
+
+  const { supabase, userId } = auth;
+  const { data: profile, error: profileErr } = await getProfileByUserId(supabase, userId);
+
+  if (profileErr) {
+    sendJson(res, 500, { error: profileErr.message });
+    return;
+  }
+  if (!profile) {
+    sendJson(res, 404, { error: 'Business profile not found.' });
+    return;
+  }
+  if (!profile.stripe_account_id) {
+    sendJson(res, 200, stripeConnectionStatus(profile, null));
+    return;
+  }
+
+  const { profile: reconciledProfile, account, error } = await reconcileStripeOnboardingStatus(
+    supabase,
+    profile
+  );
+  if (error || !reconciledProfile) {
+    sendJson(res, isStripeConfigErrorMessage(error) ? 503 : 502, {
+      error: error || 'Could not load Stripe account status.',
+    });
+    return;
+  }
+
+  sendJson(res, 200, stripeConnectionStatus(reconciledProfile, account));
+}
+
 async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
   const auth = await authenticate(req, sendJson, res);
   if (!auth) return;
@@ -187,13 +319,6 @@ async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
     sendJson(res, 404, { error: 'Invoice not found.' });
     return;
   }
-  if (invoice.stripe_payment_url) {
-    sendJson(res, 200, {
-      url: invoice.stripe_payment_url,
-      payment_link_id: invoice.stripe_payment_link_id ?? null,
-    });
-    return;
-  }
 
   const { data: profile, error: profileErr } = await supabase
     .from('business_profiles')
@@ -212,57 +337,61 @@ async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
     return;
   }
 
-  const totalCents = Math.round(Number(invoice.total) * 100);
-  if (!Number.isFinite(totalCents) || totalCents <= 0) {
-    sendJson(res, 400, { error: 'Invoice total must be greater than zero.' });
+  // Guard: verify card_payments capability is active before attempting to create a payment link.
+  // Without this, Stripe returns: "You cannot create a charge on a connected account without
+  // the card_payments capability enabled."
+  const { data: connectedAccount, error: capErr } = await getConnectedAccount(profile.stripe_account_id);
+  if (capErr || !connectedAccount) {
+    sendJson(res, 502, { error: 'Could not verify Stripe account capabilities.' });
     return;
   }
-
-  const invoiceNumber = String(invoice.invoice_number ?? '').padStart(4, '0');
-  const { data: linkData, error: linkErr } = await createInvoicePaymentLink({
-    stripeAccountId: profile.stripe_account_id,
-    invoiceId: invoice.id,
-    jobId: invoice.job_id,
-    userId,
-    totalCents,
-    title: `Invoice #${invoiceNumber}`,
-    description: `ScopeLock invoice #${invoiceNumber}`,
-  });
-
-  if (linkErr || !linkData?.url) {
-    sendJson(res, isStripeConfigErrorMessage(linkErr) ? 503 : 502, {
-      error: linkErr || 'Could not create payment link.',
+  if (connectedAccount.card_payments_status !== 'active') {
+    sendJson(res, 409, {
+      error:
+        connectedAccount.card_payments_status === 'pending'
+          ? 'Your Stripe account is still being verified. Complete onboarding and wait for Stripe approval before sending invoices.'
+          : 'Your Stripe account is not approved to accept payments yet. Complete Stripe onboarding to enable card payments.',
     });
     return;
   }
 
-  const { error: updateErr } = await supabase
-    .from('invoices')
-    .update({
-      stripe_payment_link_id: linkData.id,
-      stripe_payment_url: linkData.url,
-    })
-    .eq('id', invoice.id)
-    .eq('user_id', userId);
-
-  if (updateErr) {
-    sendJson(res, 500, { error: updateErr.message });
-    return;
+  try {
+    const result = await createOrReuseInvoicePaymentLink({
+      invoice,
+      userId,
+      supabase,
+      stripeAccountId: profile.stripe_account_id,
+    });
+    sendJson(res, 200, {
+      url: result.url,
+      payment_link_id: result.payment_link_id ?? null,
+    });
+  } catch (err) {
+    if (err.message.includes('not signed')) {
+      sendJson(res, 409, { error: err.message });
+      return;
+    }
+    if (err.message.includes('greater than zero')) {
+      sendJson(res, 400, { error: err.message });
+      return;
+    }
+    sendJson(res, 502, { error: err.message || 'Could not create payment link.' });
   }
-
-  await supabase
-    .from('business_profiles')
-    .update({ stripe_onboarding_complete: true })
-    .eq('user_id', userId)
-    .eq('stripe_account_id', profile.stripe_account_id);
-
-  sendJson(res, 200, {
-    url: linkData.url,
-    payment_link_id: linkData.id,
-  });
 }
 
-async function markInvoicePaidFromWebhook(supabase, invoiceId, paidAt) {
+async function markInvoicePaidFromWebhook(supabase, invoiceId, paidAt, eventId) {
+  // Idempotency check - skip if already paid
+  const { data: existing } = await supabase
+    .from('invoices')
+    .select('payment_status')
+    .eq('id', invoiceId)
+    .maybeSingle();
+
+  if (existing?.payment_status === 'paid') {
+    log.info('invoice already paid, skipping duplicate', { invoiceId, eventId });
+    return existing;
+  }
+
   const { data: invoice, error } = await supabase
     .from('invoices')
     .update({
@@ -282,12 +411,14 @@ async function markInvoicePaidFromWebhook(supabase, invoiceId, paidAt) {
 async function handleWebhook(req, res, helpers) {
   const secret = env('STRIPE_WEBHOOK_SECRET');
   if (!secret) {
+    log.warn('stripe webhook secret not configured');
     helpers.sendJson(res, 503, { error: 'Stripe webhook secret is not configured.' });
     return;
   }
 
   const signature = req.headers['stripe-signature'];
   if (!signature || typeof signature !== 'string') {
+    log.warn('missing stripe signature header');
     helpers.sendJson(res, 400, { error: 'Missing Stripe signature header.' });
     return;
   }
@@ -296,15 +427,23 @@ async function handleWebhook(req, res, helpers) {
   try {
     payload = await helpers.readRawBody(req);
   } catch {
+    log.warn('invalid webhook payload');
     helpers.sendJson(res, 400, { error: 'Invalid webhook payload.' });
     return;
   }
 
   const { data: event, error: eventErr } = constructWebhookEvent(payload, signature, secret);
   if (eventErr || !event) {
+    log.warn('stripe signature verification failed', { error: eventErr });
     helpers.sendJson(res, 400, { error: eventErr || 'Could not verify Stripe webhook.' });
     return;
   }
+
+  log.info('stripe webhook received', {
+    eventId: event.id,
+    eventType: event.type,
+    invoiceId: event.data?.object?.metadata?.invoice_id ?? null,
+  });
 
   let supabase;
   try {
@@ -313,6 +452,7 @@ async function handleWebhook(req, res, helpers) {
       errorMessage: 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for Stripe routes.',
     });
   } catch (error) {
+    log.error('supabase not configured for stripe webhook', log.errCtx(error));
     helpers.sendJson(res, 503, {
       error: error instanceof Error ? error.message : 'Stripe is unavailable.',
     });
@@ -320,7 +460,7 @@ async function handleWebhook(req, res, helpers) {
   }
 
   if (event.type === 'checkout.session.async_payment_failed') {
-    console.log('[stripe webhook] async payment failed', {
+    log.info('async payment failed', {
       eventId: event.id,
       invoiceId: event.data?.object?.metadata?.invoice_id ?? null,
     });
@@ -332,6 +472,7 @@ async function handleWebhook(req, res, helpers) {
     event.type !== 'checkout.session.completed' &&
     event.type !== 'checkout.session.async_payment_succeeded'
   ) {
+    log.info('ignoring unhandled event type', { eventId: event.id, eventType: event.type });
     helpers.sendJson(res, 200, { ok: true, ignored: true });
     return;
   }
@@ -339,18 +480,22 @@ async function handleWebhook(req, res, helpers) {
   const session = event.data?.object;
   const invoiceId = session?.metadata?.invoice_id;
   if (typeof invoiceId !== 'string' || !invoiceId.trim()) {
+    log.warn('webhook missing invoice_id in metadata', { eventId: event.id, eventType: event.type });
     helpers.sendJson(res, 200, { ok: true, ignored: true });
     return;
   }
 
   if (event.type === 'checkout.session.completed' && session?.payment_status !== 'paid') {
+    log.info('checkout session pending async payment', { eventId: event.id, invoiceId });
     helpers.sendJson(res, 200, { ok: true, pending: true });
     return;
   }
 
   try {
-    await markInvoicePaidFromWebhook(supabase, invoiceId, paymentDateFromEvent(event));
+    await markInvoicePaidFromWebhook(supabase, invoiceId, paymentDateFromEvent(event), event.id);
+    log.info('marked invoice paid', { invoiceId, eventId: event.id, eventType: event.type });
   } catch (error) {
+    log.error('failed to mark invoice paid', { invoiceId, eventId: event.id, ...log.errCtx(error) });
     helpers.sendJson(res, 500, {
       error: error instanceof Error ? error.message : 'Could not reconcile invoice payment.',
     });
@@ -367,6 +512,9 @@ export async function tryHandleStripeRoute(req, res, helpers) {
   switch (route.kind) {
     case 'connect-start':
       await handleConnectStart(req, res, helpers.sendJson);
+      return true;
+    case 'connect-status':
+      await handleConnectStatus(req, res, helpers.sendJson);
       return true;
     case 'payment-link':
       await handleInvoicePaymentLink(req, res, helpers.sendJson, route.invoiceId);
