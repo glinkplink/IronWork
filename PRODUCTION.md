@@ -20,6 +20,8 @@ Everything in this section requires action outside the codebase — Stripe dashb
 - [x] **Enable ACH Debit** if you want to support it (Dashboard → Settings → Payment methods)
 - [ ] **Complete Stripe's platform profile** if required for Connect activation (business info, website, etc.)
 - [ ] **Test the full payment flow** in test mode first (use `sk_test_...` keys + `whsec_test_...`) before switching to live keys
+- [x] **Capabilities requested at account creation** — `card_payments` + `transfers` + `mcc: '1799'` (Special Trade Contractors) are set in `createConnectedAccount`; no manual dashboard action required for new accounts
+- [ ] **Run repair script for any existing accounts** created before this fix: `STRIPE_SECRET_KEY=sk_live_... node scripts/repair-stripe-capabilities.mjs`
 
 ### Supabase Dashboard
 

@@ -64,6 +64,9 @@ A contractor can **start a work order without signing in**. They fill the job fo
 - **Routes (same app server as PDFs):** `POST /api/stripe/connect/start`, `GET /api/stripe/connect/status`, `POST /api/stripe/invoices/:invoiceId/payment-link`, and `POST /api/stripe/webhook`.
 - **Auth:** Connect start/status and invoice payment-link routes require `Authorization: Bearer <Supabase access_token>`; the server verifies the JWT and loads the caller’s `business_profiles` row via the Supabase service role. The webhook does **not** use Supabase auth; it verifies the Stripe signature with `STRIPE_WEBHOOK_SECRET`.
 - **Invoice issuance gate:** New invoice issuance is blocked until the parent work order is signature-satisfied. `createOrReuseInvoicePaymentLink` allows issuance only when `jobs.esign_status = 'completed'` or `jobs.offline_signed_at` is set; already-issued invoices with an existing `stripe_payment_url` still reuse that legacy link.
+- **Account creation:** `createConnectedAccount` (Express type) always requests `card_payments` and `transfers` capabilities and sets `business_profile.mcc = '1799'` (Special Trade Contractors). Omitting capabilities or MCC causes `card_payments` to stay `inactive` even after onboarding completes; omitting MCC puts all required fields in `past_due`.
+- **Onboarding complete signal:** `isStripeOnboardingComplete` uses `account.charges_enabled` (not `details_submitted`). Stripe sets `details_submitted = true` prematurely even when required fields are still `past_due`; `charges_enabled` is the reliable gate.
+- **Payment link capability guard:** Before creating a payment link, the server calls `getConnectedAccount` and checks `capabilities.card_payments === 'active'`. Returns 409 with a user-facing message if `pending` (onboarding incomplete/under review) or `inactive` (never completed).
 - **Profile integration:** `business_profiles.stripe_account_id` stores the connected account id. `business_profiles.stripe_onboarding_complete` is reconciled from Stripe account state by `GET /api/stripe/connect/status` when the user returns from onboarding.
 - **Return flow:** Stripe onboarding returns to `/?stripe_connect=return` and refresh uses `/?stripe_connect=refresh`. The client moves the user to **Edit Profile**, clears the query param from the URL, reloads profile state, and surfaces a status banner there.
 - **Hosted deploys (e.g. Render):** The runtime environment must include **`STRIPE_SECRET_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, and optionally **`APP_BASE_URL`** if forwarded headers are not sufficient to derive the public origin for Connect return links.
@@ -199,11 +202,15 @@ scope-lock/
 │   ├── App.tsx                       # Root component - view state machine + lazy-loaded document/dashboard screens
 │   └── main.tsx                      # Entry point
 ├── server/
-│   ├── app-server.mjs               # App server + /api/pdf + e-sign + Stripe routes
+│   ├── app-server.mjs               # App server + /api/pdf + e-sign + Stripe + invoice routes
 │   ├── stripe-routes.mjs            # Stripe Connect start/status, payment-link, Stripe webhook
-│   ├── lib/stripe.mjs               # Stripe SDK helpers for accounts, payment links, webhook verification
+│   ├── invoice-routes.mjs           # POST /api/invoices/:id/send — invoice email delivery via Resend
 │   ├── esign-routes.mjs             # JWT send/resend; webhook + service-role e-sign updates
-│   └── docuseal-esign-state.mjs     # DocuSeal submission → shared esign_* patch fields
+│   ├── docuseal-esign-state.mjs     # DocuSeal submission → shared esign_* patch fields
+│   └── lib/
+│       ├── stripe.mjs               # Stripe SDK helpers: account creation (capabilities + MCC), payment links, webhook verification
+│       ├── logger.mjs               # Structured JSON logger (log.info / log.warn / log.error)
+│       └── rate-limit.mjs           # Per-IP rate limiter for PDF, e-sign send/resend, invoice send, Connect start
 ├── supabase/
 │   ├── config.toml                   # Supabase CLI config
 │   └── migrations/
