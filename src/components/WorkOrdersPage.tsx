@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import type {
   BusinessProfile,
   Invoice,
@@ -10,13 +10,10 @@ import type {
 import {
   getJobById,
   getWorkOrdersDashboardSummary,
-  listWorkOrdersDashboard,
   listWorkOrdersDashboardPage,
 } from '../lib/db/jobs';
 import { getInvoice, getInvoiceBusinessStatus } from '../lib/db/invoices';
-import { useEsignPoller } from '../hooks/useEsignPoller';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
-import { shouldPollEsignStatus } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
 import { getWorkOrderSignatureState } from '../lib/work-order-signature';
 import './WorkOrdersPage.css';
@@ -93,27 +90,6 @@ function renderEsignStrip(
       <span className="esign-strip-text">{progress.title}</span>
     </span>
   );
-}
-
-function hasInFlightEsign(job: WorkOrderDashboardJob): boolean {
-  return (
-    shouldPollEsignStatus(job.esign_status) ||
-    job.hasInFlightChangeOrders ||
-    job.changeOrderPreview.some((changeOrder) => shouldPollEsignStatus(changeOrder.esign_status))
-  );
-}
-
-function collectInFlightJobIds(jobs: WorkOrderDashboardJob[]): string[] {
-  return jobs.filter((job) => hasInFlightEsign(job)).map((job) => job.id);
-}
-
-function mergeDashboardRows(
-  currentJobs: WorkOrderDashboardJob[],
-  refreshedJobs: WorkOrderDashboardJob[]
-): WorkOrderDashboardJob[] {
-  if (refreshedJobs.length === 0) return currentJobs;
-  const refreshedById = new Map(refreshedJobs.map((job) => [job.id, job]));
-  return currentJobs.map((job) => refreshedById.get(job.id) ?? job);
 }
 
 function appendDashboardRows(
@@ -328,23 +304,6 @@ export function WorkOrdersPage({
       cancelled = true;
     };
   }, [userId]);
-
-  const inFlightJobIds = useMemo(() => collectInFlightJobIds(jobs), [jobs]);
-
-  useEsignPoller({
-    enabled: inFlightJobIds.length > 0,
-    pollOnce: async () => {
-      const refreshedJobs = await listWorkOrdersDashboard(userId, inFlightJobIds);
-      if (refreshedJobs.length === 0) return false;
-      let shouldContinue = false;
-      setJobs((currentJobs) => {
-        const mergedJobs = mergeDashboardRows(currentJobs, refreshedJobs);
-        shouldContinue = collectInFlightJobIds(mergedJobs).length > 0;
-        return mergedJobs;
-      });
-      return shouldContinue;
-    },
-  });
 
   useEffect(() => {
     if (!successBanner) return;

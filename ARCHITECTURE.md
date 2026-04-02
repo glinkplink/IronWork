@@ -55,7 +55,7 @@ A contractor can **start a work order without signing in**. They fill the job fo
 - **Send payload:** `POST .../send` accepts **exactly one** document entry; every `documents[i].html` (and optional `html_header` / `html_footer`) must be a string. Total UTF-8 size of those HTML fields is capped (**2 MiB**) before the DocuSeal request. Misconfigured server env for e-sign surfaces as **503** with a generic JSON body; unexpected handler failures return **500** with a generic message (details stay in server logs).
 - **Resend:** V1 uses **`PUT /submitters/{esign_submitter_id}`** on the submitter id returned from the first send — not a second HTML submission for the same document. If DocuSeal replies that the submitter already completed, the server reconciles local `esign_*` fields from `GET /submissions/{esign_submission_id}` so the UI can self-heal from missed completion webhooks.
 - **HTML:** The client builds DocuSeal-specific HTML in **`src/lib/docuseal-agreement-html.ts`** (work orders) and **`src/lib/docuseal-change-order-html.ts`** (change orders) — embedded styles + `esc()`; customer fields use DocuSeal HTML field tags; send payloads include contextual **email** `message` subject/body (contractor name, document reference, `{{submitter.link}}`). Optional canvas **SP signature** PNG (`docuseal-signature-image.ts`) is embedded for CO send/resend when provided. The server forwards those payloads to DocuSeal; it does not re-derive sections from raw rows.
-- **Status poll:** `GET .../work-orders/:jobId/status` and `GET .../change-orders/:coId/status` (authenticated) fetch the DocuSeal submission, reconcile, and update **`jobs` / `change_orders`** so the UI can refresh without resend. Detail pages use this on a short timer while `esign_status` is in-flight; webhooks still update the same rows.
+- **Status sync:** `GET .../work-orders/:jobId/status` and `GET .../change-orders/:coId/status` (authenticated) fetch the DocuSeal submission when needed, reconcile, and update **`jobs` / `change_orders`**. Work-order and change-order detail pages call each endpoint **once** when the user opens that screen (and again after send/resend paths that already refreshed). **Webhooks** still update the same rows; there is **no** client interval polling.
 - **DB:** Migration **`0010_jobs_esign.sql`** adds **`jobs.esign_*`** columns; **`0011_jobs_esign_status_check.sql`** adds the status CHECK constraint; **`0012_jobs_inflight_esign_by_user_created_at.sql`** adds an index for in-flight polling; **`0013_change_orders_esign.sql`** adds matching **`change_orders.esign_*`** columns + constraint + index; **`0016_invoices_esign_and_issuance.sql`** adds **`invoices.issued_at`** for business issuance tracking. **`WorkOrderListJob.esign_status`** powers the work-orders list progress strip; work-order and change-order detail surfaces share the same Sent / Opened / Signed timeline card. Invoice business badges derive from `issued_at` (no e-sign tracking).
 - **Hosted deploys (e.g. Render):** The Node process must have **`DOCUSEAL_API_KEY`**, **`SUPABASE_URL`**, **`SUPABASE_SERVICE_ROLE_KEY`**, and webhook header secrets in the **runtime** environment (dashboard env vars—not only `VITE_*` at build). Blueprint/`render.yaml` sync can overwrite dashboard-only vars if the YAML omits them. **End-to-end DocuSeal checks** (inbound email copy, signed PDF appearance, webhook delivery) use the **deployed** public URL and that environment; localhost can still run e-sign when `.env.local` is complete.
 
@@ -151,7 +151,6 @@ scope-lock/
 │   │   ├── useAuth.ts                # Auth state hook (Supabase session)
 │   │   ├── useAuthProfile.ts         # Profile loading + capture redirect handling
 │   │   ├── useChangeOrderFlow.ts     # Detail/wizard/detail navigation for COs
-│   │   ├── useEsignPoller.ts         # Shared timer + visibility wiring for e-sign polling
 │   │   ├── useInvoiceFlow.ts         # Invoice wizard/final page flow state
 │   │   ├── useScaledPreview.ts       # 816px preview scaling for WO/invoice mini previews
 │   │   ├── useWorkOrderDraft.ts      # New/edit draft state + next_wo_number refresh path
@@ -179,7 +178,7 @@ scope-lock/
 │   │   ├── esign-api.ts                   # send/resend WO and CO for signature (app server API)
 │   │   ├── stripe-connect.ts              # Authenticated Stripe Connect start/status helpers
 │   │   ├── esign-labels.ts                # E-sign status strings for UI
-│   │   ├── esign-live.ts                  # Shared polling cadence + in-flight status helpers + timestamp formatting
+│   │   ├── esign-live.ts                  # E-sign timestamp formatting for detail UI
 │   │   ├── esign-progress.ts              # Shared e-sign step/tone model for detail timeline + list strip
 │   │   ├── fetch-with-supabase-auth.ts    # Same-origin fetch with Bearer from Supabase session
 │   │   ├── guest-agreement-profile.ts     # BusinessProfile-shaped stub from guest form fields for preview
@@ -225,7 +224,7 @@ scope-lock/
 │       ├── 0009_jobs_other_classification.sql  # persist "Specify" text when job type is Other
 │       ├── 0010_jobs_esign.sql                 # DocuSeal esign_* columns on jobs
 │       ├── 0011_jobs_esign_status_check.sql    # CHECK constraint on jobs.esign_status
-│       ├── 0012_jobs_inflight_esign_by_user_created_at.sql  # index for in-flight WO polling
+│       ├── 0012_jobs_inflight_esign_by_user_created_at.sql  # index for in-flight WO e-sign queries
 │       ├── 0013_change_orders_esign.sql        # DocuSeal esign_* columns + constraint + index on change_orders
 │       ├── 0014_work_orders_dashboard.sql      # list_work_orders_dashboard RPC (used for targeted row refresh)
 │       ├── 0015_work_orders_dashboard_page.sql # list_work_orders_dashboard_page + get_work_orders_dashboard_summary RPCs
@@ -350,7 +349,7 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
   - `latest_invoice`
 - **`get_work_orders_dashboard_summary`** runs separately from the page RPC so whole-dataset totals do not depend on the currently loaded page.
 - Job-level invoice classification still uses a guarded JSONB scan over **`invoices.line_items`**: an invoice is job-level only when no line item has a non-empty `change_order_id`.
-- While e-sign is in flight, the page polls only already-loaded rows and merges those updates without resetting pagination state.
+- The Work Orders list reflects each page load from `list_work_orders_dashboard_page` (and “Load more”); it does **not** periodically refetch rows while the user stays on the dashboard.
 
 ## What Is and Isn't Persisted
 
@@ -360,7 +359,7 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 | Default exclusions/assumptions | Yes | Supabase DB, pre-populate new agreements |
 | Auth session | Yes | Supabase session (survives refresh) |
 | Work Agreement (current job) | In-memory while editing | **Download & Save** persists via `saveWorkOrder` |
-| Invoices | Yes | Created at wizard step 3. Business state is **Draft** until `issued_at` is set (Stripe payment-link creation sets this), then **Invoiced**. `payment_status` (`unpaid`/`paid`/`offline`) and `paid_at` are set by the Stripe webhook; the **Paid** badge renders from invoice props on `InvoiceFinalPage`, `WorkOrdersPage`, and `WorkOrderDetailPage` — no in-page polling. Downloading the PDF does **not** transition invoice lifecycle. |
+| Invoices | Yes | Created at wizard step 3. Business state is **Draft** until `issued_at` is set (Stripe payment-link creation sets this), then **Invoiced**. `payment_status` (`unpaid`/`paid`/`offline`) and `paid_at` are set by the Stripe webhook. **`InvoiceFinalPage`** refetches the invoice row once on mount so **Paid** reflects webhook updates when the user opens that screen; `WorkOrdersPage` and `WorkOrderDetailPage` use list/detail loads (no interval polling). Downloading the PDF does **not** transition invoice lifecycle. |
 | Clients | Yes (rows) | Upsert on **Download & Save**; **JobForm** customer-name combobox searches when authenticated |
 | Change orders | Yes | **ChangeOrderWizard** + detail page; **`create_change_order`** RPC allocates `co_number` under an advisory lock (see **0006**); no client-side retry loop |
 | Completion signoffs | No | Schema only |
@@ -419,7 +418,7 @@ The checkbox sections below track shipped work and the longer backlog; the three
 ### Near-Term
 - [x] Research standard welder work agreements/ contracts and edit ours to match
 - [x] Generate Invoice flow from work orders (wizard + PDF + persisted invoices)
-- [x] DocuSeal e-sign for work orders and change orders (send/resend, webhook, polling, progress timeline)
+- [x] DocuSeal e-sign for work orders and change orders (send/resend, webhook, on-enter status sync, progress timeline)
 - [x] Stripe Connect Express onboarding (Edit Profile CTA, return/refresh flow, status reconciliation)
 - [x] Stripe invoice payment links (create, copy, webhook-driven `payment_status` / `paid_at`)
 - [ ] Deploy the app server and Puppeteer route alongside production hosting

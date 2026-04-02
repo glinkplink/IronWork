@@ -11,16 +11,13 @@ import type {
   WorkOrdersDashboardSummary,
 } from '../../types/db';
 import { WorkOrdersPage } from '../WorkOrdersPage';
-import { ESIGN_POLL_INTERVAL_MS } from '../../lib/esign-live';
 
-const listWorkOrdersDashboard = vi.fn();
 const listWorkOrdersDashboardPage = vi.fn();
 const getWorkOrdersDashboardSummary = vi.fn();
 const getJobById = vi.fn();
 const getInvoice = vi.fn();
 
 vi.mock('../../lib/db/jobs', () => ({
-  listWorkOrdersDashboard: (...args: unknown[]) => listWorkOrdersDashboard(...args),
   listWorkOrdersDashboardPage: (...args: unknown[]) => listWorkOrdersDashboardPage(...args),
   getWorkOrdersDashboardSummary: (...args: unknown[]) => getWorkOrdersDashboardSummary(...args),
   getJobById: (...args: unknown[]) => getJobById(...args),
@@ -236,14 +233,12 @@ describe('WorkOrdersPage', () => {
   });
 
   beforeEach(() => {
-    listWorkOrdersDashboard.mockReset();
     listWorkOrdersDashboardPage.mockReset();
     getWorkOrdersDashboardSummary.mockReset();
     getJobById.mockReset();
     getInvoice.mockReset();
     listWorkOrdersDashboardPage.mockResolvedValue(makePageResult([listJobA]));
     getWorkOrdersDashboardSummary.mockResolvedValue({ data: summaryResult, error: null });
-    listWorkOrdersDashboard.mockResolvedValue([]);
     getJobById.mockImplementation((id: string) => Promise.resolve(minimalFullJob(id, id)));
     getInvoice.mockImplementation((id: string) => Promise.resolve(minimalInvoice(id)));
   });
@@ -311,58 +306,6 @@ describe('WorkOrdersPage', () => {
     expect(listWorkOrdersDashboardPage).toHaveBeenNthCalledWith(2, 'u1', 25, nextCursor);
     expect(screen.getByText('Customer A')).toBeInTheDocument();
     expect(screen.getByText('Customer B')).toBeInTheDocument();
-  });
-
-  it('polls loaded rows with in-flight work-order statuses and merges the refresh result', async () => {
-    vi.useFakeTimers();
-    listWorkOrdersDashboardPage.mockResolvedValue(makePageResult([listJobA, listJobB]));
-    listWorkOrdersDashboard.mockResolvedValue([{ ...listJobB, esign_status: 'completed' }]);
-
-    renderPage();
-    await flushAsync();
-
-    expect(screen.getByLabelText('E-signature status: Sent')).toBeInTheDocument();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
-    });
-    await flushAsync();
-
-    expect(listWorkOrdersDashboard).toHaveBeenCalledWith('u1', ['job-b']);
-    expect(screen.getByLabelText('Signature status: Signed')).toBeInTheDocument();
-    expect(screen.getByText('Customer A')).toBeInTheDocument();
-  });
-
-  it('polls loaded rows when hidden change orders are in flight via hasInFlightChangeOrders', async () => {
-    vi.useFakeTimers();
-    listWorkOrdersDashboardPage.mockResolvedValue(
-      makePageResult([
-        {
-          ...listJobA,
-          changeOrderCount: 4,
-          changeOrderPreview: [previewCO('co-1', 1, 'completed'), previewCO('co-2', 2, 'completed')],
-          hasInFlightChangeOrders: true,
-        },
-      ])
-    );
-    listWorkOrdersDashboard.mockResolvedValue([
-      {
-        ...listJobA,
-        changeOrderCount: 4,
-        changeOrderPreview: [previewCO('co-1', 1, 'completed'), previewCO('co-2', 2, 'completed')],
-        hasInFlightChangeOrders: false,
-      },
-    ]);
-
-    renderPage();
-    await flushAsync();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
-    });
-    await flushAsync();
-
-    expect(listWorkOrdersDashboard).toHaveBeenCalledWith('u1', ['job-a']);
   });
 
   it('opens work-order detail immediately with the row job id and does not prefetch on click', async () => {

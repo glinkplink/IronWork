@@ -121,5 +121,6 @@ Before concluding any task, verify:
   - completion and liability transfer
   - workmanship warranty
 - **DocuSeal / e-sign:** Local dev works when server env is complete; **end-to-end** checks (webhook URL, notification emails, signed output) follow the **deployed** host and runtime env — see **ARCHITECTURE.md** → *E-sign (DocuSeal)* and **AGENTS.md** (DocuSeal localhost vs hosted).
-- **Invoice lifecycle:** Invoice business state: no row → `Invoice`, `issued_at = null` → `Draft`, `issued_at != null` → `Invoiced` (payment-link creation sets `issued_at`). `payment_status` (`unpaid`/`paid`/`offline`) and `paid_at` are set by the Stripe webhook; no invoice e-sign tracking.
+- **Invoice lifecycle:** Invoice business state: no row → `Invoice`, `issued_at = null` → `Draft`, `issued_at != null` → `Invoiced` (payment-link creation sets `issued_at`). `payment_status` (`unpaid`/`paid`/`offline`) and `paid_at` are set by the Stripe webhook; no invoice e-sign tracking. **`InvoiceFinalPage`** refetches the invoice once on mount for webhook-updated payment state.
+- **E-sign UI:** No client interval polling; work-order and change-order detail call authenticated status once when the screen opens (send/resend paths still refresh).
 - **Invoice issuance gate:** Invoice issuance (payment-link creation and send) is blocked until the parent work order is signature-satisfied (DocuSeal `completed` or `jobs.offline_signed_at` set). Invoice drafts can be created regardless of signature state.

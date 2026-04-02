@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, fireEvent, act } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import type { BusinessProfile, ChangeOrder, Job } from '../../types/db';
 import { ChangeOrderDetailPage } from '../ChangeOrderDetailPage';
 import * as esignApi from '../../lib/esign-api';
+import { getChangeOrderById } from '../../lib/db/change-orders';
 
 vi.mock('../../lib/change-order-generator', () => ({
   generateChangeOrderHtml: () => '<div>Change Order Preview</div>',
@@ -13,7 +14,7 @@ vi.mock('../../lib/change-order-generator', () => ({
 vi.mock('../../lib/esign-api', () => ({
   sendChangeOrderForSignature: vi.fn(),
   resendChangeOrderSignature: vi.fn(),
-  mergeEsignResponseIntoChangeOrder: vi.fn((_co: ChangeOrder, r: ChangeOrder) => r),
+  mergeEsignResponseIntoChangeOrder: vi.fn(),
   pollChangeOrderEsignStatus: vi.fn(),
   downloadSignedDocumentFile: vi.fn(),
 }));
@@ -180,12 +181,62 @@ function changeOrderWithEsign(status: ChangeOrder['esign_status']): ChangeOrder 
 }
 
 describe('ChangeOrderDetailPage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     window.scrollTo = vi.fn();
+    vi.mocked(getChangeOrderById).mockImplementation(() => Promise.resolve(null));
+    vi.mocked(esignApi.pollChangeOrderEsignStatus).mockReset();
+    const actual = await vi.importActual<typeof import('../../lib/esign-api')>('../../lib/esign-api');
+    vi.mocked(esignApi.mergeEsignResponseIntoChangeOrder).mockImplementation(
+      actual.mergeEsignResponseIntoChangeOrder
+    );
   });
 
   afterEach(() => {
     cleanup();
+  });
+
+  it('syncs e-sign status on mount when the row exists and notifies onCoUpdated', async () => {
+    const co = unsentChangeOrder();
+    vi.mocked(getChangeOrderById).mockResolvedValue(co);
+    vi.mocked(esignApi.pollChangeOrderEsignStatus).mockResolvedValue({
+      jobId: 'job-1',
+      coId: 'co-1',
+      esign_submission_id: 'sub-1',
+      esign_submitter_id: 'submitter-1',
+      esign_embed_src: 'https://example.com/sign',
+      esign_status: 'opened',
+      esign_submission_state: 'opened',
+      esign_submitter_state: 'opened',
+      esign_sent_at: '2025-01-01T08:00:00Z',
+      esign_resent_at: null,
+      esign_opened_at: '2025-01-01T09:00:00Z',
+      esign_completed_at: null,
+      esign_declined_at: null,
+      esign_decline_reason: null,
+      esign_signed_document_url: null,
+    });
+
+    const onCoUpdated = vi.fn();
+    render(
+      <ChangeOrderDetailPage
+        userId="u1"
+        co={co}
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+        onCoUpdated={onCoUpdated}
+      />
+    );
+
+    await waitFor(() => {
+      expect(getChangeOrderById).toHaveBeenCalledWith('co-1');
+      expect(esignApi.pollChangeOrderEsignStatus).toHaveBeenCalledWith('co-1');
+      expect(onCoUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ esign_status: 'opened', esign_opened_at: '2025-01-01T09:00:00Z' })
+      );
+    });
   });
 
   it('shows copy signing link before the change order is signed', () => {

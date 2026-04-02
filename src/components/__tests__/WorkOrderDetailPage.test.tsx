@@ -5,7 +5,6 @@ import { cleanup, render, screen, waitFor, within, act } from '@testing-library/
 import { useState } from 'react';
 import type { Job, BusinessProfile, ChangeOrder } from '../../types/db';
 import { WorkOrderDetailPage } from '../WorkOrderDetailPage';
-import { ESIGN_POLL_INTERVAL_MS } from '../../lib/esign-live';
 
 const mockFns = vi.hoisted(() => {
   const listChangeOrders = vi.fn();
@@ -13,6 +12,7 @@ const mockFns = vi.hoisted(() => {
   const getJobById = vi.fn();
   const sendWorkOrderForSignature = vi.fn();
   const resendWorkOrderSignature = vi.fn();
+  const pollWorkOrderEsignStatus = vi.fn();
   const coBlockState = { blocks: false, error: null as Error | null };
   const jobInvoiceState = { data: null as { job_id: string; payment_status: 'unpaid' | 'paid' | 'offline'; invoice_number: number; issued_at: string | null }[] | null, error: null as Error | null };
   const getBlocksNewChangeOrdersForJob: ReturnType<typeof vi.fn<(userId: string, jobId: string) => Promise<{ blocks: boolean; error: Error | null }>>> = vi.fn(async () => ({
@@ -31,6 +31,7 @@ const mockFns = vi.hoisted(() => {
     getJobById,
     sendWorkOrderForSignature,
     resendWorkOrderSignature,
+    pollWorkOrderEsignStatus,
     getBlocksNewChangeOrdersForJob,
     setCoBlockResult(next: { blocks: boolean; error: Error | null }) {
       coBlockState.blocks = next.blocks;
@@ -77,6 +78,7 @@ vi.mock('../../lib/esign-api', async (importOriginal) => {
       mockFns.sendWorkOrderForSignature(jobId, payload),
     resendWorkOrderSignature: (jobId: string, message?: unknown) =>
       mockFns.resendWorkOrderSignature(jobId, message),
+    pollWorkOrderEsignStatus: (jobId: string) => mockFns.pollWorkOrderEsignStatus(jobId),
   };
 });
 
@@ -246,6 +248,7 @@ describe('WorkOrderDetailPage', () => {
     mockFns.getJobById.mockReset();
     mockFns.sendWorkOrderForSignature.mockReset();
     mockFns.resendWorkOrderSignature.mockReset();
+    mockFns.pollWorkOrderEsignStatus.mockReset();
     mockFns.listInvoiceStatusByChangeOrder.mockResolvedValue({ data: [], error: null, warning: null });
     mockFns.listChangeOrders.mockResolvedValue([makeCO(1, 'First'), makeCO(2, 'Second')]);
     mockFns.getJobById.mockResolvedValue(minimalJob());
@@ -279,7 +282,25 @@ describe('WorkOrderDetailPage', () => {
       esign_decline_reason: null,
       esign_signed_document_url: null,
     });
+    const defaultPoll = {
+      jobId: 'job-1',
+      esign_submission_id: null,
+      esign_submitter_id: null,
+      esign_embed_src: null,
+      esign_status: 'not_sent' as const,
+      esign_submission_state: null,
+      esign_submitter_state: null,
+      esign_sent_at: null,
+      esign_resent_at: null,
+      esign_opened_at: null,
+      esign_completed_at: null,
+      esign_declined_at: null,
+      esign_decline_reason: null,
+      esign_signed_document_url: null,
+    };
+    mockFns.pollWorkOrderEsignStatus.mockResolvedValue(defaultPoll);
     mockFns.setCoBlockResult({ blocks: false, error: null });
+    mockFns.setJobInvoiceResult({ data: null, error: null });
   });
 
   it('shows one invoice control per change-order row and job-level invoice status when present', async () => {
@@ -441,21 +462,42 @@ describe('WorkOrderDetailPage', () => {
     }
   );
 
-  it('polls the job row after send and updates the timeline from webhook-backed data', async () => {
-    vi.useFakeTimers();
-    const sentJob = {
-      ...jobWithEsign('sent'),
-      customer_email: 'customer@example.com',
+  it('refreshes e-sign timeline after send when the status endpoint returns opened', async () => {
+    const base = { ...minimalJob(), customer_email: 'customer@example.com' };
+    mockFns.getJobById.mockResolvedValue(base);
+    const notSentPoll = {
+      jobId: 'job-1',
+      esign_submission_id: null,
+      esign_submitter_id: null,
+      esign_embed_src: null,
+      esign_status: 'not_sent' as const,
+      esign_submission_state: null,
+      esign_submitter_state: null,
+      esign_sent_at: null,
+      esign_resent_at: null,
+      esign_opened_at: null,
+      esign_completed_at: null,
+      esign_declined_at: null,
+      esign_decline_reason: null,
+      esign_signed_document_url: null,
+    };
+    const openedPoll = {
+      jobId: 'job-1',
+      esign_submission_id: 'sub-1',
       esign_submitter_id: 'submitter-1',
       esign_embed_src: 'https://example.com/sign',
+      esign_status: 'opened' as const,
+      esign_submission_state: 'opened',
+      esign_submitter_state: 'opened',
+      esign_sent_at: '2025-01-01T08:00:00Z',
+      esign_resent_at: null,
+      esign_opened_at: '2025-01-01T09:00:00Z',
+      esign_completed_at: null,
+      esign_declined_at: null,
+      esign_decline_reason: null,
+      esign_signed_document_url: null,
     };
-    const openedJob = {
-      ...jobWithEsign('opened'),
-      customer_email: 'customer@example.com',
-      esign_submitter_id: 'submitter-1',
-      esign_embed_src: 'https://example.com/sign',
-    };
-    mockFns.getJobById.mockResolvedValueOnce(sentJob).mockResolvedValueOnce(openedJob);
+    mockFns.pollWorkOrderEsignStatus.mockResolvedValueOnce(notSentPoll).mockResolvedValueOnce(openedPoll);
 
     function Harness() {
       const [job, setJob] = useState<Job>({ ...minimalJob(), customer_email: 'customer@example.com' });
@@ -480,16 +522,55 @@ describe('WorkOrderDetailPage', () => {
     await act(async () => {
       screen.getByRole('button', { name: /send for signature/i }).click();
     });
-    await flushAsync();
 
-    expect(screen.getByLabelText('Customer signature status: Sent')).toBeInTheDocument();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    await waitFor(() => {
+      expect(screen.getByLabelText('Customer signature status: Opened')).toBeInTheDocument();
     });
+    expect(mockFns.pollWorkOrderEsignStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs enter status sync once when onJobUpdated is an unstable inline callback (App.tsx pattern)', async () => {
+    const base = { ...minimalJob(), customer_email: 'customer@example.com' };
+    mockFns.getJobById.mockResolvedValue(base);
+    mockFns.pollWorkOrderEsignStatus.mockClear();
+    mockFns.pollWorkOrderEsignStatus.mockResolvedValue({
+      jobId: 'job-1',
+      esign_submission_id: null,
+      esign_submitter_id: null,
+      esign_embed_src: null,
+      esign_status: 'not_sent',
+      esign_submission_state: null,
+      esign_submitter_state: null,
+      esign_sent_at: null,
+      esign_resent_at: null,
+      esign_opened_at: null,
+      esign_completed_at: null,
+      esign_declined_at: null,
+      esign_decline_reason: null,
+      esign_signed_document_url: null,
+    });
+
+    function UnstableParent() {
+      const [job, setJob] = useState<Job>(base);
+      return (
+        <WorkOrderDetailPage
+          userId="u1"
+          jobId={job.id}
+          job={job}
+          profile={minimalProfile()}
+          onJobUpdated={(j) => setJob(j)}
+          onBack={() => {}}
+          onStartChangeOrder={() => {}}
+          onStartChangeOrderInvoice={() => {}}
+          onOpenCODetail={() => {}}
+        />
+      );
+    }
+
+    render(<UnstableParent />);
     await flushAsync();
 
-    expect(screen.getByLabelText('Customer signature status: Opened')).toBeInTheDocument();
+    expect(mockFns.pollWorkOrderEsignStatus).toHaveBeenCalledTimes(1);
   });
 
   it('passes the custom DocuSeal message on work-order resend', async () => {

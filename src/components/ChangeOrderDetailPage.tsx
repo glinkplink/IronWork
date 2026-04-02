@@ -16,9 +16,8 @@ import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-i
 import '../lib/change-order-document.css';
 import { deleteChangeOrder, getChangeOrderById } from '../lib/db/change-orders';
 import { jobRowToWelderJob } from '../lib/job-to-welder-job';
-import { shouldPollEsignStatus, formatEsignTimestamp } from '../lib/esign-live';
+import { formatEsignTimestamp } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
-import { useEsignPoller } from '../hooks/useEsignPoller';
 import {
   sendChangeOrderForSignature,
   resendChangeOrderSignature,
@@ -90,6 +89,10 @@ export function ChangeOrderDetailPage({
   const [coEsignResendNotice, setCoEsignResendNotice] = useState(false);
   const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resendNoticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCoUpdatedRef = useRef(onCoUpdated);
+  useEffect(() => {
+    onCoUpdatedRef.current = onCoUpdated;
+  }, [onCoUpdated]);
 
   const coEsignWasResent = Boolean(co?.esign_resent_at);
   const esignProgress = useMemo(
@@ -116,14 +119,21 @@ export function ChangeOrderDetailPage({
     }
   }, [co, onCoUpdated]);
 
-  useEsignPoller({
-    enabled: Boolean(onCoUpdated) && shouldPollEsignStatus(co.esign_status),
-    pollOnce: async () => {
-      const row = await refreshCoRow();
-      if (!row) return false;
-      return shouldPollEsignStatus(row.esign_status);
-    },
-  });
+  /** One-shot DocuSeal/DB sync when opening this change order (no interval polling). */
+  useEffect(() => {
+    void (async () => {
+      const row = await getChangeOrderById(co.id);
+      if (!row) return;
+      try {
+        const r = await pollChangeOrderEsignStatus(co.id);
+        const updatedCo = mergeEsignResponseIntoChangeOrder(row, r);
+        onCoUpdatedRef.current?.(updatedCo);
+      } catch {
+        const again = await getChangeOrderById(co.id);
+        if (again) onCoUpdatedRef.current?.(again);
+      }
+    })();
+  }, [co.id]);
 
   useEffect(() => {
     return () => {

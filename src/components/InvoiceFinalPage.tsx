@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { Job, BusinessProfile, Invoice } from '../types/db';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
-import { getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
+import { getInvoice, getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
 import { fetchWithSupabaseAuth } from '../lib/fetch-with-supabase-auth';
 import { sendInvoice } from '../lib/invoice-send';
 import { getWorkOrderSignatureState } from '../lib/work-order-signature';
@@ -23,12 +23,9 @@ interface InvoiceFinalPageProps {
   onInvoiceUpdated: (invoice: Invoice) => void;
 }
 
-// NOTE: payment_status and paid_at are rendered from the invoiceProp passed by the parent.
-// These fields are only updated via the Stripe webhook handler on the server. A user sitting
-// on this page after a payment completes will not see the Paid badge until they navigate away
-// and back. There is no polling or realtime subscription here. If real-time payment confirmation
-// becomes a priority, add a polling interval or a Supabase realtime channel subscription on
-// the invoices row keyed by invoice.id.
+// NOTE: payment_status and paid_at come from Postgres (Stripe webhook updates the row).
+// On mount we refetch the invoice once so opening this page picks up webhook-updated state
+// without requiring a full navigation away and back.
 export function InvoiceFinalPage({
   invoice: invoiceProp,
   job,
@@ -52,6 +49,10 @@ export function InvoiceFinalPage({
 
   const documentRef = useRef<HTMLDivElement | null>(null);
   const paymentLinkCopiedTimeoutRef = useRef<number | null>(null);
+  const onInvoiceUpdatedRef = useRef(onInvoiceUpdated);
+  useEffect(() => {
+    onInvoiceUpdatedRef.current = onInvoiceUpdated;
+  }, [onInvoiceUpdated]);
 
   const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
   const businessStatus = getInvoiceBusinessStatus(invoiceProp);
@@ -77,6 +78,12 @@ export function InvoiceFinalPage({
   useEffect(() => {
     setNotesDraft(invoiceProp.notes ?? '');
   }, [invoiceProp.id, invoiceProp.notes]);
+
+  useEffect(() => {
+    void getInvoice(invoiceProp.id).then((row) => {
+      if (row) onInvoiceUpdatedRef.current(row);
+    });
+  }, [invoiceProp.id]);
 
   useEffect(() => {
     return () => {

@@ -34,8 +34,7 @@ import {
   downloadSignedDocumentFile,
 } from '../lib/esign-api';
 import { getJobById, updateJob } from '../lib/db/jobs';
-import { formatEsignTimestamp, shouldPollEsignStatus } from '../lib/esign-live';
-import { useEsignPoller } from '../hooks/useEsignPoller';
+import { formatEsignTimestamp } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
 import { getWorkOrderSignatureState } from '../lib/work-order-signature';
 import { agreementSectionsToHtml } from '../lib/agreement-sections-html';
@@ -123,6 +122,11 @@ export function WorkOrderDetailPage({
   const changeOrdersSectionRef = useRef<HTMLElement | null>(null);
   const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialScrollHandledRef = useRef(false);
+  /** App passes inline `onJobUpdated` lambdas; keep latest without re-running enter-sync when identity changes. */
+  const onJobUpdatedRef = useRef(onJobUpdated);
+  useEffect(() => {
+    onJobUpdatedRef.current = onJobUpdated;
+  }, [onJobUpdated]);
 
   const [pdfError, setPdfError] = useState('');
   const [esignError, setEsignError] = useState('');
@@ -390,14 +394,26 @@ export function WorkOrderDetailPage({
     }
   }, [job, onJobUpdated]);
 
-  useEsignPoller({
-    enabled: Boolean(job && onJobUpdated) && shouldPollEsignStatus(job?.esign_status ?? 'not_sent'),
-    pollOnce: async () => {
-      const row = await refreshJobRow();
-      if (!row) return false;
-      return shouldPollEsignStatus(row.esign_status);
-    },
-  });
+  /** One-shot DocuSeal/DB sync when the detail surface loads or `jobId` changes (no interval polling). */
+  useEffect(() => {
+    if (jobLoading) return;
+    void (async () => {
+      const row = await getJobById(jobId);
+      if (!row) return;
+      try {
+        const r = await pollWorkOrderEsignStatus(jobId);
+        const updatedJob = mergeEsignResponseIntoJob(row, r);
+        setHydratedJob(updatedJob);
+        onJobUpdatedRef.current?.(updatedJob);
+      } catch {
+        const dbRow = await getJobById(jobId);
+        if (dbRow) {
+          setHydratedJob(dbRow);
+          onJobUpdatedRef.current?.(dbRow);
+        }
+      }
+    })();
+  }, [jobLoading, jobId]);
 
   useEffect(() => {
     return () => {

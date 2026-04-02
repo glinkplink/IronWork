@@ -58,7 +58,7 @@ VITE_GEOAPIFY_API_KEY=...   # optional — job site street autocomplete
 
 ## Server, PDFs, deployment (reality check)
 
-- **Not static-only hosting:** Work order, invoice, and change-order PDFs all need the **Node server** and a **local Chrome/Chromium** binary. The browser posts HTML to **`/api/pdf`** on the **same origin** as the UI. **DocuSeal** send/resend, **status** polling, and inbound **webhooks** use the same app server (`/api/esign/...`, `/api/webhooks/docuseal`).
+- **Not static-only hosting:** Work order, invoice, and change-order PDFs all need the **Node server** and a **local Chrome/Chromium** binary. The browser posts HTML to **`/api/pdf`** on the **same origin** as the UI. **DocuSeal** send/resend, authenticated **status** sync (`GET .../status`), and inbound **webhooks** use the same app server (`/api/esign/...`, `/api/webhooks/docuseal`).
 - **Stripe routes live on the same server:** Edit Profile uses authenticated **`POST /api/stripe/connect/start`** and **`GET /api/stripe/connect/status`** for Connect onboarding and reconciliation. Invoice payment links and **`POST /api/stripe/webhook`** also run on this server.
 - **Single entrypoint:** Use `npm run dev` or `npm run preview` / `NODE_ENV=production node server/app-server.mjs` — there is no supported “Vite-only” production path if you want working downloads.
 - **Operator detail:** Env tables, reverse-proxy notes, and common deployment mistakes → **[README.md](./README.md)** and **[ARCHITECTURE.md](./ARCHITECTURE.md)** (Deployment + Portability).
@@ -125,7 +125,7 @@ src/
     esign-api.ts               # send/resend/status helpers for work orders and change orders
     esign-labels.ts            # E-sign status strings for UI
     esign-progress.ts          # Shared e-sign step/tone model for detail timeline + list strip
-    esign-live.ts              # Shared e-sign polling cadence + in-flight status helpers + timestamp formatting
+    esign-live.ts              # E-sign timestamp formatting for detail UI
     html-escape.ts           # esc() for generated HTML (WO / CO / invoice strings)
     owner-name.ts            # normalize owner full name for profile + preview stubs
     guest-agreement-profile.ts # `BusinessProfile`-shaped stub from guest form fields for agreement preview when no DB profile
@@ -146,7 +146,6 @@ src/
     useAuth.ts               # Supabase auth state listener
     useAuthProfile.ts        # Profile loading + capture redirect handling
     useChangeOrderFlow.ts    # Detail/wizard/detail navigation for change orders
-    useEsignPoller.ts        # Shared timer + visibility wiring for short-lived e-sign polling
     useInvoiceFlow.ts        # Invoice wizard/final page flow state
     useScaledPreview.ts      # 816px preview scaling helpers
     useWorkOrderDraft.ts     # Draft state + next_wo_number refresh after first save; optional onNewDraft (e.g. clear App guest information fields)
@@ -192,12 +191,12 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 - `WorkOrdersPage` keeps the toolbar **Create Work Order** button; treat it as required UI.
 - `WorkOrdersPage` loads row pages from `list_work_orders_dashboard_page` and whole-dataset summary totals from `get_work_orders_dashboard_summary`; the summary is not derived from the currently loaded rows.
 - `WorkOrdersPage` shows a **View & Create Change Orders** link under the client name when `changeOrderCount > 0`, opening work-order detail with scroll to the Change Orders section (no per-CO chips on the list).
-- Work Orders e-sign polling refreshes only loaded in-flight rows; targeted row refresh can still use the older `list_work_orders_dashboard` RPC because `0014` is already applied.
+- The Work Orders list does not periodically refetch dashboard rows; re-open **Work Orders** or navigate away and back to pick up webhook-updated e-sign or invoice badges. The `list_work_orders_dashboard` RPC (`0014`) remains available for targeted refresh if needed.
 - Clicking a work-order row navigates immediately with `jobId`; `WorkOrderDetailPage` loads the full job row locally and shows a loading state while hydrating.
 - `WorkOrderDetailPage` renders a job-level invoice status strip (issued invoice number + paid/offline/invoiced badge) when an invoice exists; CO-level invoice controls are a separate section.
-- Invoice business state: no invoice row shows **Invoice**, an existing invoice with `issued_at = null` shows **Draft**, `issued_at != null` shows **Invoiced** (payment-link creation sets `issued_at`), and `payment_status = 'paid'` shows a **Paid** badge on `InvoiceFinalPage`, `WorkOrdersPage`, and `WorkOrderDetailPage` (set by Stripe webhook; no in-page polling).
+- Invoice business state: no invoice row shows **Invoice**, an existing invoice with `issued_at = null` shows **Draft**, `issued_at != null` shows **Invoiced** (payment-link creation sets `issued_at`), and `payment_status = 'paid'` shows a **Paid** badge on `InvoiceFinalPage`, `WorkOrdersPage`, and `WorkOrderDetailPage` (Stripe webhook updates Postgres; **`InvoiceFinalPage`** refetches the invoice once on mount).
 - `ChangeOrderWizard` now saves the CO, sends the DocuSeal request immediately, then routes to `ChangeOrderDetailPage`; CO business `status` tracks approval lifecycle (`pending_approval` after send/open, `approved` on completed signature, `rejected` on decline).
-- **`jobs.esign_*` and `change_orders.esign_*`:** detail surfaces show e-sign progress, signing actions, and signed artifacts. While e-sign is in-flight, detail pages call **`GET /api/esign/work-orders/:id/status`** or **`GET /api/esign/change-orders/:id/status`** (authenticated) to reconcile DocuSeal into the row; webhooks update the same fields. **Email** subject/body for DocuSeal notifications and **signed PDF** layout are best verified on the **deployed** app (public URL + production-like env), not assumed identical to every local setup.
+- **`jobs.esign_*` and `change_orders.esign_*`:** detail surfaces show e-sign progress, signing actions, and signed artifacts. Opening work-order or change-order detail triggers **one** authenticated **`GET /api/esign/work-orders/:id/status`** or **`GET /api/esign/change-orders/:id/status`** (plus send/resend flows that already refresh); **webhooks** update the same fields. **Email** subject/body for DocuSeal notifications and **signed PDF** layout are best verified on the **deployed** app (public URL + production-like env), not assumed identical to every local setup.
 - **Offline signature:** Work orders can be manually marked as signed offline via `jobs.offline_signed_at`. This is a signature-satisfied state alongside DocuSeal `completed`. Invoice issuance (payment-link creation and send) is blocked until the parent work order is signature-satisfied. Invoice drafts can be created regardless of signature state.
 
 **`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).

@@ -9,6 +9,7 @@ import { InvoiceFinalPage } from '../InvoiceFinalPage';
 const fetchInvoicePdfBlob = vi.fn();
 const downloadPdfBlobToFile = vi.fn();
 const updateInvoice = vi.fn();
+const getInvoice = vi.fn();
 
 vi.mock('../../lib/agreement-pdf', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/agreement-pdf')>();
@@ -24,6 +25,7 @@ vi.mock('../../lib/db/invoices', async (importOriginal) => {
   return {
     ...actual,
     updateInvoice: (...args: unknown[]) => updateInvoice(...args),
+    getInvoice: (...args: unknown[]) => getInvoice(...args),
   };
 });
 
@@ -182,6 +184,7 @@ describe('InvoiceFinalPage', () => {
     fetchInvoicePdfBlob.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }));
     downloadPdfBlobToFile.mockResolvedValue(undefined);
     updateInvoice.mockResolvedValue({ data: baseInvoice(), error: null });
+    getInvoice.mockImplementation(async (id: string) => baseInvoice({ id }));
   });
 
   afterEach(() => {
@@ -218,5 +221,26 @@ describe('InvoiceFinalPage', () => {
 
     expect(screen.queryByRole('button', { name: /edit invoice/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Download Invoice$/i })).toBeInTheDocument();
+  });
+
+  it('refetches invoice on mount and passes the row to onInvoiceUpdated', async () => {
+    const fresh = baseInvoice({
+      id: 'inv-1',
+      payment_status: 'paid',
+      paid_at: '2025-01-15T12:00:00Z',
+    });
+    getInvoice.mockResolvedValueOnce(fresh);
+    renderPage(baseInvoice({ id: 'inv-1', payment_status: 'unpaid' }));
+
+    await waitFor(() => {
+      expect(getInvoice).toHaveBeenCalledWith('inv-1');
+      expect(onInvoiceUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'inv-1',
+          payment_status: 'paid',
+          paid_at: '2025-01-15T12:00:00Z',
+        })
+      );
+    });
   });
 });
