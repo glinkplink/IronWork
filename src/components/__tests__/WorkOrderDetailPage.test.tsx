@@ -10,7 +10,6 @@ import { ESIGN_POLL_INTERVAL_MS } from '../../lib/esign-live';
 const mockFns = vi.hoisted(() => {
   const listChangeOrders = vi.fn();
   const listInvoiceStatusByChangeOrder = vi.fn();
-  const listInvoiceStatusByJob = vi.fn();
   const getJobById = vi.fn();
   const sendWorkOrderForSignature = vi.fn();
   const resendWorkOrderSignature = vi.fn();
@@ -23,7 +22,8 @@ const mockFns = vi.hoisted(() => {
   return {
     listChangeOrders,
     listInvoiceStatusByChangeOrder,
-    listInvoiceStatusByJob: vi.fn(async (userId: string) => ({
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    listInvoiceStatusByJob: vi.fn(async (_userId: string) => ({
       data: jobInvoiceState.data,
       error: jobInvoiceState.error,
       warning: null,
