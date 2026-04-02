@@ -189,31 +189,48 @@ export function InvoiceWizard({
     setCoInitJobId(job.id);
   }, [changeOrdersOnJob, existingInvoice, isChangeOrderInvoice, changeOrder, job.id, coInitJobId]);
 
-  const selectedCOs = existingInvoice
-    ? []
-    : changeOrdersOnJob.filter((c) =>
-        isChangeOrderInvoice && changeOrder ? c.id === changeOrder.id : selectedCoIds.has(c.id)
-      );
-
-  const mergedLineItems = buildInvoiceLineItems({
-    job,
-    fixedTotal,
-    laborRows,
-    materialsYes: materialsYes === true,
-    materialRows,
-    selectedCOs,
-    includeBaseScope: !isChangeOrderInvoice,
-    existingLineItems: existingInvoice?.line_items,
-  });
-
-  const subtotal = roundCurrency(mergedLineItems.reduce((s, i) => s + i.total, 0));
-  const changeOrderTotal = roundCurrency(
-    mergedLineItems.reduce((sum, line) => sum + (isChangeOrderInvoiceLine(line) ? line.total : 0), 0)
+  const selectedCOs = useMemo(
+    () =>
+      existingInvoice
+        ? []
+        : changeOrdersOnJob.filter((c) =>
+            isChangeOrderInvoice && changeOrder ? c.id === changeOrder.id : selectedCoIds.has(c.id)
+          ),
+    [existingInvoice, changeOrdersOnJob, isChangeOrderInvoice, changeOrder, selectedCoIds]
   );
-  const originalTotal = roundCurrency(subtotal - changeOrderTotal);
-  const taxRate = normalizeTaxRate(percentValueToTaxRate(taxPercent));
-  const tax_amount = roundCurrency(subtotal * taxRate);
-  const total = roundCurrency(subtotal + tax_amount);
+
+  const mergedLineItems = useMemo(
+    () =>
+      buildInvoiceLineItems({
+        job,
+        fixedTotal,
+        laborRows,
+        materialsYes: materialsYes === true,
+        materialRows,
+        selectedCOs,
+        includeBaseScope: !isChangeOrderInvoice,
+        existingLineItems: existingInvoice?.line_items,
+      }),
+    [job, fixedTotal, laborRows, materialsYes, materialRows, selectedCOs, isChangeOrderInvoice, existingInvoice?.line_items]
+  );
+
+  const { subtotal, changeOrderTotal, originalTotal, taxRate, tax_amount, total } = useMemo(() => {
+    const sub = roundCurrency(mergedLineItems.reduce((s, i) => s + i.total, 0));
+    const coTotal = roundCurrency(
+      mergedLineItems.reduce((sum, line) => sum + (isChangeOrderInvoiceLine(line) ? line.total : 0), 0)
+    );
+    const origTotal = roundCurrency(sub - coTotal);
+    const rate = normalizeTaxRate(percentValueToTaxRate(taxPercent));
+    const taxAmt = roundCurrency(sub * rate);
+    return {
+      subtotal: sub,
+      changeOrderTotal: coTotal,
+      originalTotal: origTotal,
+      taxRate: rate,
+      tax_amount: taxAmt,
+      total: roundCurrency(sub + taxAmt),
+    };
+  }, [mergedLineItems, taxPercent]);
   const selectedCOAmountFields =
     !existingInvoice && selectedCOs.length > 0 ? (
       <div className="invoice-co-amounts-grid">

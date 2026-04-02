@@ -52,12 +52,12 @@ describe('AgreementDocumentSections', () => {
     ],
   };
 
-  it('shows guest SP placeholders when showGuestServiceProviderPlaceholders', () => {
+  it('shows guest SP placeholders when isAnonymousPreview', () => {
     render(
       <div className="agreement-document">
         <AgreementDocumentSections
           sections={[partiesSectionEmptySp]}
-          showGuestServiceProviderPlaceholders
+          isAnonymousPreview
         />
       </div>
     );
@@ -65,7 +65,7 @@ describe('AgreementDocumentSections', () => {
     expect(screen.getAllByText('(Will be filled in at final step)')).toHaveLength(2);
   });
 
-  it('omits guest SP placeholders when showGuestServiceProviderPlaceholders is false', () => {
+  it('omits guest SP placeholders when isAnonymousPreview is false', () => {
     render(
       <div className="agreement-document">
         <AgreementDocumentSections sections={[partiesSectionEmptySp]} />

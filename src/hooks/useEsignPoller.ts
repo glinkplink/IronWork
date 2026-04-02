@@ -32,7 +32,12 @@ export function useEsignPoller({ enabled, pollOnce }: UseEsignPollerOptions) {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         return;
       }
-      const shouldContinue = await pollOnceRef.current();
+      let shouldContinue = true;
+      try {
+        shouldContinue = await pollOnceRef.current();
+      } catch (err) {
+        console.error('[useEsignPoller] poll error (will retry):', err);
+      }
       if (cancelled) return;
       if (shouldContinue) {
         schedule();

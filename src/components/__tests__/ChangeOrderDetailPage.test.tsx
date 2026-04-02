@@ -1,12 +1,30 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, act } from '@testing-library/react';
 import type { BusinessProfile, ChangeOrder, Job } from '../../types/db';
 import { ChangeOrderDetailPage } from '../ChangeOrderDetailPage';
+import * as esignApi from '../../lib/esign-api';
 
 vi.mock('../../lib/change-order-generator', () => ({
   generateChangeOrderHtml: () => '<div>Change Order Preview</div>',
+}));
+
+vi.mock('../../lib/esign-api', () => ({
+  sendChangeOrderForSignature: vi.fn(),
+  resendChangeOrderSignature: vi.fn(),
+  mergeEsignResponseIntoChangeOrder: vi.fn((_co: ChangeOrder, r: ChangeOrder) => r),
+  pollChangeOrderEsignStatus: vi.fn(),
+  downloadSignedDocumentFile: vi.fn(),
+}));
+
+vi.mock('../../lib/docuseal-signature-image', () => ({
+  buildDocusealProviderSignatureImage: vi.fn(() => Promise.resolve('')),
+}));
+
+vi.mock('../../lib/db/change-orders', () => ({
+  deleteChangeOrder: vi.fn(),
+  getChangeOrderById: vi.fn(() => Promise.resolve(null)),
 }));
 
 function minimalProfile(): BusinessProfile {
@@ -98,6 +116,37 @@ function minimalJob(): Job {
   };
 }
 
+function unsentChangeOrder(): ChangeOrder {
+  return {
+    id: 'co-1',
+    user_id: 'u1',
+    job_id: 'job-1',
+    co_number: 1,
+    description: 'Add support',
+    reason: 'Needed for fit-up',
+    status: 'pending_approval',
+    requires_approval: true,
+    line_items: [],
+    time_amount: 0,
+    time_unit: 'hours',
+    time_note: '',
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    esign_submission_id: null,
+    esign_submitter_id: null,
+    esign_embed_src: null,
+    esign_status: 'not_sent',
+    esign_submission_state: null,
+    esign_submitter_state: null,
+    esign_sent_at: null,
+    esign_opened_at: null,
+    esign_completed_at: null,
+    esign_declined_at: null,
+    esign_decline_reason: null,
+    esign_signed_document_url: null,
+  };
+}
+
 function changeOrderWithEsign(status: ChangeOrder['esign_status']): ChangeOrder {
   const co: ChangeOrder = {
     id: 'co-1',
@@ -170,5 +219,76 @@ describe('ChangeOrderDetailPage', () => {
 
     expect(screen.queryByRole('button', { name: /copy signing link/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /download signed pdf/i })).toBeInTheDocument();
+  });
+
+  it('disables Edit and Delete while send for signature is in-flight', async () => {
+    let resolveSend!: () => void;
+    const pendingSend = new Promise<never>((resolve) => {
+      resolveSend = resolve as () => void;
+    });
+    vi.mocked(esignApi.sendChangeOrderForSignature).mockReturnValue(pendingSend);
+
+    render(
+      <ChangeOrderDetailPage
+        userId="u1"
+        co={unsentChangeOrder()}
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
+    );
+
+    const sendBtn = screen.getByRole('button', { name: /send for signature/i });
+    await act(async () => {
+      fireEvent.click(sendBtn);
+    });
+
+    expect(screen.getByRole('button', { name: /edit/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /delete/i })).toBeDisabled();
+
+    // cleanup pending promise to avoid unhandled rejection
+    resolveSend();
+  });
+
+  it('re-enables Edit and Delete after send for signature completes', async () => {
+    vi.mocked(esignApi.sendChangeOrderForSignature).mockResolvedValue({
+      jobId: 'job-1',
+      coId: 'co-1',
+      esign_submission_id: 'sub-1',
+      esign_submitter_id: 'submitter-1',
+      esign_embed_src: 'https://example.com/sign',
+      esign_status: 'sent',
+      esign_submission_state: 'sent',
+      esign_submitter_state: 'sent',
+      esign_sent_at: '2025-01-01T08:00:00Z',
+      esign_resent_at: null,
+      esign_opened_at: null,
+      esign_completed_at: null,
+      esign_declined_at: null,
+      esign_decline_reason: null,
+      esign_signed_document_url: null,
+    });
+
+    render(
+      <ChangeOrderDetailPage
+        userId="u1"
+        co={unsentChangeOrder()}
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
+    );
+
+    const sendBtn = screen.getByRole('button', { name: /send for signature/i });
+    await act(async () => {
+      fireEvent.click(sendBtn);
+    });
+
+    expect(screen.getByRole('button', { name: /edit/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /delete/i })).not.toBeDisabled();
   });
 });

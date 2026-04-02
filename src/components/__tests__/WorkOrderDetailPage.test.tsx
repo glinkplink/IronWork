@@ -492,6 +492,39 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByLabelText('Customer signature status: Opened')).toBeInTheDocument();
   });
 
+  it('passes the custom DocuSeal message on work-order resend', async () => {
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        jobId="job-1"
+        job={{
+          ...jobWithEsign('sent'),
+          customer_email: 'customer@example.com',
+          esign_submitter_id: 'submitter-1',
+        }}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+
+    await act(async () => {
+      screen.getByRole('button', { name: /resend work order/i }).click();
+    });
+
+    await waitFor(() => {
+      expect(mockFns.resendWorkOrderSignature).toHaveBeenCalledWith(
+        'job-1',
+        expect.objectContaining({
+          subject: expect.stringContaining('Work Order to sign'),
+          body: expect.stringContaining('{{submitter.link}}'),
+        })
+      );
+    });
+  });
+
   it('renders filled active bubbles and timestamp rows without seconds', async () => {
     render(
       <WorkOrderDetailPage

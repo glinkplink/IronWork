@@ -379,6 +379,7 @@ export function ChangeOrderDetailPage({
         <button
           type="button"
           className="btn-secondary btn-large work-order-detail-download"
+          disabled={coEsignBusy}
           onClick={() => onEdit(co)}
         >
           Edit
@@ -394,6 +395,7 @@ export function ChangeOrderDetailPage({
         <button
           type="button"
           className="btn-secondary btn-large work-order-detail-download"
+          disabled={coEsignBusy}
           onClick={() => void handleDelete()}
         >
           Delete

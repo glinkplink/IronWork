@@ -17,7 +17,10 @@ import {
   getWorkOrderHeaderLabel,
   downloadPdfBlobToFile,
 } from '../lib/agreement-pdf';
-import { buildDocusealWorkOrderHtmlDocument } from '../lib/docuseal-agreement-html';
+import {
+  buildDocusealWorkOrderHtmlDocument,
+  buildWorkOrderEsignNotificationMessage,
+} from '../lib/docuseal-agreement-html';
 import {
   buildDocusealEsignFooterLine,
   buildDocusealHtmlFooter,
@@ -31,7 +34,6 @@ import {
   downloadSignedDocumentFile,
 } from '../lib/esign-api';
 import { getJobById, updateJob } from '../lib/db/jobs';
-import { jobLocationSingleLine } from '../lib/job-site-address';
 import { formatEsignTimestamp, shouldPollEsignStatus } from '../lib/esign-live';
 import { useEsignPoller } from '../hooks/useEsignPoller';
 import { getEsignProgressModel } from '../lib/esign-progress';
@@ -427,15 +429,6 @@ export function WorkOrderDetailPage({
     });
     const header = buildDocusealHtmlHeader(getWorkOrderHeaderLabel(welderJob));
     const footer = buildDocusealHtmlFooter(buildDocusealEsignFooterLine(profile, welderJob));
-    const contractorName = profile?.business_name ?? 'Your Contractor';
-    const signerName = profile?.owner_name ?? contractorName;
-    const customerFirst = welderJob.customer_name.split(' ')[0] || welderJob.customer_name;
-    const rawType = (welderJob.job_type || '').trim().toLowerCase();
-    const jobTypeLabel = rawType === 'other'
-      ? ((welderJob.other_classification ?? '').trim() || 'work')
-      : (rawType || 'work');
-    const jobTypeCap = jobTypeLabel.charAt(0).toUpperCase() + jobTypeLabel.slice(1);
-    const location = jobLocationSingleLine(welderJob.job_location);
     return {
       name: `Work Order #${wo}`,
       send_email: true,
@@ -447,10 +440,7 @@ export function WorkOrderDetailPage({
           html_footer: footer,
         },
       ],
-      message: {
-        subject: `${contractorName} sent you a Work Order to sign — WO #${wo}`,
-        body: `Hi ${customerFirst},\n\n${contractorName} has prepared a Work Order for your ${jobTypeCap} project${location ? ` at ${location}` : ''} and is requesting your signature.\n\nReference: Work Order #${wo}\n\nPlease review and sign using the link below:\n\n{{submitter.link}}\n\nThank you,\n${signerName}\n${contractorName}`,
-      },
+      message: buildWorkOrderEsignNotificationMessage(welderJob, profile),
     };
   };
 
@@ -478,7 +468,11 @@ export function WorkOrderDetailPage({
     setEsignError('');
     setEsignBusy(true);
     try {
-      const r = await resendWorkOrderSignature(job.id);
+      const welderJob = jobRowToWelderJob(job, profile);
+      const r = await resendWorkOrderSignature(
+        job.id,
+        buildWorkOrderEsignNotificationMessage(welderJob, profile)
+      );
       onJobUpdated?.(mergeEsignResponseIntoJob(job, r));
       await refreshJobRow();
     } catch (e) {

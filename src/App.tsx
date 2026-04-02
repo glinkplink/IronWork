@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { JobForm } from './components/JobForm';
 import { AuthPage } from './components/AuthPage';
 import { BusinessProfileForm } from './components/BusinessProfileForm';
@@ -62,11 +62,44 @@ function scheduleIdleTask(task: () => void): () => void {
   return () => window.clearTimeout(timeoutId);
 }
 
+// Manual verification only — React error boundaries are not easily testable without dedicated libraries.
+class LazyPageErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown, info: unknown) {
+    console.error('[LazyPageErrorBoundary] Uncaught render error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="app-loading" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+          <p style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>Something went wrong.</p>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function renderLazyPage(page: ReactNode) {
   return (
-    <Suspense fallback={<div className="app-loading">Loading...</div>}>
-      {page}
-    </Suspense>
+    <LazyPageErrorBoundary>
+      <Suspense fallback={<div className="app-loading">Loading...</div>}>
+        {page}
+      </Suspense>
+    </LazyPageErrorBoundary>
   );
 }
 

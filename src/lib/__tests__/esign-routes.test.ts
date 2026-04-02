@@ -729,10 +729,20 @@ describe('tryHandleEsignRoute', () => {
       url: `/api/esign/work-orders/${JOB_UUID}/resend`,
       headers: { authorization: 'Bearer good-token' },
     };
-    await tryHandleEsignRoute(req as never, res as never, defaultHelpers());
+    await tryHandleEsignRoute(
+      req as never,
+      res as never,
+      defaultHelpers(async () => ({
+        message: { subject: 'Please sign', body: 'Message body' },
+      }))
+    );
     expect(res.status).toBe(200);
     const putCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes('/submitters/77'));
     expect(putCalls.length).toBe(1);
+    expect(JSON.parse(String(putCalls[0]?.[1]?.body))).toEqual({
+      send_email: true,
+      message: { subject: 'Please sign', body: 'Message body' },
+    });
   });
 
   it('resend reconciles signed state when DocuSeal says submitter already completed', async () => {

@@ -160,6 +160,33 @@ describe('JobForm payment terms', () => {
     expect(onGoToPreview).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent(/payment terms|days/i);
   });
+
+  it('keeps error visible after re-focus; clears error when valid value entered', async () => {
+    const user = userEvent.setup();
+    render(
+      <JobForm
+        job={{ ...baseJob, payment_terms_days: 21, late_fee_rate: 1.5 }}
+        onChange={vi.fn()}
+      />
+    );
+
+    const daysInput = screen.getByPlaceholderText('14');
+
+    // Type invalid value and blur — error should appear
+    await user.clear(daysInput);
+    await user.type(daysInput, 'abc');
+    await user.tab(); // triggers blur → marks touched → validates → error
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    // Re-focus the field — error stays visible
+    await user.click(daysInput);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    // Fix the value — error clears immediately
+    await user.clear(daysInput);
+    await user.type(daysInput, '30');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });
 
 describe('JobForm Your Information (no profile)', () => {

@@ -94,6 +94,32 @@ describe('useEsignPoller', () => {
     expect(pollOnce).toHaveBeenCalledTimes(1);
   });
 
+  it('continues polling after the callback throws, logging the error', async () => {
+    vi.useFakeTimers();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const err = new Error('DB failure');
+    const pollOnce = vi.fn<() => Promise<boolean>>()
+      .mockRejectedValueOnce(err)
+      .mockResolvedValue(true);
+
+    render(<PollerHarness enabled pollOnce={pollOnce} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    });
+    expect(pollOnce).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('[useEsignPoller]'),
+      err
+    );
+
+    // poller should schedule next tick and poll again
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESIGN_POLL_INTERVAL_MS);
+    });
+    expect(pollOnce).toHaveBeenCalledTimes(2);
+  });
+
   it('does not double-poll when becoming visible after hidden; interval continues once', async () => {
     vi.useFakeTimers();
     Object.defineProperty(document, 'visibilityState', {

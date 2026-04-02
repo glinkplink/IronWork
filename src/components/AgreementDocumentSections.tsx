@@ -6,13 +6,13 @@ const GUEST_SP_PLACEHOLDER = '(Will be filled in at final step)';
 interface AgreementDocumentSectionsProps {
   sections: AgreementSection[];
   /** Anonymous preview before capture — empty SP name/email show placeholders. */
-  showGuestServiceProviderPlaceholders?: boolean;
+  isAnonymousPreview?: boolean;
 }
 
 /** Renders agreement body sections (same markup as preview/PDF). Parent supplies `.agreement-document` wrapper + ref for PDF. */
 export function AgreementDocumentSections({
   sections,
-  showGuestServiceProviderPlaceholders = false,
+  isAnonymousPreview = false,
 }: AgreementDocumentSectionsProps) {
   return (
     <>
@@ -54,9 +54,9 @@ export function AgreementDocumentSections({
                 const spNameBlank = !sp.businessName.trim();
                 const spEmailBlank = !(sp.email ?? '').trim();
                 const spNameCell =
-                  showGuestServiceProviderPlaceholders && spNameBlank ? GUEST_SP_PLACEHOLDER : sp.businessName;
+                  isAnonymousPreview && spNameBlank ? GUEST_SP_PLACEHOLDER : sp.businessName;
                 const spEmailCell =
-                  showGuestServiceProviderPlaceholders && spEmailBlank ? GUEST_SP_PLACEHOLDER : sp.email;
+                  isAnonymousPreview && spEmailBlank ? GUEST_SP_PLACEHOLDER : sp.email;
                 return (
                   <div key={`${block.type}-${bi}`} className="parties-layout">
                     <div className="parties-plain">
@@ -85,7 +85,7 @@ export function AgreementDocumentSections({
                         <tr>
                           <td className="table-label">Name</td>
                           <td
-                            className={`table-value${showGuestServiceProviderPlaceholders && spNameBlank ? ' parties-guest-preview-placeholder' : ''}`}
+                            className={`table-value${isAnonymousPreview && spNameBlank ? ' parties-guest-preview-placeholder' : ''}`}
                           >
                             {spNameCell}
                           </td>
@@ -99,7 +99,7 @@ export function AgreementDocumentSections({
                         <tr>
                           <td className="table-label">Email</td>
                           <td
-                            className={`table-value${showGuestServiceProviderPlaceholders && spEmailBlank ? ' parties-guest-preview-placeholder' : ''}`}
+                            className={`table-value${isAnonymousPreview && spEmailBlank ? ' parties-guest-preview-placeholder' : ''}`}
                           >
                             {spEmailCell}
                           </td>

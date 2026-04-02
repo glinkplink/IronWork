@@ -1,6 +1,8 @@
-import type { AgreementSection, SectionContentBlock, SignatureBlockData } from '../types';
+import type { AgreementSection, SectionContentBlock, SignatureBlockData, WelderJob } from '../types';
+import type { BusinessProfile } from '../types/db';
 import { esc } from './html-escape';
 import { DOCUSEAL_CUSTOMER_ROLE } from './docuseal-constants';
+import { jobLocationSingleLine } from './job-site-address';
 
 /** MM/DD/YYYY for DocuSeal `date-field` default_value (US). */
 export function docusealUsDateToday(): string {
@@ -239,4 +241,26 @@ ${inner}
 </div>
 </body>
 </html>`;
+}
+
+/** DocuSeal `message` for work-order send/resend (no HTML document build). */
+export function buildWorkOrderEsignNotificationMessage(
+  job: WelderJob,
+  profile: BusinessProfile | null
+): { subject: string; body: string } {
+  const wo = String(job.wo_number).padStart(4, '0');
+  const contractorName = profile?.business_name ?? 'Your Contractor';
+  const signerName = profile?.owner_name ?? contractorName;
+  const customerFirst = job.customer_name.split(' ')[0] || job.customer_name;
+  const rawType = (job.job_type || '').trim().toLowerCase();
+  const jobTypeLabel = rawType === 'other'
+    ? ((job.other_classification ?? '').trim() || 'work')
+    : (rawType || 'work');
+  const jobTypeCap = jobTypeLabel.charAt(0).toUpperCase() + jobTypeLabel.slice(1);
+  const location = jobLocationSingleLine(job.job_location);
+
+  return {
+    subject: `${contractorName} sent you a Work Order to sign - WO #${wo}`,
+    body: `Hi ${customerFirst},\n\n${contractorName} has prepared a Work Order for your ${jobTypeCap} project${location ? ` at ${location}` : ''} and is requesting your signature.\n\nReference: Work Order #${wo}\n\nPlease review and sign using the link below:\n\n{{submitter.link}}\n\nThank you,\n${signerName}\n${contractorName}`,
+  };
 }

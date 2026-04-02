@@ -199,6 +199,7 @@ export function JobForm({
     daysToPreset(job.payment_terms_days)
   );
   const [paymentTermsDaysError, setPaymentTermsDaysError] = useState<string | null>(null);
+  const paymentTermsDaysTouched = useRef(false);
   const [lateFeeRateError, setLateFeeRateError] = useState<string | null>(null);
   /** Only re-copy job → raw strings when job payment fields actually change (avoids StrictMode / effect wiping user edits). */
   const lastSyncedPaymentFromJob = useRef({
@@ -685,6 +686,7 @@ export function JobForm({
     const preset = e.target.value as PaymentTermsPreset;
     const days = presetToDays(preset);
     setPaymentTermsDaysError(null);
+    paymentTermsDaysTouched.current = false;
     if (days != null) {
       updateField('payment_terms_days', days);
       setRawCustomPaymentDays(String(days));
@@ -698,16 +700,22 @@ export function JobForm({
   const handleCustomPaymentDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const s = e.target.value;
     setRawCustomPaymentDays(s);
-    setPaymentTermsDaysError(null);
     const trimmed = s.trim();
-    if (trimmed === '') return;
+    if (trimmed === '') {
+      if (paymentTermsDaysTouched.current) setPaymentTermsDaysError(null);
+      return;
+    }
     const n = parseInt(trimmed, 10);
     if (Number.isInteger(n) && validatePaymentTermsDays(n) === null) {
       updateField('payment_terms_days', n);
+      if (paymentTermsDaysTouched.current) setPaymentTermsDaysError(null);
+    } else if (paymentTermsDaysTouched.current) {
+      setPaymentTermsDaysError(validatePaymentTermsDays(n));
     }
   };
 
   const handleCustomPaymentDaysBlur = () => {
+    paymentTermsDaysTouched.current = true;
     const trimmed = rawCustomPaymentDays.trim();
     if (trimmed === '') {
       // Keep empty until user fills or Preview validates — do not snap back (blur runs before Preview click).
