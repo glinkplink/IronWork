@@ -82,7 +82,7 @@ Everything in this section requires action outside the codebase — Stripe dashb
 - [ ] **No error tracking (Sentry or equivalent)** — server-side Puppeteer crashes, Stripe API errors, and DocuSeal failures are silent. No alerting, no stack traces in a dashboard. You'll only notice problems when users report them or you check logs manually.
 - [ ] **No structured logging on Stripe webhook** — payment events (paid, failed, amount mismatch) currently log nothing; debugging billing issues in prod requires reading raw Render logs
 - [ ] **Stripe webhook idempotency audit trail** — the `payment_status` DB update is idempotent, but duplicate events from Stripe retries are silently dropped with no log entry
-- [ ] **`Paid` badge not visible on Work Orders dashboard** — `payment_status = 'paid'` only shows on `InvoiceFinalPage`; the list view has no indicator that a job has been paid
+- [ ] **`Paid` status is still missing on Work Order detail** — `payment_status = 'paid'` now shows on `WorkOrdersPage` and `InvoiceFinalPage`, but `WorkOrderDetailPage` still does not surface that state
 
 ---
 
@@ -96,7 +96,8 @@ Run these manually or automate as integration tests before marking a deploy heal
 - [ ] Download PDF (work order) → file opens correctly
 - [ ] Send for Signature → DocuSeal email received → sign → work order status updates in dashboard
 - [ ] Create Invoice → wizard completes → InvoiceFinalPage shows payment link button
-- [ ] Click "Get Payment Link" → link generated and copied to clipboard
+- [ ] Click "Create Payment Link" → link generated and copied to clipboard
+- [ ] Mark test invoice as paid via Stripe webhook/test flow → Work Orders dashboard shows `Paid`
 - [ ] Edit Profile → Stripe section visible → "Connect Stripe" button present
 - [ ] Click "Connect Stripe" → redirects to Stripe onboarding (test mode)
 - [ ] Complete onboarding → returns to app → profile shows "Connected"
@@ -107,7 +108,7 @@ Run these manually or automate as integration tests before marking a deploy heal
 
 These are not blockers but are the next logical increments:
 
-1. **`Paid` badge on Work Orders dashboard** — surface `payment_status = 'paid'` visually on the work order list and detail
+1. **`Paid` status on Work Order detail** — surface invoice `payment_status = 'paid'` on `WorkOrderDetailPage`, not just `WorkOrdersPage` and `InvoiceFinalPage`
 2. **Error tracking (Sentry or equivalent)** — server-side crash visibility, alerting, stack traces
 3. **Structured Stripe webhook logging** — audit trail for payment events
 4. **Change order invoice billing rules** — decide whether paid COs appear as informational rows on final WO invoices
