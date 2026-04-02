@@ -5,10 +5,10 @@ import { render, screen } from '@testing-library/react';
 import { HomePage } from '../HomePage';
 
 describe('HomePage', () => {
-  it('renders the greeting, headline, and CTA without the old subheading', () => {
-    render(<HomePage onCreateAgreement={vi.fn()} ownerName="Casey" />);
+  it('renders headline, subheading, and CTA without the old tagline', () => {
+    render(<HomePage onCreateAgreement={vi.fn()} />);
 
-    expect(screen.getByText('Welcome back, Casey')).toBeInTheDocument();
+    expect(screen.getByText(/Stop working for free/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Cover your ass.' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create Work Order' })).toBeInTheDocument();
     expect(screen.queryByText(/Work orders that keep your backend clean/i)).not.toBeInTheDocument();

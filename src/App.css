@@ -831,7 +831,7 @@ body {
 
 .header-work-orders-link {
   font-family: inherit;
-  font-size: 0.6875rem;
+  font-size: calc(0.6875rem + 3px);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -909,8 +909,8 @@ body {
 }
 
 .btn-header-settings-icon {
-  width: 20px;
-  height: 20px;
+  width: 23px;
+  height: 23px;
   flex-shrink: 0;
 }
 
@@ -1081,13 +1081,21 @@ body {
 
 .app-footer {
   background: #111110;
-  color: #5A5650;
+  color: #ebe9e4;
   padding: var(--space-md);
   text-align: center;
-  font-size: 0.75rem;
+  font-size: calc(0.75rem + 2px);
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.app-footer p {
+  margin: 0;
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.45;
 }
 
 /* ─── Modal ──────────────────────────────────────────── */
@@ -1130,13 +1138,36 @@ body {
   justify-content: flex-end;
 }
 
+/* Match .header-work-orders-link metrics so signed-out header matches signed-in (size + caps) */
 .header-sign-in-link {
-  background: none;
-  border: none;
+  font-family: inherit;
+  font-size: calc(0.6875rem + 3px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--primary-light);
-  font-size: 0.9rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.4rem 0.45rem;
+  margin: 0;
   cursor: pointer;
-  padding: 0.25rem 0.5rem;
+  transition: color 0.15s, opacity 0.15s, text-decoration 0.15s;
+}
+
+.header-sign-in-link:hover {
+  color: var(--accent-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.header-sign-in-link:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.header-sign-in-link:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
 }
 
 /* ─── Print ──────────────────────────────────────────── */
@@ -1224,10 +1255,17 @@ body {
   }
 
   .header-work-orders-link {
-    font-size: 0.8125rem;
+    font-size: calc(0.8125rem + 3px);
     font-weight: 700;
     letter-spacing: 0.06em;
     opacity: 1;
+    padding: 0.5rem 0.6rem;
+  }
+
+  .header-sign-in-link {
+    font-size: calc(0.8125rem + 3px);
+    font-weight: 700;
+    letter-spacing: 0.06em;
     padding: 0.5rem 0.6rem;
   }
 
@@ -1236,8 +1274,8 @@ body {
   }
 
   .btn-header-settings-icon {
-    width: 24px;
-    height: 24px;
+    width: 27px;
+    height: 27px;
   }
 
   .invoice-flow-section-title {

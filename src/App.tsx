@@ -271,10 +271,7 @@ function App() {
   const showTabs = view === 'form' || view === 'preview';
 
   const homePageEl = (
-    <HomePage
-      onCreateAgreement={draftFlow.createNewAgreement}
-      ownerName={profile?.owner_name || profile?.business_name}
-    />
+    <HomePage onCreateAgreement={draftFlow.createNewAgreement} />
   );
 
   function renderView(): ReactNode {
@@ -542,7 +539,7 @@ function App() {
       <main className="app-main">{renderView()}</main>
 
       <footer className="app-footer">
-        <p>IronWork - Protect Your Work</p>
+        <p>IronWork - Built for contractors who are tired of getting burned.</p>
       </footer>
 
       {draft.showUnsavedModal && (
