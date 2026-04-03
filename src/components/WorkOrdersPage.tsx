@@ -16,39 +16,18 @@ import { getInvoice, getInvoiceBusinessStatus } from '../lib/db/invoices';
 import { useWorkOrderRowActions } from '../hooks/useWorkOrderRowActions';
 import { getEsignProgressModel } from '../lib/esign-progress';
 import { getWorkOrderSignatureState } from '../lib/work-order-signature';
+import {
+  formatUsd,
+  formatWorkOrderDashboardRowDate,
+  formatWorkOrderDashboardWoLabel,
+} from '../lib/work-order-dashboard-display';
 import './WorkOrdersPage.css';
 
 const HIDE_COMPLETE_PROFILE_CTA_PREFIX = 'scope-lock-hide-complete-profile-cta:';
 const WORK_ORDERS_PAGE_SIZE = 25;
 
-const USD_FORMATTER = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-
-const ROW_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-});
-
 function hasBusinessPhone(profile: BusinessProfile | null): boolean {
   return Boolean(profile?.phone?.replace(/\D/g, '').length);
-}
-
-function formatUsd(amount: number | null | undefined): string {
-  if (typeof amount !== 'number' || !Number.isFinite(amount)) return '—';
-  return USD_FORMATTER.format(amount);
-}
-
-function formatRowDate(job: WorkOrderDashboardJob): string {
-  const raw = job.agreement_date || job.created_at?.split('T')[0] || '';
-  if (!raw) return '—';
-  const [y, m, d] = raw.split('-').map(Number);
-  if (!y || !m || !d) return raw;
-  return ROW_DATE_FORMATTER.format(new Date(y, m - 1, d));
 }
 
 function renderEsignStrip(
@@ -131,10 +110,9 @@ const WorkOrderRow = memo(function WorkOrderRow({
   onStartInvoice,
   onOpenPendingInvoice,
 }: WorkOrderRowProps) {
-  const woLabel =
-    job.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : 'WO (no #)';
+  const woLabel = formatWorkOrderDashboardWoLabel(job);
   const invoice = job.latestInvoice;
-  const jobMetaLabel = formatRowDate(job);
+  const jobMetaLabel = formatWorkOrderDashboardRowDate(job);
 
   return (
     <li className="work-orders-row">

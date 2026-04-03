@@ -83,8 +83,8 @@ src/
     BusinessProfileForm.css  # BusinessProfileForm-only styles
     CaptureModal.tsx         # Anonymous Download & Save / Send: account fields + optional “Save defaults?” onboarding opt-in
     CaptureModal.css         # CaptureModal-only styles
-    HomePage.tsx             # Home after login; “Create Work Order”
-    HomePage.css             # HomePage-only styles
+    HomePage.tsx             # Guest hero + signed-in dashboard (summary + recent WOs via same RPCs as list); clears dashboard state on sign-out
+    HomePage.css             # HomePage-only styles (Forge dashboard + guest hero)
     JobForm.tsx              # Work agreement form (structured job site + Geoapify autocomplete); optional “Your Information” when no profile
     JobForm.css              # JobForm-only styles
     AgreementPreview.tsx     # Preview + Download & Save / Save & Send / PDF; hosts CaptureModal when anonymous
@@ -138,6 +138,7 @@ src/
     invoice-line-items.ts    # Invoice line item parsing, validation, source types
     payment-terms.ts         # Payment terms presets + validators
     work-order-list-label.ts # Job type display formatting for Work Orders list
+    work-order-dashboard-display.ts # Shared USD / WO label / row date + compact status badge (Home + Work Orders list)
     payment-methods.ts, tax.ts, defaults.ts
     db/
       profile.ts             # getProfile, upsertProfile, updateNextWoNumber
@@ -193,6 +194,8 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 **Signed in but no `business_profiles` row** (edge case): full-screen **BusinessProfileForm** until a profile exists.
 
 **After sign-in (with profile):** **Home**, **Work Orders**, **gear (Edit profile)**; session persists via Supabase (refresh-safe).
+
+**Home (signed in):** Loads `get_work_orders_dashboard_summary` plus the first page of `list_work_orders_dashboard_page` (small limit for “recent” rows). Failed load shows a single error with **Retry** (both RPCs re-run). Opening work-order detail from Home still returns via **Work Orders** when using **Back** (no `backTarget` stack yet).
 
 **Work Orders details worth remembering:**
 - `WorkOrdersPage` shows **Contract value** rollups from `job.price`, not invoice totals.

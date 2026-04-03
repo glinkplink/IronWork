@@ -273,7 +273,13 @@ function App() {
   const showHeaderNavLinks = Boolean(user && !profile);
 
   const homePageEl = (
-    <HomePage onCreateAgreement={draftFlow.createNewAgreement} />
+    <HomePage
+      userId={user?.id ?? null}
+      profile={profile ?? null}
+      onCreateAgreement={draftFlow.createNewAgreement}
+      onOpenWorkOrders={openWorkOrders}
+      onOpenWorkOrderDetail={(jobId) => handleOpenWorkOrderDetail(jobId, 'top')}
+    />
   );
 
   function renderView(): ReactNode {

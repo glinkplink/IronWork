@@ -146,7 +146,7 @@ scope-lock/
 │   │   ├── BusinessProfileForm.tsx   # Signed-in user with no profile row (edge case)
 │   │   ├── CaptureModal.tsx          # Anonymous first Download & Save / Send: account + optional defaults opt-in
 │   │   ├── EditProfilePage.tsx       # Edit profile + agreement defaults
-│   │   ├── HomePage.tsx              # Landing; Create Work Order
+│   │   ├── HomePage.tsx              # Guest hero + signed-in dashboard (`get_work_orders_dashboard_summary` + first page of `list_work_orders_dashboard_page` for recent rows)
 │   │   ├── WorkOrdersPage.tsx        # List jobs + invoice actions; row opens detail
 │   │   ├── WorkOrderDetailPage.tsx   # Saved job → agreement + change orders + PDFs + e-sign / offline-sign actions
 │   │   ├── ChangeOrderWizard.tsx     # Create/edit change order (3 steps; saves + sends to DocuSeal on finish)
@@ -268,7 +268,7 @@ First Download & Save → CaptureModal → signUp + upsertProfile (+ optional WO
       ↓
 [Signed in, no profile row] → BusinessProfileForm (rare edge case)
       ↓
-[Signed in + profile] → HomePage; header: Work Orders, Edit profile (gear)
+[Signed in + profile] → HomePage (dashboard summary + recent WOs; **Back** from detail opened here still returns to Work Orders until a `backTarget` stack exists)
       ↓
 Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + change orders + PDFs + offline-sign controls)
                       → Change Order → ChangeOrderWizard → detail (refresh list)

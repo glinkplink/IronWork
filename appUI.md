@@ -132,23 +132,23 @@ These need to be treated as explicit scope decisions before implementation start
 - Signed-in dashboard content needs new props or local data loading.
 
 ### Changes
-- [ ] Replace signed-out state with the new simplified hero
+- [x] Replace signed-out state with the new simplified hero
   - remove current “Cover your ass.” messaging
   - keep a clear single CTA
-- [ ] Add signed-in dashboard state
+- [x] Add signed-in dashboard state
   - greeting
   - stats
   - quick actions
   - recent work orders
-- [ ] Add data plumbing
+- [x] Add data plumbing
   - either fetch summary/recent jobs inside `HomePage`
   - or pass them from `App.tsx`
-- [ ] Add “Work Orders” quick action
-- [ ] Reuse visual card system planned for the Work Orders list
+- [x] Add “Work Orders” quick action
+- [x] Reuse visual card system planned for the Work Orders list
 
 ### Data scope
-- [ ] Use `get_work_orders_dashboard_summary` for totals
-- [ ] Define a concrete source for “recent work orders”
+- [x] Use `get_work_orders_dashboard_summary` for totals
+- [x] Define a concrete source for “recent work orders”
   - either first page of `list_work_orders_dashboard_page`
   - or a dedicated helper
 
@@ -169,6 +169,9 @@ These need to be treated as explicit scope decisions before implementation start
   - open change-orders section
   - invoice entry points
   - profile-completion nudge
+- [ ] Adjust profile-completion nudge dismissal behavior
+  - when the user clicks `Not now`, hide the message immediately
+  - re-show the message 48 hours after dismissal if the business phone is still missing
 
 ### Optional phase 2
 - [ ] Add status chips
