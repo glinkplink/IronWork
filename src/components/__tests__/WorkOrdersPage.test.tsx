@@ -72,6 +72,30 @@ const listJobB: WorkOrderDashboardJob = {
   latestInvoice: null,
 };
 
+const listJobSignedOffline: WorkOrderDashboardJob = {
+  id: 'job-c',
+  wo_number: 3,
+  customer_name: 'Customer C',
+  job_type: 'repair',
+  other_classification: null,
+  agreement_date: '2025-01-03',
+  created_at: '2025-01-03T12:00:00Z',
+  price: 300,
+  esign_status: 'not_sent',
+  offline_signed_at: '2025-01-03T16:00:00Z',
+  changeOrderCount: 0,
+  changeOrderPreview: [],
+  hasInFlightChangeOrders: false,
+  latestInvoice: {
+    id: 'inv-c',
+    job_id: 'job-c',
+    issued_at: '2025-01-04T00:00:00Z',
+    invoice_number: 3,
+    created_at: '2025-01-04T00:00:00Z',
+    payment_status: 'offline',
+  },
+};
+
 function previewCO(
   id: string,
   coNumber: number,
@@ -563,6 +587,137 @@ describe('WorkOrdersPage', () => {
         screen.getByText(/Create your first agreement and it will show up here/)
       ).toBeInTheDocument();
     });
+  });
+
+  it('filters loaded rows by search text only', async () => {
+    const user = userEvent.setup();
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([listJobA, listJobB, listJobSignedOffline])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Customer C');
+    await user.type(
+      screen.getByRole('searchbox', { name: /search loaded work orders/i }),
+      'Customer B'
+    );
+
+    const list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Customer B')).toBeInTheDocument();
+    expect(within(list).queryByText('Customer A')).not.toBeInTheDocument();
+    expect(within(list).queryByText('Customer C')).not.toBeInTheDocument();
+  });
+
+  it('filters by each chip predicate and keeps signed chip inclusive of offline-signed rows', async () => {
+    const user = userEvent.setup();
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        listJobA,
+        {
+          ...listJobB,
+          latestInvoice: {
+            id: 'inv-b',
+            job_id: 'job-b',
+            issued_at: null,
+            invoice_number: 2,
+            created_at: '2025-01-02T00:00:00Z',
+            payment_status: 'unpaid',
+          },
+        },
+        listJobSignedOffline,
+      ])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Customer C');
+
+    await user.click(screen.getByRole('tab', { name: /needs signature/i }));
+    let list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Customer A')).toBeInTheDocument();
+    expect(within(list).getByText('Customer B')).toBeInTheDocument();
+    expect(within(list).queryByText('Customer C')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /^Signed$/i }));
+    list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Customer C')).toBeInTheDocument();
+    expect(within(list).queryByText('Customer A')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /draft invoice/i }));
+    list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Customer B')).toBeInTheDocument();
+    expect(within(list).queryByText('Customer A')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /^Paid offline$/i }));
+    list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Customer C')).toBeInTheDocument();
+    expect(within(list).queryByText('Customer B')).not.toBeInTheDocument();
+  });
+
+  it('shows filtered-empty state and keeps Load More available when more rows can satisfy filters', async () => {
+    const user = userEvent.setup();
+    const nextCursor = { created_at: '2025-01-03T12:00:00Z', id: 'job-c' };
+    listWorkOrdersDashboardPage
+      .mockResolvedValueOnce(makePageResult([listJobA], { hasMore: true, nextCursor }))
+      .mockResolvedValueOnce(makePageResult([listJobSignedOffline]));
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Customer A');
+    await user.click(screen.getByRole('tab', { name: /^Paid offline$/i }));
+
+    expect(screen.getByText('No loaded work orders match')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /load more/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /load more/i }));
+
+    await waitFor(() => {
+      const list = latestWorkOrdersListUl();
+      expect(within(list).getByText('Customer C')).toBeInTheDocument();
+    });
+  });
+
+  it('combines search and status chip filtering on the loaded dataset', async () => {
+    const user = userEvent.setup();
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        {
+          ...listJobA,
+          customer_name: 'Alpha Fab',
+          latestInvoice: {
+            id: 'inv-a',
+            job_id: 'job-a',
+            issued_at: '2025-01-02T00:00:00Z',
+            invoice_number: 1,
+            created_at: '2025-01-02T00:00:00Z',
+            payment_status: 'paid',
+          },
+        },
+        {
+          ...listJobB,
+          customer_name: 'Bravo Fab',
+          latestInvoice: {
+            id: 'inv-b',
+            job_id: 'job-b',
+            issued_at: '2025-01-02T00:00:00Z',
+            invoice_number: 2,
+            created_at: '2025-01-02T00:00:00Z',
+            payment_status: 'paid',
+          },
+        },
+      ])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Bravo Fab');
+    await user.click(screen.getByRole('tab', { name: /^Paid$/i }));
+    await user.type(screen.getByRole('searchbox', { name: /search loaded work orders/i }), 'Bravo');
+
+    const list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Bravo Fab')).toBeInTheDocument();
+    expect(within(list).queryByText('Alpha Fab')).not.toBeInTheDocument();
   });
 
   it('hides the entire profile nudge after Not now', async () => {

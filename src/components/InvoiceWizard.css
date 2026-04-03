@@ -355,6 +355,36 @@
   color: var(--iron-300);
 }
 
+.co-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.co-status-badge.draft {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--iron-300);
+}
+
+.co-status-badge.pending {
+  background: rgba(255, 140, 0, 0.16);
+  color: #ffd98b;
+}
+
+.co-status-badge.approved {
+  background: rgba(62, 207, 142, 0.16);
+  color: #b7ffd7;
+}
+
+.co-status-badge.rejected {
+  background: rgba(255, 133, 117, 0.16);
+  color: #ffc3ba;
+}
+
 .invoice-co-picker-row .co-status-badge {
   font-size: 0.6875rem;
 }

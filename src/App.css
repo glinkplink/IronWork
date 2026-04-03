@@ -1949,51 +1949,6 @@ body::before {
   margin: 0 0 0.75rem;
 }
 
-/* ── Change Order Wizard ── */
-
-.co-section-label {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-
-.co-section-label--time {
-  margin-top: 16px;
-}
-
-.co-status-badge {
-  display: inline-block;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: var(--radius);
-}
-
-.co-status-badge.draft {
-  background: var(--surface);
-  color: var(--text-muted);
-}
-
-.co-status-badge.pending {
-  background: #fef3cd;
-  color: #856404;
-}
-
-.co-status-badge.approved {
-  background: #d4edda;
-  color: #155724;
-}
-
-.co-status-badge.rejected {
-  background: #f8d7da;
-  color: #721c24;
-}
-
 .btn-text {
   background: none;
   border: none;

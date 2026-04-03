@@ -52,6 +52,19 @@
   padding-bottom: 92px;
 }
 
+.co-section-label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--iron-350);
+}
+
+.co-section-label--time {
+  margin-top: 16px;
+}
+
 .co-wizard-step-header {
   margin-bottom: var(--space-lg);
 }

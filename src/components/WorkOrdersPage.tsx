@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   BusinessProfile,
   Invoice,
@@ -26,6 +26,28 @@ import './WorkOrdersPage.css';
 const HIDE_COMPLETE_PROFILE_CTA_PREFIX = 'scope-lock-hide-complete-profile-cta:';
 const PROFILE_NUDGE_DISMISS_MS = 48 * 60 * 60 * 1000;
 const WORK_ORDERS_PAGE_SIZE = 25;
+
+const WORK_ORDER_FILTER_OPTIONS = [
+  'all',
+  'needs_signature',
+  'signed',
+  'draft_invoice',
+  'invoiced',
+  'paid',
+  'paid_offline',
+] as const;
+
+type WorkOrderFilterOption = (typeof WORK_ORDER_FILTER_OPTIONS)[number];
+
+const WORK_ORDER_FILTER_LABELS: Record<WorkOrderFilterOption, string> = {
+  all: 'All',
+  needs_signature: 'Needs signature',
+  signed: 'Signed',
+  draft_invoice: 'Draft invoice',
+  invoiced: 'Invoiced',
+  paid: 'Paid',
+  paid_offline: 'Paid offline',
+};
 
 function readProfileNudgeDismissedActive(userId: string): boolean {
   try {
@@ -104,6 +126,66 @@ function appendDashboardRows(
   });
 
   return mergedJobs;
+}
+
+function getRowInvoiceLabel(job: WorkOrderDashboardJob): string | null {
+  const invoice = job.latestInvoice;
+  if (!invoice) return null;
+  if (invoice.payment_status === 'paid') return 'Paid';
+  if (invoice.payment_status === 'offline') return 'Paid Offline';
+  if (getInvoiceBusinessStatus(invoice) === 'draft') return 'Draft';
+  return 'Invoiced';
+}
+
+function matchesWorkOrderFilter(job: WorkOrderDashboardJob, filter: WorkOrderFilterOption): boolean {
+  if (filter === 'all') return true;
+
+  const signatureState = getWorkOrderSignatureState(job.esign_status, job.offline_signed_at);
+  const invoice = job.latestInvoice;
+  const invoiceBusinessStatus = invoice ? getInvoiceBusinessStatus(invoice) : null;
+
+  switch (filter) {
+    case 'needs_signature':
+      return !signatureState.isSignatureSatisfied;
+    case 'signed':
+      return signatureState.isSignatureSatisfied;
+    case 'draft_invoice':
+      return Boolean(invoice && invoiceBusinessStatus === 'draft');
+    case 'invoiced':
+      return Boolean(
+        invoice &&
+        invoiceBusinessStatus === 'invoiced' &&
+        invoice.payment_status !== 'paid' &&
+        invoice.payment_status !== 'offline'
+      );
+    case 'paid':
+      return Boolean(invoice && invoice.payment_status === 'paid');
+    case 'paid_offline':
+      return Boolean(invoice && invoice.payment_status === 'offline');
+    default:
+      return true;
+  }
+}
+
+function matchesWorkOrderSearch(job: WorkOrderDashboardJob, searchTerm: string): boolean {
+  const trimmed = searchTerm.trim().toLowerCase();
+  if (!trimmed) return true;
+
+  const signatureState = getWorkOrderSignatureState(job.esign_status, job.offline_signed_at);
+  const progressTitle = getEsignProgressModel(job.esign_status, 'work_order').title;
+  const invoiceLabel = getRowInvoiceLabel(job);
+  const haystack = [
+    formatWorkOrderDashboardWoLabel(job),
+    job.customer_name,
+    signatureState.displayLabel,
+    progressTitle,
+    invoiceLabel,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .toLowerCase();
+
+  return haystack.includes(trimmed);
 }
 
 type WorkOrderRowProps = {
@@ -237,6 +319,8 @@ export function WorkOrdersPage({
   const [loadMoreLoading, setLoadMoreLoading] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [summary, setSummary] = useState<WorkOrdersDashboardSummary | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilter, setActiveFilter] = useState<WorkOrderFilterOption>('all');
 
   const {
     busyJobIds: actionLoadingJobIds,
@@ -357,6 +441,14 @@ export function WorkOrdersPage({
 
   const summaryInvoicedDisplay = formatUsd(summary?.invoicedContractTotal);
   const summaryPendingDisplay = formatUsd(summary?.pendingContractTotal);
+  const filteredJobs = useMemo(
+    () =>
+      jobs.filter(
+        (job) => matchesWorkOrderFilter(job, activeFilter) && matchesWorkOrderSearch(job, searchTerm)
+      ),
+    [activeFilter, jobs, searchTerm]
+  );
+  const hasActiveFilters = activeFilter !== 'all' || searchTerm.trim().length > 0;
 
   return (
     <div className="work-orders-page">
@@ -430,6 +522,36 @@ export function WorkOrdersPage({
               <div className="work-orders-stat-label">Pending invoice</div>
             </div>
           </div>
+          <div className="work-orders-filters" aria-label="Work order filters">
+            <div className="form-group work-orders-search-group">
+              <label htmlFor="work-orders-search">Search loaded work orders</label>
+              <input
+                id="work-orders-search"
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search WO #, customer, or status"
+                autoComplete="off"
+              />
+            </div>
+            <div className="work-orders-filter-chips" role="tablist" aria-label="Work order status filters">
+              {WORK_ORDER_FILTER_OPTIONS.map((filter) => {
+                const selected = filter === activeFilter;
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    className={`work-orders-filter-chip${selected ? ' work-orders-filter-chip--active' : ''}`}
+                    onClick={() => setActiveFilter(filter)}
+                  >
+                    {WORK_ORDER_FILTER_LABELS[filter]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {jobs.length === 0 ? (
             <div className="work-orders-empty-state">
               <p className="work-orders-empty-title">No work orders yet</p>
@@ -445,10 +567,38 @@ export function WorkOrdersPage({
                 Create Work Order
               </button>
             </div>
+          ) : filteredJobs.length === 0 ? (
+            <>
+              <div className="work-orders-filtered-empty-state">
+                <p className="work-orders-empty-title">No loaded work orders match</p>
+                <p className="work-orders-empty-lead">
+                  {hasActiveFilters
+                    ? 'Try a different search or status filter, or load more work orders to expand the local results.'
+                    : 'No loaded work orders match the current filters.'}
+                </p>
+              </div>
+              {loadMoreError ? (
+                <div className="error-banner work-orders-load-more-error" role="alert">
+                  {loadMoreError}
+                </div>
+              ) : null}
+              {hasMore ? (
+                <div className="work-orders-load-more-wrap">
+                  <button
+                    type="button"
+                    className="work-orders-load-more-btn"
+                    disabled={loadMoreLoading}
+                    onClick={handleLoadMore}
+                  >
+                    {loadMoreLoading ? 'Loading…' : 'Load More'}
+                  </button>
+                </div>
+              ) : null}
+            </>
           ) : (
             <>
               <ul className="work-orders-list">
-                {jobs.map((job) => (
+                {filteredJobs.map((job) => (
                   <WorkOrderRow
                     key={job.id}
                     job={job}

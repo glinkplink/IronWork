@@ -26,9 +26,9 @@ These need to be treated as explicit scope decisions before implementation start
   - Global bottom nav cannot simply replace the current draft-flow tabs.
   - `form` and `preview` currently rely on the shell-level `tab-nav` to switch between edit and preview.
   - **Decision:** contextual **`tab-nav`** for `form` / `preview` is **kept**; bottom nav is only for top-level signed-in routes (Home, Work Orders, Profile, create FAB).
-- [ ] **Work Orders filtering/search scope is defined**
+- [x] **Work Orders filtering/search scope is defined**
   - Current list data comes from `list_work_orders_dashboard_page(userId, limit, cursor)` with no server-side search/filter args.
-  - Decision: phase 1 uses client-side filtering on loaded rows only, or phase 2 adds backend support.
+  - **Decision:** shipped as client-side filtering/search on loaded rows only; no backend/RPC support in this redesign.
 
 ---
 
@@ -94,7 +94,7 @@ These need to be treated as explicit scope decisions before implementation start
   - remove or restyle if it clashes with the phone-shell presentation
 
 ### Do not do
-- [ ] Do not globally replace the current draft tabs with Home / Work Orders / Profile and call it done *(constraint respected in Sections 1–2 implementation)*
+- [x] Do not globally replace the current draft tabs with Home / Work Orders / Profile and call it done *(constraint respected in Sections 1–2 implementation)*
 
 ---
 
@@ -173,14 +173,14 @@ These need to be treated as explicit scope decisions before implementation start
   - when the user clicks `Not now`, hide the message immediately
   - re-show the message 48 hours after dismissal if the business phone is still missing
 
-### Optional phase 2
-- [ ] Add status chips
-- [ ] Add search field
+### Completed in this redesign
+- [x] Add status chips
+- [x] Add search field
 
 ### Constraint
-- [ ] Status chips/search need an explicit data decision
-  - client-side filtering of already loaded rows only
-  - or backend/RPC changes for full dataset behavior
+- [x] Status chips/search need an explicit data decision
+  - shipped as client-side filtering of already loaded rows only
+  - no backend/RPC changes for full dataset behavior in this redesign
 
 ### Status model
 - [x] Do not collapse real business states too aggressively
@@ -366,8 +366,8 @@ These need to be treated as explicit scope decisions before implementation start
 **Effort:** ~1 to 2 hours
 
 ### Changes
-- [ ] Only add if event wiring is worth the scope
-- [ ] Fixed placement must not conflict with bottom nav or modal flows
+- [x] Only add if event wiring is worth the scope *(decision: not shipping a toast system in this redesign)*
+- [x] Fixed placement must not conflict with bottom nav or modal flows *(not applicable because the toast system is intentionally not shipping)*
 
 ---
 
@@ -421,9 +421,9 @@ This order reflects the real dependency graph in the current codebase.
 
 ## Implementation Discipline
 
-- [ ] Keep page-specific CSS co-located with the owning component
-- [ ] Use `App.css` only for tokens, shell, shared utilities, and truly cross-cutting rules
-- [ ] Preserve all document/PDF light-mode output
-- [ ] Preserve current business states and gating rules
-- [ ] Update tests that assert old copy, shell controls, or old visual-state labels
-- [ ] If the Forge design system ships, update the living docs in the same implementation set
+- [x] Keep page-specific CSS co-located with the owning component
+- [x] Use `App.css` only for tokens, shell, shared utilities, and truly cross-cutting rules
+- [x] Preserve all document/PDF light-mode output
+- [x] Preserve current business states and gating rules
+- [x] Update tests that assert old copy, shell controls, or old visual-state labels
+- [x] If the Forge design system ships, update the living docs in the same implementation set *(already handled during the earlier Forge shell rollout; no new repo-wide rule was introduced in this closeout pass)*
