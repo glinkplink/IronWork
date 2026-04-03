@@ -274,7 +274,7 @@ Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + chan
                       → Change Order → ChangeOrderWizard → detail (refresh list)
                       → Invoice → InvoiceWizard (optional CO lines on **new** invoices) → InvoiceFinalPage (PDF + send/payment-link issuance gate; back returns to Work Orders)
       ↓
-Invoices → InvoicesPage (all invoices; job-only and CO invoices detected via line_items[].change_order_id) → InvoiceFinalPage (back returns to Invoices list)
+Invoices → InvoicesPage (all invoices; CO-only routing requires exactly one `change_order_id` and no base-scope lines) → InvoiceFinalPage (back returns to Invoices list)
       ↓
 Create Work Order → JobForm → Preview tab → AgreementPreview (Download & Save / PDF)
       ↓
@@ -321,7 +321,7 @@ Edit profile (gear) → EditProfilePage
 
 ## Database Schema
 
-Four tables in Supabase Postgres, all with row-level security:
+Five tables in Supabase Postgres, all with row-level security:
 
 | Table | Key Columns |
 |---|---|

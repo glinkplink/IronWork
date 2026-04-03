@@ -166,7 +166,7 @@ describe('InvoicesPage', () => {
       'Customer B',
       null
     );
-    listInvoicesWithCustomerName.mockResolvedValue([invA, invB]);
+    listInvoicesWithCustomerName.mockResolvedValue({ data: [invA, invB], error: null });
 
     render(
       <InvoicesPage userId="u1" onOpenInvoice={onOpenInvoice} onOpenCoInvoice={onOpenCoInvoice} />
@@ -179,7 +179,8 @@ describe('InvoicesPage', () => {
   });
 
   it('renders draft, invoiced, paid, and paid offline status pills (WO row invoice button styles)', async () => {
-    listInvoicesWithCustomerName.mockResolvedValue([
+    listInvoicesWithCustomerName.mockResolvedValue({
+      data: [
       withListFields(
         baseInvoice({ id: 'inv-draft', invoice_number: 1, issued_at: null, payment_status: 'unpaid' }),
         'Draft Customer',
@@ -205,7 +206,9 @@ describe('InvoicesPage', () => {
         'Offline Customer',
         4
       ),
-    ]);
+      ],
+      error: null,
+    });
 
     render(
       <InvoicesPage userId="u1" onOpenInvoice={onOpenInvoice} onOpenCoInvoice={onOpenCoInvoice} />
@@ -241,7 +244,7 @@ describe('InvoicesPage', () => {
       'Client',
       5
     );
-    listInvoicesWithCustomerName.mockResolvedValue([inv]);
+    listInvoicesWithCustomerName.mockResolvedValue({ data: [inv], error: null });
     const job = minimalJob('job-1');
     getJobById.mockResolvedValue(job);
     getChangeOrderById.mockResolvedValue(null);
@@ -295,7 +298,7 @@ describe('InvoicesPage', () => {
       'Client',
       1
     );
-    listInvoicesWithCustomerName.mockResolvedValue([inv]);
+    listInvoicesWithCustomerName.mockResolvedValue({ data: [inv], error: null });
     const job = minimalJob('job-1');
     const co = minimalChangeOrder(coId, 'job-1');
     getJobById.mockResolvedValue(job);
@@ -331,7 +334,7 @@ describe('InvoicesPage', () => {
       'B',
       2
     );
-    listInvoicesWithCustomerName.mockResolvedValue([inv1, inv2]);
+    listInvoicesWithCustomerName.mockResolvedValue({ data: [inv1, inv2], error: null });
 
     let release!: (j: Job) => void;
     const hang = new Promise<Job>((resolve) => {
@@ -372,5 +375,73 @@ describe('InvoicesPage', () => {
     await waitFor(() => {
       expect(onOpenInvoice).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('routes mixed base-scope + single-CO invoices to normal invoice flow', async () => {
+    const user = userEvent.setup();
+    const coId = 'co-99';
+    const inv = withListFields(
+      baseInvoice({
+        id: 'inv-mixed',
+        job_id: 'job-1',
+        line_items: [
+          {
+            kind: 'labor',
+            description: 'Original scope',
+            qty: 1,
+            unit_price: 100,
+            total: 100,
+            source: 'original_scope',
+          },
+          {
+            kind: 'labor',
+            description: 'Change Order #0001',
+            qty: 1,
+            unit_price: 50,
+            total: 50,
+            source: 'change_order',
+            change_order_id: coId,
+          },
+        ],
+      }),
+      'Client',
+      5
+    );
+    listInvoicesWithCustomerName.mockResolvedValue({ data: [inv], error: null });
+    const job = minimalJob('job-1');
+    getJobById.mockResolvedValue(job);
+
+    render(
+      <InvoicesPage userId="u1" onOpenInvoice={onOpenInvoice} onOpenCoInvoice={onOpenCoInvoice} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /INV #0001/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /INV #0001/i }));
+
+    await waitFor(() => {
+      expect(onOpenInvoice).toHaveBeenCalledTimes(1);
+    });
+    expect(onOpenInvoice).toHaveBeenCalledWith(job, inv);
+    expect(onOpenCoInvoice).not.toHaveBeenCalled();
+    expect(getChangeOrderById).not.toHaveBeenCalled();
+  });
+
+  it('shows an error banner when invoice list query fails', async () => {
+    listInvoicesWithCustomerName.mockResolvedValue({
+      data: [],
+      error: new Error('query failed'),
+    });
+
+    render(
+      <InvoicesPage userId="u1" onOpenInvoice={onOpenInvoice} onOpenCoInvoice={onOpenCoInvoice} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to load invoices.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('No invoices yet.')).not.toBeInTheDocument();
   });
 });

@@ -66,6 +66,16 @@ function isChangeOrderInvoiceLine(line: InvoiceLineItem): boolean {
   );
 }
 
+function hasEditableBaseScopeLine(lineItems: InvoiceLineItem[]): boolean {
+  return lineItems.some((line) => {
+    if (line.source === 'original_scope' || line.source === 'labor' || line.source === 'material') {
+      return true;
+    }
+    const hasCoId = typeof line.change_order_id === 'string' && line.change_order_id.trim() !== '';
+    return !hasCoId && line.source !== 'change_order';
+  });
+}
+
 function InvoicePreviewSummary({
   originalTotal,
   changeOrderTotal,
@@ -137,7 +147,9 @@ export function InvoiceWizard({
   onCancel,
   onSuccess,
 }: InvoiceWizardProps) {
-  const isChangeOrderInvoice = changeOrder !== null;
+  const isChangeOrderInvoice =
+    changeOrder !== null &&
+    (!existingInvoice || !hasEditableBaseScopeLine(existingInvoice.line_items));
   const initial = useMemo(() => {
     if (existingInvoice) {
       return {

@@ -4,6 +4,10 @@
   gap: 0;
 }
 
+.app-main--bottom-nav .job-form {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-xl));
+}
+
 .job-form .form-section {
   position: relative;
   overflow: visible;

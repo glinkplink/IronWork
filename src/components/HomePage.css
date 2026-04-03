@@ -73,6 +73,10 @@
   overflow-x: hidden;
 }
 
+.app-main--bottom-nav .home-page--dashboard {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-xl));
+}
+
 .home-dash-greeting {
   padding: var(--space-md) var(--space-md) var(--space-sm);
 }

@@ -4,7 +4,11 @@
   max-width: 640px;
   margin: 0 auto;
   width: 100%;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-md));
+  padding-bottom: var(--space-md);
+}
+
+.app-main--bottom-nav .invoices-page.work-orders-page {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-xl));
 }
 
 .invoices-page.work-orders-page .work-orders-toolbar {

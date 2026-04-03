@@ -6,6 +6,10 @@
   --wo-header-rhythm: var(--space-lg);
 }
 
+.app-main--bottom-nav .work-orders-page {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-xl));
+}
+
 /* ─── Toolbar ─── */
 .work-orders-toolbar {
   display: flex;

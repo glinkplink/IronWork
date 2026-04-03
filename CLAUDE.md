@@ -122,7 +122,6 @@ src/
     agreement-sections-html.ts # Agreement sections → HTML string (combined PDFs)
     docuseal-agreement-html.ts # DocuSeal HTML document for WO (embedded CSS + field tags; uses esc())
     docuseal-change-order-html.ts # DocuSeal HTML document for CO (embedded CSS + field tags; uses esc()); optional `providerSignatureDataUrl` for SP signature image (same canvas PNG as WO)
-    docuseal-change-order-html.ts # DocuSeal HTML/message builder for change orders
     docuseal-header-footer.ts  # html_header / html_footer strings for DocuSeal submissions
     docuseal-constants.ts      # Shared DocuSeal role name(s)
     docuseal-signature-image.ts # Render DocuSeal SP signature as image in signed documents

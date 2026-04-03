@@ -454,7 +454,13 @@ export type InvoiceWithCustomerName = Invoice & {
   wo_number: number | null;
 };
 
-export const listInvoicesWithCustomerName = async (userId: string): Promise<InvoiceWithCustomerName[]> => {
+export type ListInvoicesWithCustomerNameResult =
+  | { data: InvoiceWithCustomerName[]; error: null }
+  | { data: []; error: Error };
+
+export const listInvoicesWithCustomerName = async (
+  userId: string
+): Promise<ListInvoicesWithCustomerNameResult> => {
   const { data, error } = await supabase
     .from('invoices')
     .select('*, jobs!job_id(customer_name, wo_number)')
@@ -463,10 +469,10 @@ export const listInvoicesWithCustomerName = async (userId: string): Promise<Invo
 
   if (error) {
     console.error('Error listing invoices with customer name:', error);
-    return [];
+    return { data: [], error: new Error(error.message) };
   }
 
-  return (data ?? []).map((row) => {
+  const mapped = (data ?? []).map((row) => {
     const inv = mapInvoiceRow(row as Record<string, unknown>);
     const jobRelation = (row as Record<string, unknown>).jobs as Record<string, unknown> | null;
     const customer_name =
@@ -478,6 +484,7 @@ export const listInvoicesWithCustomerName = async (userId: string): Promise<Invo
     const wo_number = Number.isFinite(n) ? n : null;
     return { ...inv, customer_name, wo_number };
   });
+  return { data: mapped, error: null };
 };
 
 export const getInvoiceByChangeOrderId = async (jobId: string, changeOrderId: string): Promise<Invoice | null> => {

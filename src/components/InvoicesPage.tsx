@@ -14,12 +14,25 @@ interface InvoicesPageProps {
   onOpenCoInvoice: (job: Job, changeOrder: ChangeOrder, invoice: Invoice) => void;
 }
 
-/** Returns the single CO id if exactly one unique change_order_id exists across line items; otherwise null. */
-function getSingleCoId(lineItems: InvoiceLineItem[]): string | null {
+/**
+ * Returns the CO id when this is a CO-only invoice:
+ * - exactly one unique `change_order_id`
+ * - no base-scope lines (original/labor/material/manual/etc without a CO id)
+ */
+function getSingleCoIdForCoOnlyInvoice(lineItems: InvoiceLineItem[]): string | null {
+  if (lineItems.length === 0) return null;
+
   const ids = new Set(
     lineItems.map((i) => i.change_order_id).filter((id): id is string => Boolean(id))
   );
-  return ids.size === 1 ? [...ids][0] : null;
+  if (ids.size !== 1) return null;
+
+  const hasBaseScopeLine = lineItems.some((line) => {
+    const hasCoId = typeof line.change_order_id === 'string' && line.change_order_id.trim() !== '';
+    return !hasCoId && line.source !== 'change_order';
+  });
+
+  return hasBaseScopeLine ? null : [...ids][0];
 }
 
 function formatInvoiceDate(dateStr: string): string {
@@ -101,15 +114,23 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
     setInvoices([]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
-    void listInvoicesWithCustomerName(userId).then((result) => {
-      if (cancelled) return;
-      setInvoices(result);
-      setLoading(false);
-    }).catch(() => {
-      if (cancelled) return;
-      setError('Failed to load invoices.');
-      setLoading(false);
-    });
+    void listInvoicesWithCustomerName(userId)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.error) {
+          setError('Failed to load invoices.');
+          setInvoices([]);
+          setLoading(false);
+          return;
+        }
+        setInvoices(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError('Failed to load invoices.');
+        setLoading(false);
+      });
 
     return () => { cancelled = true; };
   }, [userId]);
@@ -118,7 +139,7 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
     if (busyId) return;
     setBusyId(invoice.id);
     try {
-      const coId = getSingleCoId(invoice.line_items);
+      const coId = getSingleCoIdForCoOnlyInvoice(invoice.line_items);
       const job = await getJobById(invoice.job_id);
       if (!job) {
         setBusyId(null);

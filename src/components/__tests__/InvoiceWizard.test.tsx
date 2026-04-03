@@ -212,4 +212,59 @@ describe('InvoiceWizard', () => {
     expect(within(summary).getByText((_, node) => node?.textContent === 'Change Order Total$200.00')).toBeInTheDocument();
     expect(within(summary).getByText((_, node) => node?.textContent === 'Total$300.00')).toBeInTheDocument();
   });
+
+  it('does not force CO-only edit mode when existing invoice includes base-scope lines', async () => {
+    const existingInvoice: Invoice = {
+      id: 'inv-1',
+      user_id: 'u1',
+      job_id: 'job-1',
+      invoice_number: 1,
+      invoice_date: '2025-01-01',
+      due_date: '2025-01-15',
+      status: 'draft',
+      issued_at: null,
+      line_items: [
+        {
+          id: 'l1',
+          position: 0,
+          kind: 'labor',
+          description: 'Original scope',
+          qty: 1,
+          unit_price: 100,
+          total: 100,
+          source: 'original_scope',
+        },
+        {
+          id: 'l2',
+          position: 1,
+          kind: 'labor',
+          description: 'Change Order #0002: extra',
+          qty: 1,
+          unit_price: 50,
+          total: 50,
+          source: 'change_order',
+          change_order_id: 'co-2',
+        },
+      ],
+      stripe_payment_link_id: null,
+      stripe_payment_url: null,
+      payment_status: 'unpaid',
+      paid_at: null,
+      subtotal: 150,
+      tax_rate: 0,
+      tax_amount: 0,
+      total: 150,
+      payment_methods: [],
+      notes: null,
+      created_at: '2025-01-01T00:00:00Z',
+      updated_at: '2025-01-01T00:00:00Z',
+    };
+
+    renderWizard({ changeOrder: makeCO(2, 'Second'), existingInvoice });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Original scope total/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/CO #0002 only/i)).toBeNull();
+  });
 });

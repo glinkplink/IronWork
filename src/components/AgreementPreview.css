@@ -10,6 +10,10 @@
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.38);
 }
 
+.app-main--bottom-nav .agreement-preview {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-xl));
+}
+
 .agreement-preview .agreement-document {
   font-family: var(--font-document);
   border-radius: calc(var(--radius-lg) + 2px);
