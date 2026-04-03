@@ -1,34 +1,70 @@
-.capture-modal-subtitle {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  margin: 0 0 1rem;
+.capture-modal-overlay {
+  background: rgba(3, 4, 7, 0.78);
+  backdrop-filter: blur(12px);
 }
 
-/* Account capture modal — match field notebook forms + navy primary */
 .capture-modal {
   max-width: 420px;
   width: min(420px, calc(100% - 32px));
   box-sizing: border-box;
-  box-shadow: var(--shadow-sm);
+  background:
+    radial-gradient(circle at top, rgba(255, 140, 0, 0.15), transparent 36%),
+    linear-gradient(180deg, rgba(20, 23, 30, 0.98), rgba(11, 13, 18, 0.98));
+  border: 1px solid var(--iron-600);
+  border-radius: var(--shell-radius-lg);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.42);
+  color: var(--iron-50);
 }
 
 .capture-modal h3 {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: 'Chakra Petch', ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--spark);
   margin: 0 0 var(--space-sm);
   padding-bottom: var(--space-sm);
-  border-bottom: 2px solid var(--border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   text-align: center;
 }
 
-.capture-modal .capture-modal-subtitle {
-  font-size: 0.875rem;
-  line-height: 1.45;
-  margin: 0 0 var(--space-lg);
+.capture-modal p {
+  color: var(--iron-300);
+}
+
+.capture-modal-subtitle {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 1rem;
   text-align: center;
+}
+
+.capture-modal .form-group label {
+  color: var(--iron-300);
+}
+
+.capture-modal .form-group input[type='text'],
+.capture-modal .form-group input[type='tel'],
+.capture-modal .form-group input[type='email'],
+.capture-modal .form-group input[type='password'],
+.capture-modal .form-group input[type='number'],
+.capture-modal .form-group input[type='date'],
+.capture-modal .form-group select,
+.capture-modal .form-group textarea {
+  background: rgba(7, 9, 13, 0.88);
+  color: var(--iron-50);
+  border: 1px solid var(--iron-600);
+  border-radius: var(--shell-radius-sm);
+}
+
+.capture-modal .form-group input::placeholder,
+.capture-modal .form-group textarea::placeholder {
+  color: var(--iron-500);
+}
+
+.capture-modal .form-group select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a9acb4'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
 }
 
 .capture-modal .form-group:last-of-type {
@@ -36,7 +72,7 @@
 }
 
 .capture-modal .capture-modal-defaults-blurb {
-  color: var(--text-secondary);
+  color: var(--iron-300);
   font-size: 0.875rem;
   line-height: 1.5;
   margin: 0 0 var(--space-sm);
@@ -63,10 +99,15 @@
   margin: 0;
   font-size: 0.875rem;
   font-weight: 600;
+  color: var(--iron-100);
+}
+
+.capture-modal .capture-modal-defaults-row input[type='checkbox'] {
+  accent-color: var(--spark);
 }
 
 .capture-modal .form-error {
-  color: var(--danger);
+  color: #ffb3a8;
   font-size: 0.875rem;
   font-weight: 600;
   margin: 0 0 var(--space-md);
@@ -79,12 +120,8 @@
   gap: var(--space-sm) var(--space-md);
 }
 
-.capture-modal .modal-actions .btn-secondary {
-  flex: 1 1 140px;
-  min-width: 0;
-}
-
+.capture-modal .modal-actions .btn-secondary,
 .capture-modal .modal-actions .btn-primary {
-  flex: 1 1 180px;
+  flex: 1 1 160px;
   min-width: 0;
 }

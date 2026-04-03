@@ -82,20 +82,20 @@ src/
     BusinessProfileForm.tsx  # Full-screen when signed in but no profile row (edge case)
     BusinessProfileForm.css  # BusinessProfileForm-only styles
     CaptureModal.tsx         # Anonymous Download & Save / Send: account fields + optional “Save defaults?” onboarding opt-in
-    CaptureModal.css         # CaptureModal-only styles
+    CaptureModal.css         # CaptureModal-only dark modal styling and capture form overrides
     HomePage.tsx             # Guest hero + signed-in dashboard (summary + recent WOs via same RPCs as list); clears dashboard state on sign-out
     HomePage.css             # HomePage-only styles (Forge dashboard + guest hero)
     JobForm.tsx              # Work agreement form (structured job site + Geoapify autocomplete); optional “Your Information” when no profile
-    JobForm.css              # JobForm-only styles
+    JobForm.css              # JobForm-only layout, combobox/autocomplete dropdowns, guest-info block
     AgreementPreview.tsx     # Preview + Download & Save / Save & Send / PDF; hosts CaptureModal when anonymous
-    AgreementPreview.css     # Preview-only chrome (e-sign row, hints)
+    AgreementPreview.css     # Preview-only dark shell chrome, action rows, scaled-sheet wrapper
     AgreementDocumentSections.tsx  # Renders agreement sections (preview, detail, PDF body)
     EditProfilePage.tsx      # Edit business profile + agreement defaults
     EditProfilePage.css      # EditProfilePage-only styles
     WorkOrdersPage.tsx       # Paginated work-order dashboard; toolbar “Create Work Order”; invoice actions; opens detail
     WorkOrdersPage.css       # WorkOrdersPage-only Forge toolbar, stat strip/cards, card rows, page-scoped invoice buttons, nudge, empty state
     WorkOrderDetailPage.tsx  # Saved job → agreement + change orders + PDFs + offline-sign controls
-    WorkOrderDetailPage.css  # WO detail invoice strip + CO row ordering/sublist (e.g. `.co-list-*`)
+    WorkOrderDetailPage.css  # WO detail shell, e-sign timeline card, invoice strip, CO list/order styling
     ChangeOrderDetailPage.tsx # Saved change order → HTML/PDF + actions
     ChangeOrderDetailPage.css # CO detail-only chrome (e.g. `.co-detail-*`)
     ChangeOrderWizard.tsx    # Create/edit change order (3 steps)

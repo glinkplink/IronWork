@@ -1,27 +1,59 @@
+.work-order-detail-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  min-height: 50vh;
+  padding-bottom: var(--space-md);
+}
+
+.work-order-detail-header {
+  margin: 0 0 var(--space-lg);
+  padding: 0 var(--space-xs);
+}
+
+.work-order-detail-page .invoice-final-nav-plain {
+  color: var(--iron-100);
+}
+
+.work-order-detail-page .invoice-final-nav-plain:hover {
+  color: var(--spark-hot);
+}
+
+.work-order-detail-page .invoice-final-heading {
+  color: var(--iron-50);
+}
+
+.work-order-detail-page .invoice-final-heading-sub {
+  color: var(--iron-300);
+}
+
 .wo-invoice-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: var(--space-md) 0;
+  margin: 0 0 var(--space-lg);
   padding: var(--space-sm) var(--space-md);
-  background-color: var(--surface-white);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--shell-radius-md);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
 }
 
 .wo-invoice-status-loading,
 .wo-invoice-status-error {
   font-size: 0.875rem;
-  color: var(--text-muted);
+  color: var(--iron-300);
 }
 
 .wo-invoice-status-error {
-  color: #c53030;
+  color: #ff9d8e;
 }
 
 .wo-invoice-number {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--iron-200);
 }
 
 .badge-paid {
@@ -29,8 +61,8 @@
   padding: 2px 8px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #fff;
-  background-color: #2a7a3b;
+  color: #f4fffa;
+  background-color: #1f7a53;
   border-radius: var(--radius);
 }
 
@@ -39,14 +71,13 @@
   padding: 2px 8px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #fff;
-  background-color: #744210;
+  color: #fff7e9;
+  background-color: #8a5b12;
   border-radius: var(--radius);
 }
 
 .wo-detail-invoice-strip {
   border-bottom: none;
-  padding-top: 0;
 }
 
 .wo-detail-invoice-meta {
@@ -54,13 +85,222 @@
   margin-top: 2px;
 }
 
+.wo-esign-card {
+  margin: 0 0 var(--space-lg);
+  padding: clamp(1rem, 2.5vw, 1.35rem);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--shell-radius-lg);
+  background:
+    linear-gradient(180deg, rgba(24, 26, 33, 0.94), rgba(13, 16, 22, 0.96)),
+    radial-gradient(circle at top, rgba(255, 140, 0, 0.1), transparent 42%);
+  text-align: center;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3);
+}
+
+.wo-esign-heading {
+  margin: 0 0 var(--space-sm);
+  font-family: 'Chakra Petch', ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--spark);
+}
+
+.wo-esign-timeline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  margin: 0 auto var(--space-sm);
+  width: min(100%, 30rem);
+}
+
+.wo-esign-step {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--iron-400);
+}
+
+.wo-esign-step-dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: rgba(8, 10, 14, 0.9);
+}
+
+.wo-esign-step-dot-filled {
+  background: currentColor;
+}
+
+.wo-esign-step-line {
+  position: absolute;
+  top: 0.375rem;
+  left: calc(50% + 0.7rem);
+  width: calc(100% - 1.4rem);
+  border-top: 2px solid currentColor;
+  opacity: 0.45;
+}
+
+.wo-esign-step-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.wo-esign-step-active {
+  color: var(--spark);
+}
+
+.wo-esign-step-success {
+  color: #3ecf8e;
+}
+
+.wo-esign-step-danger {
+  color: #ff8575;
+}
+
+.wo-esign-step-warning {
+  color: #e8ab4c;
+}
+
+.wo-esign-summary {
+  margin: 0 0 var(--space-md);
+  font-size: 0.875rem;
+  color: var(--iron-200);
+}
+
+.wo-esign-meta {
+  margin: 0 auto var(--space-md);
+  font-size: 0.875rem;
+  width: min(100%, 24rem);
+  text-align: center;
+}
+
+.wo-esign-meta-row {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: 0.35rem;
+}
+
+.wo-esign-meta-row dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--iron-300);
+}
+
+.wo-esign-meta-row dd {
+  margin: 0;
+  color: var(--iron-50);
+}
+
+.wo-esign-meta-row-reason {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.15rem;
+}
+
+.wo-esign-actions {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: var(--space-sm);
+  align-items: center;
+  justify-content: center;
+}
+
+.wo-esign-actions .btn-action {
+  font-size: 0.8125rem;
+}
+
+.wo-esign-card .btn-action:not(.btn-primary) {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--iron-100);
+}
+
+.wo-esign-card .btn-action:not(.btn-primary):hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--iron-50);
+}
+
+.wo-esign-card .btn-secondary.btn-action {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--iron-100);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wo-esign-card .btn-secondary.btn-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.wo-esign-signed-link-fallback {
+  cursor: default;
+  color: var(--iron-400);
+  text-align: center;
+}
+
+.wo-esign-actions-primary {
+  width: min(100%, 20rem);
+  box-sizing: border-box;
+}
+
+.wo-esign-actions .wo-esign-actions-copy {
+  width: min(100%, 20rem);
+  box-sizing: border-box;
+}
+
+.work-order-detail-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 120px;
+  max-height: min(70vh, 900px);
+  margin-bottom: var(--space-lg);
+  padding: clamp(0.4rem, 1vw, 0.65rem);
+  border-radius: var(--shell-radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(18, 21, 27, 0.9), rgba(10, 12, 16, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.work-order-detail-document.agreement-document {
+  max-width: 100%;
+  border-radius: calc(var(--radius-lg) + 2px);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.2);
+}
+
+.work-order-detail-change-orders {
+  padding: clamp(1rem, 2vw, 1.25rem);
+  border-radius: var(--shell-radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(17, 19, 24, 0.94), rgba(10, 12, 16, 0.96));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
+}
+
+.work-order-detail-change-orders .work-orders-loading,
+.work-order-detail-change-orders .work-orders-empty {
+  color: var(--iron-300);
+}
+
 .co-list-item {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .co-list-item:last-child {
@@ -75,20 +315,22 @@
 }
 
 .co-list-heading {
-  margin: var(--space-lg) 0 var(--space-sm);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--primary);
-  letter-spacing: 0.01em;
-  text-align: center;
+  margin: 0 0 var(--space-md);
+  font-family: 'Chakra Petch', ui-monospace, monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--spark);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
 }
 
 .co-list-heading span {
   display: inline-block;
-  padding-bottom: 4px;
-  padding-left: 8px;
-  padding-right: 8px;
-  border-bottom: 2px solid var(--text-primary);
+  padding-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-bottom: none;
 }
 
 .co-list-heading-line {
@@ -96,7 +338,7 @@
   align-items: baseline;
   gap: 6px;
   width: 100%;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .co-list-number {
@@ -104,34 +346,34 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-primary);
+  color: var(--iron-50);
 }
 
 .co-list-date {
   font-size: calc(0.8125rem - 1px);
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--iron-400);
   white-space: nowrap;
 }
 
 .co-list-desc {
   display: block;
   width: 100%;
-  margin-bottom: 2px;
-  color: var(--primary);
+  margin-bottom: 4px;
+  color: var(--iron-100);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .co-list-item .work-orders-row-detail-hit:hover .co-list-desc {
-  color: var(--primary-hover);
+  color: var(--spark-hot);
 }
 
 .co-list-amount {
   font-size: 14px;
   font-weight: 600;
-  color: #2a7a3b;
+  color: #ffd38f;
   margin-bottom: 8px;
 }
 
@@ -144,8 +386,28 @@
   align-items: center;
 }
 
+.work-order-detail-footer {
+  flex-shrink: 0;
+  padding-top: var(--space-md);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.work-order-detail-download {
+  width: 100%;
+}
+
 .work-orders-empty.wo-co-finalized-block {
   text-align: center;
+}
+
+@media (min-width: 640px) {
+  .work-order-detail-download {
+    width: auto;
+    min-width: 220px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -155,5 +417,21 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     white-space: normal;
+  }
+}
+
+@media (max-width: 520px) {
+  .wo-esign-timeline {
+    width: 100%;
+  }
+
+  .wo-esign-step-label {
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+  }
+
+  .wo-esign-step-line {
+    left: calc(50% + 0.55rem);
+    width: calc(100% - 1.1rem);
   }
 }

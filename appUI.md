@@ -195,14 +195,14 @@ These need to be treated as explicit scope decisions before implementation start
 **Effort:** ~1 to 1.5 hours
 
 ### Changes
-- [ ] Add dark-shell form treatment
-- [ ] Restyle headings, sections, inputs, textareas, select controls
-- [ ] Restyle checkbox groups and autocomplete dropdowns
-- [ ] Add spacing to avoid bottom-nav overlap where necessary
-- [ ] If a back row is added, wire it to actual navigation instead of making it decorative
+- [x] Add dark-shell form treatment
+- [x] Restyle headings, sections, inputs, textareas, select controls
+- [x] Restyle checkbox groups and autocomplete dropdowns
+- [x] Add spacing to avoid bottom-nav overlap where necessary
+- [x] If a back row is added, wire it to actual navigation instead of making it decorative *(no new decorative back row added)*
 
 ### Constraint
-- [ ] Preserve existing structured address autocomplete and client-search interactions
+- [x] Preserve existing structured address autocomplete and client-search interactions
 
 ---
 
@@ -212,14 +212,14 @@ These need to be treated as explicit scope decisions before implementation start
 **Effort:** ~1 to 1.5 hours
 
 ### Changes
-- [ ] Keep document content light-mode
-- [ ] Darken only the surrounding preview shell/chrome
-- [ ] Restyle action areas and status strips
-- [ ] Make preview card feel distinct from the shell
-- [ ] Keep scaled-preview behavior intact
+- [x] Keep document content light-mode
+- [x] Darken only the surrounding preview shell/chrome
+- [x] Restyle action areas and status strips
+- [x] Make preview card feel distinct from the shell
+- [x] Keep scaled-preview behavior intact
 
 ### Constraint
-- [ ] Do not change agreement generation logic or document markup in ways that affect PDF output
+- [x] Do not change agreement generation logic or document markup in ways that affect PDF output
 
 ---
 
@@ -229,15 +229,15 @@ These need to be treated as explicit scope decisions before implementation start
 **Effort:** ~1.5 to 2 hours
 
 ### Changes
-- [ ] Restyle header and back affordance
-- [ ] Apply light-document-in-dark-shell treatment to the agreement section
-- [ ] Refresh e-sign timeline visuals
-- [ ] Restyle invoice status strip and change-order cards
-- [ ] Restyle offline-sign controls
-- [ ] Move page-only styles into `WorkOrderDetailPage.css`
+- [x] Restyle header and back affordance
+- [x] Apply light-document-in-dark-shell treatment to the agreement section
+- [x] Refresh e-sign timeline visuals
+- [x] Restyle invoice status strip and change-order cards
+- [x] Restyle offline-sign controls
+- [x] Move page-only styles into `WorkOrderDetailPage.css`
 
 ### Status model
-- [ ] Preserve invoice distinctions already present in code
+- [x] Preserve invoice distinctions already present in code
   - `Draft`
   - `Invoiced`
   - `Paid`
@@ -251,11 +251,11 @@ These need to be treated as explicit scope decisions before implementation start
 **Effort:** ~45 min
 
 ### Changes
-- [ ] Dark backdrop
-- [ ] Dark card
-- [ ] Shared form/input treatment
-- [ ] Shared primary CTA treatment
-- [ ] Accessible focus and error styling
+- [x] Dark backdrop
+- [x] Dark card
+- [x] Shared form/input treatment
+- [x] Shared primary CTA treatment
+- [x] Accessible focus and error styling
 
 ---
 

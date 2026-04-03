@@ -629,14 +629,14 @@ export function WorkOrderDetailPage({
           Go Back
         </button>
       </div>
-      <hgroup>
+      <hgroup className="work-order-detail-header">
         <h1 className="invoice-final-heading">{customerTitle}</h1>
         <p className="invoice-final-heading-sub">{woLabel}</p>
       </hgroup>
 
       {/* Job-level invoice status */}
       {jobInvoiceStatus ? (
-        <div className="wo-invoice-status">
+        <div className="wo-invoice-status wo-detail-invoice-strip">
           {jobInvoiceStatus.payment_status === 'paid' ? (
             <span className="badge-paid">Paid</span>
           ) : jobInvoiceStatus.payment_status === 'offline' ? (
@@ -646,7 +646,9 @@ export function WorkOrderDetailPage({
           ) : (
             <span className="badge-draft">Draft</span>
           )}
-          <span className="wo-invoice-number">Invoice #{String(jobInvoiceStatus.invoice_number).padStart(4, '0')}</span>
+          <span className="wo-invoice-number wo-detail-invoice-meta">
+            Invoice #{String(jobInvoiceStatus.invoice_number).padStart(4, '0')}
+          </span>
         </div>
       ) : jobInvoiceLoading ? (
         <div className="wo-invoice-status wo-invoice-status-loading">Loading invoice...</div>
@@ -812,7 +814,11 @@ export function WorkOrderDetailPage({
         </div>
       </div>
 
-      <section ref={changeOrdersSectionRef} aria-labelledby="change-orders-heading">
+      <section
+        ref={changeOrdersSectionRef}
+        className="work-order-detail-change-orders"
+        aria-labelledby="change-orders-heading"
+      >
         <h2 id="change-orders-heading" className="co-list-heading"><span>Change Orders</span></h2>
         {coNewCoBlockError ? (
           <p className="work-orders-empty" role="alert">

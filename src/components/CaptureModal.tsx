@@ -41,7 +41,7 @@ export function CaptureModal({ onSubmit, onClose, error, submitting }: CaptureMo
   const displayError = error || localError;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay capture-modal-overlay" onClick={onClose}>
       <div className="modal capture-modal" onClick={(e) => e.stopPropagation()}>
         <h3>Create your account to save & download</h3>
         <p className="capture-modal-subtitle">

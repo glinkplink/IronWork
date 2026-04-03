@@ -263,15 +263,6 @@ body::before {
   color: var(--text-primary);
 }
 
-.agreement-preview {
-  color-scheme: light;
-  color: var(--text-primary);
-}
-
-.agreement-preview .agreement-document {
-  font-family: var(--font-document);
-}
-
 /* ─── Bottom navigation (signed-in) ─────────────────── */
 
 .app-bottom-nav {
@@ -762,34 +753,6 @@ body::before {
   outline-offset: 2px;
 }
 
-/* ─── Agreement Preview ─────────────────────────────── */
-
-.agreement-preview {
-  background: var(--surface-white);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 22px;
-}
-
-.preview-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
-  padding-bottom: var(--space-lg);
-  border-bottom: 2px solid var(--border);
-}
-
-.preview-actions-bottom {
-  margin-top: var(--space-lg);
-  margin-bottom: 0;
-  padding-top: var(--space-lg);
-  padding-bottom: 0;
-  border-top: 2px solid var(--border);
-  border-bottom: none;
-}
-
 .btn-action {
   flex: 0 0 auto;
   min-width: 180px;
@@ -824,51 +787,6 @@ body::before {
 .btn-action:focus-visible {
   outline: 2px solid var(--spark);
   outline-offset: 2px;
-}
-
-/* Agreement preview sheet is light; keep action pills readable on white */
-.agreement-preview .btn-action {
-  background: white;
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-}
-
-.agreement-preview .btn-action:hover:not(:disabled) {
-  background: var(--surface);
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-
-.agreement-preview .btn-secondary.btn-action {
-  background: var(--surface-white);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-}
-
-.agreement-preview .btn-secondary.btn-action:hover:not(:disabled) {
-  background: var(--surface);
-  border-color: var(--border-strong);
-}
-
-/* Preview: scale Letter-width sheet on screen; spacer tracks transformed size. */
-.agreement-preview-scale-viewport {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  overflow-y: visible;
-}
-
-.agreement-preview-scale-spacer {
-  position: relative;
-  margin: 0 auto;
-}
-
-.agreement-preview-scale-sheet {
-  position: absolute;
-  top: 0;
-  left: 0;
-  box-sizing: border-box;
 }
 
 /* ─── Agreement Document ────────────────────────────── */
@@ -1631,7 +1549,6 @@ body::before {
   .app-header,
   .tab-nav,
   .app-bottom-nav,
-  .preview-actions,
   .app-footer {
     display: none;
   }
@@ -1639,28 +1556,6 @@ body::before {
   .app-main {
     padding: 0;
     max-width: none;
-  }
-
-  .agreement-preview {
-    box-shadow: none;
-    border: none;
-    padding: 0;
-  }
-
-  .agreement-preview-scale-viewport {
-    overflow: visible;
-  }
-
-  .agreement-preview-scale-sheet {
-    position: static;
-    transform: none !important;
-    width: 100% !important;
-    will-change: auto !important;
-  }
-
-  .agreement-preview-scale-spacer {
-    width: 100% !important;
-    height: auto !important;
   }
 
   .agreement-document {
@@ -1749,10 +1644,6 @@ body::before {
   .checkbox-group:not(.checkbox-group--flex-wrap):not(.checkbox-group--inline-row) {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .preview-actions {
-    justify-content: flex-start;
   }
 
   .btn-action {
@@ -2045,51 +1936,6 @@ body::before {
 .work-orders-empty {
   color: var(--text-secondary);
   font-size: 0.9375rem;
-}
-
-/* ─── Work order detail (read-only agreement) ─────── */
-
-.work-order-detail-page {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  min-height: 50vh;
-}
-
-.work-order-detail-scroll {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  min-height: 120px;
-  max-height: min(70vh, 900px);
-  margin-bottom: var(--space-lg);
-}
-
-.work-order-detail-document.agreement-document {
-  max-width: 100%;
-}
-
-.work-order-detail-footer {
-  flex-shrink: 0;
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  align-items: center;
-}
-
-.work-order-detail-download {
-  width: 100%;
-}
-
-@media (min-width: 640px) {
-  .work-order-detail-download {
-    width: auto;
-    min-width: 220px;
-  }
 }
 
 /* ─── Invoice wizard + shared flow typography ───────── */
@@ -2489,197 +2335,4 @@ ul.invoice-payment-list {
   letter-spacing: 0.03em;
   line-height: 1.35;
   color: var(--text-muted);
-}
-
-/* Shared DocuSeal timeline card used by work order and change order detail surfaces */
-
-.wo-esign-card {
-  margin: 0 var(--space-md) var(--space-lg);
-  padding: var(--space-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-white);
-  text-align: center;
-}
-
-.wo-esign-heading {
-  margin: 0 0 var(--space-sm);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.wo-esign-timeline {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0;
-  margin: 0 auto var(--space-sm);
-  width: min(100%, 30rem);
-}
-
-.wo-esign-step {
-  position: relative;
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--text-muted);
-}
-
-.wo-esign-step-dot {
-  width: 0.8rem;
-  height: 0.8rem;
-  border: 2px solid currentColor;
-  border-radius: 999px;
-  background: var(--surface-white);
-}
-
-.wo-esign-step-dot-filled {
-  background: currentColor;
-}
-
-.wo-esign-step-line {
-  position: absolute;
-  top: 0.375rem;
-  left: calc(50% + 0.7rem);
-  width: calc(100% - 1.4rem);
-  border-top: 2px solid currentColor;
-  opacity: 0.5;
-}
-
-.wo-esign-step-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.wo-esign-step-active {
-  color: var(--primary);
-}
-
-.wo-esign-step-success {
-  color: #2d6a2e;
-}
-
-.wo-esign-step-danger {
-  color: #9f2d20;
-}
-
-.wo-esign-step-warning {
-  color: #9a5b16;
-}
-
-.wo-esign-summary {
-  margin: 0 0 var(--space-md);
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.wo-esign-meta {
-  margin: 0 auto var(--space-md);
-  font-size: 0.875rem;
-  width: min(100%, 24rem);
-  text-align: center;
-}
-
-.wo-esign-meta-row {
-  display: flex;
-  justify-content: center;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-bottom: 0.35rem;
-}
-
-.wo-esign-meta-row dt {
-  margin: 0;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.wo-esign-meta-row dd {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.wo-esign-meta-row-reason {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.15rem;
-}
-
-.wo-esign-actions {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  gap: var(--space-sm);
-  align-items: center;
-  justify-content: center;
-}
-
-.wo-esign-actions .btn-action {
-  font-size: 0.8125rem;
-}
-
-/* E-sign timeline card is a light panel — neutral pills only; primary keeps global spark */
-.wo-esign-card .btn-action:not(.btn-primary) {
-  background: white;
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-}
-
-.wo-esign-card .btn-action:not(.btn-primary):hover:not(:disabled) {
-  background: var(--surface);
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-
-.wo-esign-card .btn-secondary.btn-action {
-  background: var(--surface-white);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-}
-
-.wo-esign-card .btn-secondary.btn-action:hover:not(:disabled) {
-  background: var(--surface);
-  border-color: var(--border-strong);
-}
-
-.wo-esign-signed-link-fallback {
-  cursor: default;
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.wo-esign-actions-primary {
-  width: min(100%, 20rem);
-  box-sizing: border-box;
-}
-
-.wo-esign-actions .wo-esign-actions-copy {
-  font-size: 0.75rem;
-  padding: 0.35rem 0.65rem;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-@media (max-width: 520px) {
-  .wo-esign-timeline {
-    width: 100%;
-  }
-
-  .wo-esign-step-label {
-    font-size: 0.6875rem;
-    letter-spacing: 0.04em;
-  }
-
-  .wo-esign-step-line {
-    left: calc(50% + 0.55rem);
-    width: calc(100% - 1.1rem);
-  }
 }
