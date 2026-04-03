@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
+  BusinessProfile,
   Invoice,
   Job,
   WorkOrderDashboardJob,
@@ -192,7 +193,43 @@ function latestWorkOrdersListUl(): HTMLElement {
   return last;
 }
 
-function renderPage() {
+const PROFILE_NUDGE_STORAGE_PREFIX = 'scope-lock-hide-complete-profile-cta:';
+
+function minimalProfileWithPhone(overrides: Partial<BusinessProfile> = {}): BusinessProfile {
+  return {
+    id: 'p1',
+    user_id: 'u1',
+    business_name: 'Biz',
+    owner_name: 'Owner',
+    phone: '5551234567',
+    email: 'o@example.com',
+    address: null,
+    google_business_profile_url: null,
+    default_exclusions: [],
+    default_assumptions: [],
+    next_wo_number: 1,
+    next_invoice_number: 1,
+    default_warranty_period: 0,
+    default_negotiation_period: 0,
+    default_payment_methods: [],
+    default_tax_rate: 0,
+    default_late_payment_terms: '',
+    default_payment_terms_days: 0,
+    default_late_fee_rate: 0,
+    default_card_fee_note: false,
+    stripe_account_id: null,
+    stripe_onboarding_complete: false,
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function minimalProfileNoPhone(): BusinessProfile {
+  return minimalProfileWithPhone({ phone: null });
+}
+
+function renderPage(profile: BusinessProfile | null = null) {
   const onCreateWorkOrder = vi.fn();
   const onStartInvoice = vi.fn();
   const onOpenPendingInvoice = vi.fn();
@@ -201,7 +238,7 @@ function renderPage() {
   render(
     <WorkOrdersPage
       userId="u1"
-      profile={null}
+      profile={profile}
       successBanner={null}
       onClearSuccessBanner={onClearSuccessBanner}
       onCreateWorkOrder={onCreateWorkOrder}
@@ -233,6 +270,7 @@ describe('WorkOrdersPage', () => {
   });
 
   beforeEach(() => {
+    localStorage.clear();
     listWorkOrdersDashboardPage.mockReset();
     getWorkOrdersDashboardSummary.mockReset();
     getJobById.mockReset();
@@ -245,7 +283,7 @@ describe('WorkOrdersPage', () => {
 
   it('renders the Create Work Order button and calls onCreateWorkOrder', async () => {
     const user = userEvent.setup();
-    const { onCreateWorkOrder } = renderPage();
+    const { onCreateWorkOrder } = renderPage(minimalProfileWithPhone());
 
     await screen.findByText('Customer A');
     await user.click(screen.getByRole('button', { name: /create work order/i }));
@@ -264,7 +302,7 @@ describe('WorkOrdersPage', () => {
       error: null,
     });
 
-    renderPage();
+    renderPage(minimalProfileWithPhone());
 
     await waitFor(() => {
       expect(screen.getByText('Customer A')).toBeInTheDocument();
@@ -310,7 +348,7 @@ describe('WorkOrdersPage', () => {
 
   it('opens work-order detail immediately with the row job id and does not prefetch on click', async () => {
     const user = userEvent.setup();
-    const { onOpenWorkOrderDetail } = renderPage();
+    const { onOpenWorkOrderDetail } = renderPage(minimalProfileWithPhone());
 
     await screen.findByText('Customer A');
     await user.click(screen.getByRole('button', { name: /Customer A/i }));
@@ -321,7 +359,7 @@ describe('WorkOrdersPage', () => {
 
   it('hydrates a full job only when starting an invoice', async () => {
     const user = userEvent.setup();
-    const { onStartInvoice } = renderPage();
+    const { onStartInvoice } = renderPage(minimalProfileWithPhone());
 
     await screen.findByText('Customer A');
     await user.click(screen.getByRole('button', { name: /^Invoice$/i }));
@@ -367,7 +405,7 @@ describe('WorkOrdersPage', () => {
       ])
     );
 
-    renderPage();
+    renderPage(minimalProfileWithPhone());
 
     await screen.findByText('Customer A');
     const row = screen.getByText('Customer A').closest('li');
@@ -416,6 +454,39 @@ describe('WorkOrdersPage', () => {
     });
   });
 
+  it('renders Paid Offline row action and opens invoice on click', async () => {
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        {
+          ...listJobA,
+          latestInvoice: {
+            id: 'inv-off',
+            job_id: 'job-a',
+            issued_at: '2025-01-05T00:00:00Z',
+            invoice_number: 9,
+            created_at: '2025-01-05T00:00:00Z',
+            payment_status: 'offline',
+          },
+        },
+      ])
+    );
+
+    const user = userEvent.setup();
+    const { onOpenPendingInvoice } = renderPage(minimalProfileWithPhone());
+
+    await waitFor(() => {
+      const list = latestWorkOrdersListUl();
+      expect(within(list).getByRole('button', { name: /^Paid Offline$/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /^Paid Offline$/i }));
+
+    await waitFor(() => {
+      expect(onOpenPendingInvoice).toHaveBeenCalledTimes(1);
+    });
+    expect(getInvoice).toHaveBeenCalledWith('inv-off');
+  });
+
   it('opens the pending invoice using the invoice id from the dashboard row', async () => {
     listWorkOrdersDashboardPage.mockResolvedValue(
       makePageResult([
@@ -434,7 +505,7 @@ describe('WorkOrdersPage', () => {
     );
 
     const user = userEvent.setup();
-    const { onOpenPendingInvoice } = renderPage();
+    const { onOpenPendingInvoice } = renderPage(minimalProfileWithPhone());
 
     await screen.findByRole('button', { name: /^Draft$/i });
     await user.click(screen.getByRole('button', { name: /^Draft$/i }));
@@ -458,7 +529,7 @@ describe('WorkOrdersPage', () => {
     render(
       <WorkOrdersPage
         userId="u1"
-        profile={null}
+        profile={minimalProfileWithPhone()}
         successBanner="Work order saved. PDF downloaded."
         onClearSuccessBanner={onClearSuccessBanner}
         onCreateWorkOrder={() => {}}
@@ -480,5 +551,108 @@ describe('WorkOrdersPage', () => {
       await vi.advanceTimersByTimeAsync(1);
     });
     expect(onClearSuccessBanner).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Forge empty state when there are no work orders', async () => {
+    listWorkOrdersDashboardPage.mockResolvedValue(makePageResult([]));
+    renderPage(minimalProfileWithPhone());
+
+    await waitFor(() => {
+      expect(screen.getByText('No work orders yet')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Create your first agreement and it will show up here/)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('hides the entire profile nudge after Not now', async () => {
+    localStorage.clear();
+    const user = userEvent.setup();
+    const onCompleteProfileClick = vi.fn();
+    render(
+      <WorkOrdersPage
+        userId="u1"
+        profile={minimalProfileNoPhone()}
+        successBanner={null}
+        onClearSuccessBanner={() => {}}
+        onCreateWorkOrder={() => {}}
+        onCompleteProfileClick={onCompleteProfileClick}
+        onStartInvoice={() => {}}
+        onOpenPendingInvoice={() => {}}
+        onOpenWorkOrderDetail={() => {}}
+      />
+    );
+
+    await screen.findByText(/Add your business phone/);
+    await user.click(screen.getByRole('button', { name: /not now/i }));
+
+    expect(screen.queryByText(/Add your business phone/)).not.toBeInTheDocument();
+    expect(localStorage.getItem(`${PROFILE_NUDGE_STORAGE_PREFIX}u1`)).toBeTruthy();
+  });
+
+  it('shows profile nudge again when dismissal is older than 48 hours', async () => {
+    localStorage.setItem(
+      `${PROFILE_NUDGE_STORAGE_PREFIX}u1`,
+      String(Date.now() - 49 * 60 * 60 * 1000)
+    );
+
+    render(
+      <WorkOrdersPage
+        userId="u1"
+        profile={minimalProfileNoPhone()}
+        successBanner={null}
+        onClearSuccessBanner={() => {}}
+        onCreateWorkOrder={() => {}}
+        onCompleteProfileClick={() => {}}
+        onStartInvoice={() => {}}
+        onOpenPendingInvoice={() => {}}
+        onOpenWorkOrderDetail={() => {}}
+      />
+    );
+
+    await screen.findByText(/Add your business phone/);
+  });
+
+  it('does not apply user A dismissal to user B profile nudge', async () => {
+    localStorage.setItem(`${PROFILE_NUDGE_STORAGE_PREFIX}u1`, String(Date.now()));
+
+    const { rerender } = render(
+      <WorkOrdersPage
+        userId="u1"
+        profile={minimalProfileNoPhone()}
+        successBanner={null}
+        onClearSuccessBanner={() => {}}
+        onCreateWorkOrder={() => {}}
+        onCompleteProfileClick={() => {}}
+        onStartInvoice={() => {}}
+        onOpenPendingInvoice={() => {}}
+        onOpenWorkOrderDetail={() => {}}
+      />
+    );
+
+    await screen.findByText('Customer A');
+    expect(screen.queryByText(/Add your business phone/)).not.toBeInTheDocument();
+
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([{ ...listJobA, id: 'job-u2' }])
+    );
+
+    rerender(
+      <WorkOrdersPage
+        userId="u2"
+        profile={minimalProfileNoPhone()}
+        successBanner={null}
+        onClearSuccessBanner={() => {}}
+        onCreateWorkOrder={() => {}}
+        onCompleteProfileClick={() => {}}
+        onStartInvoice={() => {}}
+        onOpenPendingInvoice={() => {}}
+        onOpenWorkOrderDetail={() => {}}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Add your business phone/)).toBeInTheDocument();
+    });
   });
 });

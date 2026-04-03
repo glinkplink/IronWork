@@ -24,7 +24,20 @@ import {
 import './WorkOrdersPage.css';
 
 const HIDE_COMPLETE_PROFILE_CTA_PREFIX = 'scope-lock-hide-complete-profile-cta:';
+const PROFILE_NUDGE_DISMISS_MS = 48 * 60 * 60 * 1000;
 const WORK_ORDERS_PAGE_SIZE = 25;
+
+function readProfileNudgeDismissedActive(userId: string): boolean {
+  try {
+    const raw = localStorage.getItem(`${HIDE_COMPLETE_PROFILE_CTA_PREFIX}${userId}`);
+    if (!raw) return false;
+    const ts = Number(raw);
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < PROFILE_NUDGE_DISMISS_MS;
+  } catch {
+    return false;
+  }
+}
 
 function hasBusinessPhone(profile: BusinessProfile | null): boolean {
   return Boolean(profile?.phone?.replace(/\D/g, '').length);
@@ -145,7 +158,7 @@ const WorkOrderRow = memo(function WorkOrderRow({
         {!invoice ? (
           <button
             type="button"
-            className="wo-row-create-invoice-outline"
+            className="wo-row-invoice-btn wo-row-invoice-btn--outline"
             disabled={rowBusy}
             onClick={() => onStartInvoice(job)}
           >
@@ -154,16 +167,25 @@ const WorkOrderRow = memo(function WorkOrderRow({
         ) : invoice.payment_status === 'paid' ? (
           <button
             type="button"
-            className="badge-paid"
+            className="wo-row-invoice-btn wo-row-invoice-btn--paid"
             disabled={rowBusy}
             onClick={() => onOpenPendingInvoice(job)}
           >
             Paid
           </button>
+        ) : invoice.payment_status === 'offline' ? (
+          <button
+            type="button"
+            className="wo-row-invoice-btn wo-row-invoice-btn--offline"
+            disabled={rowBusy}
+            onClick={() => onOpenPendingInvoice(job)}
+          >
+            Paid Offline
+          </button>
         ) : getInvoiceBusinessStatus(invoice) === 'draft' ? (
           <button
             type="button"
-            className="badge-pending"
+            className="wo-row-invoice-btn wo-row-invoice-btn--draft"
             disabled={rowBusy}
             onClick={() => onOpenPendingInvoice(job)}
           >
@@ -172,7 +194,7 @@ const WorkOrderRow = memo(function WorkOrderRow({
         ) : (
           <button
             type="button"
-            className="badge-invoiced"
+            className="wo-row-invoice-btn wo-row-invoice-btn--invoiced"
             disabled={rowBusy}
             onClick={() => onOpenPendingInvoice(job)}
           >
@@ -231,17 +253,16 @@ export function WorkOrdersPage({
   });
 
   const hideCtaKey = `${HIDE_COMPLETE_PROFILE_CTA_PREFIX}${userId}`;
-  const [hideCompleteProfileCta, setHideCompleteProfileCta] = useState(() => {
-    try {
-      return sessionStorage.getItem(`${HIDE_COMPLETE_PROFILE_CTA_PREFIX}${userId}`) === '1';
-    } catch {
-      return false;
-    }
-  });
+  const [profileNudgeDismissedActive, setProfileNudgeDismissedActive] = useState(() =>
+    readProfileNudgeDismissedActive(userId)
+  );
+
+  useEffect(() => {
+    setProfileNudgeDismissedActive(readProfileNudgeDismissedActive(userId));
+  }, [userId]);
 
   useEffect(() => {
     let cancelled = false;
-    /* eslint-disable react-hooks/set-state-in-effect -- reset list state before async fetch when userId changes */
     setJobsLoading(true);
     setJobsError(null);
     setJobs([]);
@@ -249,7 +270,6 @@ export function WorkOrdersPage({
     setNextCursor(null);
     setLoadMoreError(null);
     setSummary(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
 
     void Promise.all([
       listWorkOrdersDashboardPage(userId, WORK_ORDERS_PAGE_SIZE),
@@ -289,15 +309,15 @@ export function WorkOrdersPage({
     return () => clearTimeout(t);
   }, [successBanner, onClearSuccessBanner]);
 
-  const showProfileNudge = !hasBusinessPhone(profile);
+  const showProfileNudge = !hasBusinessPhone(profile) && !profileNudgeDismissedActive;
 
   const handleNotNowCompleteProfile = () => {
     try {
-      sessionStorage.setItem(hideCtaKey, '1');
+      localStorage.setItem(hideCtaKey, String(Date.now()));
     } catch {
       /* ignore */
     }
-    setHideCompleteProfileCta(true);
+    setProfileNudgeDismissedActive(true);
   };
 
   const handleOpenPendingInvoiceForRow = useCallback(
@@ -342,11 +362,7 @@ export function WorkOrdersPage({
     <div className="work-orders-page">
       <div className="work-orders-toolbar">
         <h1 className="work-orders-title">Work Orders</h1>
-        <button
-          type="button"
-          className="work-orders-create-btn"
-          onClick={onCreateWorkOrder}
-        >
+        <button type="button" className="btn-primary work-orders-toolbar-cta" onClick={onCreateWorkOrder}>
           Create Work Order
         </button>
       </div>
@@ -357,24 +373,22 @@ export function WorkOrdersPage({
             Add your business phone so it appears on agreements and PDFs. Defaults you set in your
             profile (exclusions, customer obligations) apply to new work orders.
           </p>
-          {!hideCompleteProfileCta ? (
-            <div className="work-orders-profile-nudge-actions">
-              <button
-                type="button"
-                className="work-orders-complete-profile-btn"
-                onClick={onCompleteProfileClick}
-              >
-                Complete Profile
-              </button>
-              <button
-                type="button"
-                className="work-orders-nudge-not-now"
-                onClick={handleNotNowCompleteProfile}
-              >
-                Not now
-              </button>
-            </div>
-          ) : null}
+          <div className="work-orders-profile-nudge-actions">
+            <button
+              type="button"
+              className="work-orders-complete-profile-btn"
+              onClick={onCompleteProfileClick}
+            >
+              Complete Profile
+            </button>
+            <button
+              type="button"
+              className="work-orders-nudge-not-now"
+              onClick={handleNotNowCompleteProfile}
+            >
+              Not now
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -403,21 +417,34 @@ export function WorkOrdersPage({
       ) : (
         <>
           <div
-            className="work-orders-summary-strip"
+            className="work-orders-stat-strip"
             role="group"
             aria-label="Invoiced and pending invoice totals from work order prices"
           >
-            <span className="work-orders-summary-item work-orders-summary-invoiced">
-              <span className="work-orders-summary-label">Invoiced:</span>
-              <span className="work-orders-summary-amount">{summaryInvoicedDisplay}</span>
-            </span>
-            <span className="work-orders-summary-item work-orders-summary-pending">
-              <span className="work-orders-summary-label">Pending Invoice:</span>
-              <span className="work-orders-summary-amount">{summaryPendingDisplay}</span>
-            </span>
+            <div className="work-orders-stat-card work-orders-stat-card--blue">
+              <div className="work-orders-stat-num">{summaryInvoicedDisplay}</div>
+              <div className="work-orders-stat-label">Invoiced</div>
+            </div>
+            <div className="work-orders-stat-card work-orders-stat-card--green">
+              <div className="work-orders-stat-num">{summaryPendingDisplay}</div>
+              <div className="work-orders-stat-label">Pending invoice</div>
+            </div>
           </div>
           {jobs.length === 0 ? (
-            <p className="work-orders-empty">No work orders yet.</p>
+            <div className="work-orders-empty-state">
+              <p className="work-orders-empty-title">No work orders yet</p>
+              <p className="work-orders-empty-lead">
+                Create your first agreement and it will show up here.
+              </p>
+              <button
+                type="button"
+                className="btn-primary work-orders-empty-cta"
+                aria-label="Create your first work order"
+                onClick={onCreateWorkOrder}
+              >
+                Create Work Order
+              </button>
+            </div>
           ) : (
             <>
               <ul className="work-orders-list">

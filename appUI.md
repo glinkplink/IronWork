@@ -160,16 +160,16 @@ These need to be treated as explicit scope decisions before implementation start
 **Effort:** ~2 to 3 hours for visual refresh, more if backend filtering/search is added
 
 ### Changes
-- [ ] Refresh toolbar styling and CTA treatment
-- [ ] Convert rows to card treatment if it improves scanability on mobile
-- [ ] Replace current summary strip styling with new dashboard cards
-- [ ] Add improved empty state
-- [ ] Preserve existing operational affordances
+- [x] Refresh toolbar styling and CTA treatment
+- [x] Convert rows to card treatment if it improves scanability on mobile
+- [x] Replace current summary strip styling with new dashboard cards
+- [x] Add improved empty state
+- [x] Preserve existing operational affordances
   - open detail
   - open change-orders section
   - invoice entry points
   - profile-completion nudge
-- [ ] Adjust profile-completion nudge dismissal behavior
+- [x] Adjust profile-completion nudge dismissal behavior
   - when the user clicks `Not now`, hide the message immediately
   - re-show the message 48 hours after dismissal if the business phone is still missing
 
@@ -183,7 +183,7 @@ These need to be treated as explicit scope decisions before implementation start
   - or backend/RPC changes for full dataset behavior
 
 ### Status model
-- [ ] Do not collapse real business states too aggressively
+- [x] Do not collapse real business states too aggressively
   - work-order e-sign progress still matters
   - invoice states include `draft`, `invoiced`, `paid`, and `paid offline`
 
