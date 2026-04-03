@@ -8,6 +8,7 @@ export type InvoiceFlowState = {
   invoiceFlowTarget: 'job' | 'change_order' | null;
   wizardExistingInvoice: Invoice | null;
   activeInvoice: Invoice | null;
+  invoiceFinalReturnView: 'work-orders' | 'invoices';
   refreshKey: number;
 };
 
@@ -17,6 +18,7 @@ const initialInvoice: InvoiceFlowState = {
   invoiceFlowTarget: null,
   wizardExistingInvoice: null,
   activeInvoice: null,
+  invoiceFinalReturnView: 'work-orders',
   refreshKey: 0,
 };
 
@@ -41,6 +43,7 @@ export function useInvoiceFlow(
         invoiceFlowTarget: 'job',
         wizardExistingInvoice: null,
         activeInvoice: null,
+        invoiceFinalReturnView: 'work-orders',
       }));
       navigateTo('invoice-wizard');
     },
@@ -56,6 +59,7 @@ export function useInvoiceFlow(
         invoiceFlowTarget: 'change_order',
         wizardExistingInvoice: null,
         activeInvoice: null,
+        invoiceFinalReturnView: 'work-orders',
       }));
       navigateTo('invoice-wizard');
     },
@@ -63,7 +67,7 @@ export function useInvoiceFlow(
   );
 
   const handleOpenPendingInvoice = useCallback(
-    (jobRow: Job, inv: Invoice) => {
+    (jobRow: Job, inv: Invoice, returnView: 'work-orders' | 'invoices' = 'work-orders') => {
       setInvoice((i) => ({
         ...i,
         invoiceFlowJob: jobRow,
@@ -71,6 +75,7 @@ export function useInvoiceFlow(
         invoiceFlowTarget: 'job',
         wizardExistingInvoice: null,
         activeInvoice: inv,
+        invoiceFinalReturnView: returnView,
       }));
       navigateTo('invoice-final');
     },
@@ -78,7 +83,7 @@ export function useInvoiceFlow(
   );
 
   const handleOpenPendingChangeOrderInvoice = useCallback(
-    (jobRow: Job, changeOrder: ChangeOrder, inv: Invoice) => {
+    (jobRow: Job, changeOrder: ChangeOrder, inv: Invoice, returnView: 'work-orders' | 'invoices' = 'work-orders') => {
       setInvoice((i) => ({
         ...i,
         invoiceFlowJob: jobRow,
@@ -86,6 +91,7 @@ export function useInvoiceFlow(
         invoiceFlowTarget: 'change_order',
         wizardExistingInvoice: null,
         activeInvoice: inv,
+        invoiceFinalReturnView: returnView,
       }));
       navigateTo('invoice-final');
     },
@@ -123,8 +129,9 @@ export function useInvoiceFlow(
     }
   }, [navigateTo]);
 
-  const handleInvoiceFinalWorkOrders = useCallback(() => {
-    navigateTo('work-orders');
+  const handleInvoiceFinalBack = useCallback(() => {
+    const returnView = invoiceRef.current.invoiceFinalReturnView;
+    navigateTo(returnView);
     setInvoice((i) => ({
       ...i,
       invoiceFlowJob: null,
@@ -132,6 +139,7 @@ export function useInvoiceFlow(
       invoiceFlowTarget: null,
       activeInvoice: null,
       wizardExistingInvoice: null,
+      invoiceFinalReturnView: 'work-orders',
       refreshKey: i.refreshKey + 1,
     }));
   }, [navigateTo]);
@@ -162,7 +170,7 @@ export function useInvoiceFlow(
       handleOpenPendingChangeOrderInvoice,
       handleInvoiceWizardSuccess,
       handleInvoiceWizardCancel,
-      handleInvoiceFinalWorkOrders,
+      handleInvoiceFinalBack,
       handleEditInvoice,
       handleInvoiceUpdated,
       resetInvoiceFlow,

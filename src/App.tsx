@@ -11,7 +11,7 @@ import { signUp } from './lib/auth';
 import { buildInitialProfileDefaults } from './lib/defaults';
 import { getInvoice } from './lib/db/invoices';
 import type { BusinessProfile, ChangeOrder, Job } from './types/db';
-import { ClipboardList, Home, Plus, Settings, User } from 'lucide-react';
+import { ClipboardList, FileText, Home, Plus, Settings, User } from 'lucide-react';
 import { useInvoiceFlow } from './hooks/useInvoiceFlow';
 import { useChangeOrderFlow } from './hooks/useChangeOrderFlow';
 import { useWorkOrderDraft } from './hooks/useWorkOrderDraft';
@@ -32,6 +32,8 @@ const loadChangeOrderDetailPage = () =>
   import('./components/ChangeOrderDetailPage').then((module) => ({ default: module.ChangeOrderDetailPage }));
 const loadChangeOrderWizard = () =>
   import('./components/ChangeOrderWizard').then((module) => ({ default: module.ChangeOrderWizard }));
+const loadInvoicesPage = () =>
+  import('./components/InvoicesPage').then((module) => ({ default: module.InvoicesPage }));
 
 const AgreementPreview = lazy(loadAgreementPreview);
 const WorkOrdersPage = lazy(loadWorkOrdersPage);
@@ -40,6 +42,7 @@ const InvoiceFinalPage = lazy(loadInvoiceFinalPage);
 const WorkOrderDetailPage = lazy(loadWorkOrderDetailPage);
 const ChangeOrderDetailPage = lazy(loadChangeOrderDetailPage);
 const ChangeOrderWizard = lazy(loadChangeOrderWizard);
+const InvoicesPage = lazy(loadInvoicesPage);
 
 function scheduleIdleTask(task: () => void): () => void {
   if (typeof window === 'undefined') return () => {};
@@ -201,6 +204,7 @@ function App() {
     if (!user) return;
     return scheduleIdleTask(() => {
       void loadWorkOrdersPage();
+      void loadInvoicesPage();
     });
   }, [user]);
 
@@ -421,9 +425,23 @@ function App() {
           invoice={invoice.activeInvoice}
           job={invoice.invoiceFlowJob}
           profile={profile}
-          onWorkOrders={invoiceFlow.handleInvoiceFinalWorkOrders}
+          onBack={invoiceFlow.handleInvoiceFinalBack}
           onEditInvoice={invoiceFlow.handleEditInvoice}
           onInvoiceUpdated={invoiceFlow.handleInvoiceUpdated}
+        />
+      );
+    }
+    if (view === 'invoices' && user) {
+      return renderLazyPage(
+        <InvoicesPage
+          key={`${user.id}-inv-${invoice.refreshKey}`}
+          userId={user.id}
+          onOpenInvoice={(job, inv) =>
+            invoiceFlow.handleOpenPendingInvoice(job, inv, 'invoices')
+          }
+          onOpenCoInvoice={(job, co, inv) =>
+            invoiceFlow.handleOpenPendingChangeOrderInvoice(job, co, inv, 'invoices')
+          }
         />
       );
     }
@@ -592,6 +610,14 @@ function App() {
             <span className="app-bottom-nav-fab-inner">
               <Plus className="app-bottom-nav-fab-icon" aria-hidden="true" />
             </span>
+          </button>
+          <button
+            type="button"
+            className={`app-bottom-nav-item ${view === 'invoices' ? 'active' : ''}`}
+            onClick={() => navigateTo('invoices')}
+          >
+            <FileText className="app-bottom-nav-icon" aria-hidden="true" />
+            <span className="app-bottom-nav-label">Invoices</span>
           </button>
           <button
             type="button"

@@ -106,6 +106,8 @@ src/
     InvoiceFinalPage.css     # Invoice final page-only chrome (nav/headings shared in App.css)
     InvoicePreviewModal.tsx  # Full-screen invoice HTML preview
     InvoicePreviewModal.css  # Invoice preview modal overlay/scroll/sheet
+    InvoicesPage.tsx         # Top-level Invoices tab: list of all invoices with status badges; row click opens InvoiceFinalPage with correct job/CO context
+    InvoicesPage.css         # InvoicesPage-only styles (row layout, badge-paid/offline/draft co-located)
   lib/
     supabase.ts              # Supabase client singleton
     auth.ts                  # signUp, signIn, signOut
@@ -210,8 +212,8 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 - **`jobs.esign_*` and `change_orders.esign_*`:** detail surfaces show e-sign progress, signing actions, and signed artifacts. Opening work-order or change-order detail triggers **one** authenticated **`GET /api/esign/work-orders/:id/status`** or **`GET /api/esign/change-orders/:id/status`** (plus send/resend flows that already refresh); **webhooks** update the same fields. **Email** subject/body for DocuSeal notifications and **signed PDF** layout are best verified on the **deployed** app (public URL + production-like env), not assumed identical to every local setup.
 - **Offline signature:** Work orders can be manually marked as signed offline via `jobs.offline_signed_at`. This is a signature-satisfied state alongside DocuSeal `completed`. Invoice issuance (payment-link creation and send) is blocked until the parent work order is signature-satisfied. Invoice drafts can be created regardless of signature state.
 
-**`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'auth'` (plus `pushState` / `popstate` for back/forward).
-- `App.tsx` lazy-loads preview, Work Orders, detail, change-order, and invoice screens. The initial shell stays eager; heavy document/dashboard flows load on demand, and the Work Orders chunk is idle-prefetched after sign-in.
+**`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'invoices' | 'auth'` (plus `pushState` / `popstate` for back/forward).
+- `App.tsx` lazy-loads preview, Work Orders, detail, change-order, and invoice screens. The initial shell stays eager; heavy document/dashboard flows load on demand, and the Work Orders and Invoices chunks are idle-prefetched after sign-in.
 
 ---
 
@@ -247,7 +249,7 @@ Migrations are in `supabase/migrations/` — apply via Supabase CLI (`npx supaba
 
 ## Design system — Forge shell + light documents
 
-**App shell (Forge):** Dark iron surfaces (`--iron-*`), spark orange accent (`--spark`), mobile-first. Signed-in users get a **bottom nav** (Home, Work Orders, center create FAB → new work order draft, Profile). The work-order **draft flow** keeps the shell **`tab-nav`** for **Edit Work Order / Preview** (not replaced by bottom nav). Optional subtle grain on `body`. Shell chrome uses **`--shell-radius-*`** where larger radii are intentional (e.g. FAB); keep components simple—no animation libraries. Shared **shell form panels** (`.form-section`, `.form-group` in the main flow) use **`--form-panel-*` / `--form-control-*`** in `App.css`; primary actions use **spark** (`.btn-primary`), not legacy navy, except where a **light** surface still applies (see below).
+**App shell (Forge):** Dark iron surfaces (`--iron-*`), spark orange accent (`--spark`), mobile-first. Signed-in users get a **bottom nav** (Home, Work Orders, center create FAB → new work order draft, Invoices, Profile). The work-order **draft flow** keeps the shell **`tab-nav`** for **Edit Work Order / Preview** (not replaced by bottom nav). Optional subtle grain on `body`. Shell chrome uses **`--shell-radius-*`** where larger radii are intentional (e.g. FAB); keep components simple—no animation libraries. Shared **shell form panels** (`.form-section`, `.form-group` in the main flow) use **`--form-panel-*` / `--form-control-*`** in `App.css`; primary actions use **spark** (`.btn-primary`), not legacy navy, except where a **light** surface still applies (see below).
 
 **Light documents (agreements, invoices, PDFs):** Preview sheets and generated PDFs stay **light**. Legacy light tokens in `App.css :root` (`--surface`, `--surface-white`, `--border`, `--text-primary`, `--agreement-*`, etc.) remain for **light UI surfaces** (e.g. agreement preview sheet, e-sign timeline card, capture **modal** fields, invoice wizard summary box, payment-method document copy) and document markup. **`buildPdfHtml`** inlines raw `App.css`—do not redefine those semantics to dark values without pinning light values in the PDF HTML wrapper. On-screen document roots use **`font-family: var(--font-document)`** (Barlow stack) so preview matches PDF while **`body`** uses Outfit.
 

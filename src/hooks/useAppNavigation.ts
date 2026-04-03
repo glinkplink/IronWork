@@ -11,6 +11,7 @@ export type AppView =
   | 'change-order-wizard'
   | 'invoice-wizard'
   | 'invoice-final'
+  | 'invoices'
   | 'auth';
 
 type AppHistoryState = { view?: AppView };
@@ -26,6 +27,7 @@ const APP_VIEWS: AppView[] = [
   'change-order-wizard',
   'invoice-wizard',
   'invoice-final',
+  'invoices',
   'auth',
 ];
 

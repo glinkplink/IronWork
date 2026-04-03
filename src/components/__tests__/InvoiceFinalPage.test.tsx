@@ -162,7 +162,7 @@ function baseInvoice(overrides: Partial<Invoice> = {}): Invoice {
 }
 
 describe('InvoiceFinalPage', () => {
-  const onWorkOrders = vi.fn();
+  const onBack = vi.fn();
   const onEditInvoice = vi.fn();
   const onInvoiceUpdated = vi.fn();
 
@@ -172,7 +172,7 @@ describe('InvoiceFinalPage', () => {
         invoice={invoice}
         job={job}
         profile={baseProfile()}
-        onWorkOrders={onWorkOrders}
+        onBack={onBack}
         onEditInvoice={onEditInvoice}
         onInvoiceUpdated={onInvoiceUpdated}
       />
@@ -213,7 +213,7 @@ describe('InvoiceFinalPage', () => {
       expect(fetchInvoicePdfBlob).toHaveBeenCalledTimes(1);
       expect(downloadPdfBlobToFile).toHaveBeenCalledTimes(1);
     });
-    expect(onWorkOrders).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   it('hides edit button for issued invoice', () => {

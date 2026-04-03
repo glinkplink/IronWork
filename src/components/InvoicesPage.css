@@ -1,0 +1,142 @@
+.invoices-page {
+  padding: 0 0 calc(var(--nav-height) + 16px);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.invoices-page-header {
+  padding: 24px 16px 12px;
+}
+
+.invoices-page-title {
+  font-family: var(--font-app);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--iron-100);
+  margin: 0;
+}
+
+.invoices-page-status {
+  padding: 32px 16px;
+  color: var(--iron-400);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.invoices-page-status--error {
+  color: #e05a5a;
+}
+
+.invoices-page-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 16px;
+}
+
+.invoices-page-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  background: var(--iron-850, #1a1a1a);
+  border: 1px solid var(--iron-700);
+  border-radius: var(--radius, 8px);
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+  margin-bottom: 8px;
+}
+
+.invoices-page-row:hover:not(:disabled) {
+  background: var(--iron-800);
+}
+
+.invoices-page-row--busy {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.invoices-page-row-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.invoices-page-row-label {
+  font-family: var(--font-app);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--iron-100);
+}
+
+.invoices-page-row-client {
+  font-family: var(--font-app);
+  font-size: 0.85rem;
+  color: var(--iron-400);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invoices-page-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.invoices-page-row-amount {
+  font-family: var(--font-app);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--iron-200);
+}
+
+.invoices-page-row-date {
+  font-family: var(--font-app);
+  font-size: 0.8rem;
+  color: var(--iron-500);
+  margin-right: auto;
+}
+
+/* Badge definitions for InvoicesPage — co-located per CSS rules */
+.invoices-page-row .badge-paid {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: #1a3a1a;
+  color: #4caf50;
+  border: 1px solid #2d5a2d;
+}
+
+.invoices-page-row .badge-offline {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: #1a2e3a;
+  color: #64b5f6;
+  border: 1px solid #1e4060;
+}
+
+.invoices-page-row .badge-draft {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: var(--iron-800);
+  color: var(--iron-400);
+  border: 1px solid var(--iron-700);
+}

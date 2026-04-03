@@ -272,7 +272,9 @@ First Download & Save → CaptureModal → signUp + upsertProfile (+ optional WO
       ↓
 Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + change orders + PDFs + offline-sign controls)
                       → Change Order → ChangeOrderWizard → detail (refresh list)
-                      → Invoice → InvoiceWizard (optional CO lines on **new** invoices) → InvoiceFinalPage (PDF + send/payment-link issuance gate)
+                      → Invoice → InvoiceWizard (optional CO lines on **new** invoices) → InvoiceFinalPage (PDF + send/payment-link issuance gate; back returns to Work Orders)
+      ↓
+Invoices → InvoicesPage (all invoices; job-only and CO invoices detected via line_items[].change_order_id) → InvoiceFinalPage (back returns to Invoices list)
       ↓
 Create Work Order → JobForm → Preview tab → AgreementPreview (Download & Save / PDF)
       ↓
