@@ -30,6 +30,11 @@ function formatInvoiceLabel(invoiceNumber: number): string {
   return `INV #${String(invoiceNumber).padStart(4, '0')}`;
 }
 
+/** Matches `formatWorkOrderDashboardWoLabel` in `work-order-dashboard-display.ts`. */
+function formatWoLabel(woNumber: number | null): string {
+  return woNumber != null ? `WO #${String(woNumber).padStart(4, '0')}` : 'WO (no #)';
+}
+
 interface InvoiceRowProps {
   invoice: InvoiceWithCustomerName;
   busy: boolean;
@@ -51,22 +56,27 @@ function InvoiceRow({ invoice, busy, onOpen }: InvoiceRowProps) {
   }
 
   return (
-    <button
-      type="button"
-      className={`invoices-page-row${busy ? ' invoices-page-row--busy' : ''}`}
-      onClick={() => onOpen(invoice)}
-      disabled={busy}
-    >
-      <div className="invoices-page-row-main">
-        <span className="invoices-page-row-label">{formatInvoiceLabel(invoice.invoice_number)}</span>
-        <span className="invoices-page-row-client">{invoice.customer_name ?? '—'}</span>
-      </div>
-      <div className="invoices-page-row-meta">
-        <span className="invoices-page-row-amount">{formatUsd(invoice.total)}</span>
-        <span className="invoices-page-row-date">{formatInvoiceDate(invoice.invoice_date)}</span>
-        {badgeEl}
-      </div>
-    </button>
+    <li className={`invoices-page-row${busy ? ' invoices-page-row--busy' : ''}`}>
+      <button
+        type="button"
+        className="invoices-page-row-hit"
+        onClick={() => onOpen(invoice)}
+        disabled={busy}
+      >
+        <span className="invoices-page-row-main">
+          <span className="invoices-page-row-heading">
+            <span className="invoices-page-row-label">{formatInvoiceLabel(invoice.invoice_number)}</span>
+            <span className="invoices-page-row-date">{`· ${formatInvoiceDate(invoice.invoice_date)}`}</span>
+          </span>
+          <span className="invoices-page-row-customer">{invoice.customer_name ?? '—'}</span>
+          <span className="invoices-page-row-wo">{formatWoLabel(invoice.wo_number)}</span>
+        </span>
+        <span className="invoices-page-row-actions">
+          <span className="invoices-page-row-amount">{formatUsd(invoice.total)}</span>
+          {badgeEl}
+        </span>
+      </button>
+    </li>
   );
 }
 
@@ -139,7 +149,7 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
       )}
 
       {!loading && !error && invoices.length > 0 && (
-        <div className="invoices-page-list">
+        <ul className="invoices-page-list">
           {invoices.map((inv) => (
             <InvoiceRow
               key={inv.id}
@@ -148,7 +158,7 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
               onOpen={handleRowOpen}
             />
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

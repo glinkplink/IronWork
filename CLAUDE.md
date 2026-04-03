@@ -106,8 +106,8 @@ src/
     InvoiceFinalPage.css     # Invoice final page-only chrome (nav/headings shared in App.css)
     InvoicePreviewModal.tsx  # Full-screen invoice HTML preview
     InvoicePreviewModal.css  # Invoice preview modal overlay/scroll/sheet
-    InvoicesPage.tsx         # Top-level Invoices tab: list of all invoices with status badges; row click opens InvoiceFinalPage with correct job/CO context
-    InvoicesPage.css         # InvoicesPage-only styles (row layout, badge-paid/offline/draft co-located)
+    InvoicesPage.tsx         # Top-level Invoices tab: Forge card rows (INV + date, customer, WO #) with status badges; row click opens InvoiceFinalPage with correct job/CO context
+    InvoicesPage.css         # InvoicesPage-only styles (card rows, badge-paid/offline/draft co-located; badge-invoiced global in App.css)
   lib/
     supabase.ts              # Supabase client singleton
     auth.ts                  # signUp, signIn, signOut

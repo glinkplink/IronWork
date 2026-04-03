@@ -449,12 +449,15 @@ export const getInvoiceByJobId = async (jobId: string): Promise<Invoice | null> 
   return null;
 };
 
-export type InvoiceWithCustomerName = Invoice & { customer_name: string | null };
+export type InvoiceWithCustomerName = Invoice & {
+  customer_name: string | null;
+  wo_number: number | null;
+};
 
 export const listInvoicesWithCustomerName = async (userId: string): Promise<InvoiceWithCustomerName[]> => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('*, jobs!job_id(customer_name)')
+    .select('*, jobs!job_id(customer_name, wo_number)')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -465,12 +468,15 @@ export const listInvoicesWithCustomerName = async (userId: string): Promise<Invo
 
   return (data ?? []).map((row) => {
     const inv = mapInvoiceRow(row as Record<string, unknown>);
-    const jobRelation = (row as Record<string, unknown>).jobs;
+    const jobRelation = (row as Record<string, unknown>).jobs as Record<string, unknown> | null;
     const customer_name =
-      jobRelation && typeof (jobRelation as Record<string, unknown>).customer_name === 'string'
-        ? ((jobRelation as Record<string, unknown>).customer_name as string)
+      jobRelation && typeof jobRelation.customer_name === 'string'
+        ? (jobRelation.customer_name as string)
         : null;
-    return { ...inv, customer_name };
+    const rawWo = jobRelation?.wo_number;
+    const n = rawWo != null ? Number(rawWo) : NaN;
+    const wo_number = Number.isFinite(n) ? n : null;
+    return { ...inv, customer_name, wo_number };
   });
 };
 

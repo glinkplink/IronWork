@@ -28,77 +28,122 @@
 }
 
 .invoices-page-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 0 16px;
+  gap: 10px;
 }
 
 .invoices-page-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  background: var(--iron-850, #1a1a1a);
-  border: 1px solid var(--iron-700);
-  border-radius: var(--radius, 8px);
-  padding: 12px 14px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s;
-  margin-bottom: 8px;
-}
-
-.invoices-page-row:hover:not(:disabled) {
-  background: var(--iron-800);
+  list-style: none;
+  background: var(--iron-750);
+  border: 1px solid var(--iron-600);
+  border-radius: var(--shell-radius-sm);
 }
 
 .invoices-page-row--busy {
   opacity: 0.6;
+}
+
+/* Full-card button — resets chrome, fills the li, lays out left+right columns */
+.invoices-page-row-hit {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+  border-radius: inherit;
+}
+
+.invoices-page-row-hit:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.invoices-page-row-hit:disabled {
   cursor: wait;
 }
 
+.invoices-page-row-hit:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-spark);
+  border-radius: var(--shell-radius-sm);
+}
+
+/* Left column */
 .invoices-page-row-main {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.invoices-page-row-label {
-  font-family: var(--font-app);
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--iron-100);
-}
-
-.invoices-page-row-client {
-  font-family: var(--font-app);
-  font-size: 0.85rem;
-  color: var(--iron-400);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.invoices-page-row-meta {
+.invoices-page-row-heading {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: baseline;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-.invoices-page-row-amount {
-  font-family: var(--font-app);
-  font-size: 0.9rem;
+.invoices-page-row-label {
+  font-family: 'Chakra Petch', var(--font-app);
+  font-size: 0.8rem;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--iron-200);
 }
 
 .invoices-page-row-date {
-  font-family: var(--font-app);
   font-size: 0.8rem;
-  color: var(--iron-500);
-  margin-right: auto;
+  color: var(--iron-400);
+}
+
+.invoices-page-row-customer {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--iron-50);
+}
+
+.invoices-page-row-wo {
+  font-size: 0.8rem;
+  color: var(--iron-400);
+}
+
+/* Right column — amount + badge */
+.invoices-page-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.invoices-page-row-amount {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--iron-50);
+}
+
+@media (max-width: 640px) {
+  .invoices-page-row-hit {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invoices-page-row-actions {
+    align-self: flex-end;
+  }
 }
 
 /* Badge definitions for InvoicesPage — co-located per CSS rules */
