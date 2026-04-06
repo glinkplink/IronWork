@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import type { Client } from '../../types/db';
+import type { Client, ClientListItem } from '../../types/db';
 
 /** Escape `%`, `_`, and `\` for use inside a Postgres ILIKE pattern (default escape `\`). */
 function escapeIlikePattern(fragment: string): string {
@@ -13,6 +13,21 @@ function normalizeClientSearchFragment(value: string): string {
 export interface ClientSearchQuery {
   firstName?: string;
   lastName?: string;
+}
+
+export type ListClientItemsResult =
+  | { data: ClientListItem[]; error: null }
+  | { data: null; error: Error };
+
+type ClientActivityRow = {
+  client_id: string | null;
+  agreement_date: string | null;
+  created_at: string;
+};
+
+function getClientLatestActivityAt(row: ClientActivityRow): string {
+  const agreementDate = row.agreement_date?.trim();
+  return agreementDate ? `${agreementDate}T00:00:00Z` : row.created_at;
 }
 
 /**
@@ -64,6 +79,66 @@ export const listClients = async (userId: string): Promise<Client[]> => {
   }
 
   return data;
+};
+
+export const listClientItems = async (userId: string): Promise<ListClientItemsResult> => {
+  const [{ data: clients, error: clientsError }, { data: jobs, error: jobsError }] =
+    await Promise.all([
+      supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', userId)
+        .order('name', { ascending: true }),
+      supabase
+        .from('jobs')
+        .select('client_id, agreement_date, created_at')
+        .eq('user_id', userId)
+        .not('client_id', 'is', null),
+    ]);
+
+  if (clientsError) {
+    console.error('Error listing client items:', clientsError);
+    return { data: null, error: new Error(clientsError.message) };
+  }
+
+  if (jobsError) {
+    console.error('Error loading client activity:', jobsError);
+    return { data: null, error: new Error(jobsError.message) };
+  }
+
+  const activityByClientId = new Map<string, { jobCount: number; latestActivityAt: string | null }>();
+
+  for (const rawRow of (jobs ?? []) as ClientActivityRow[]) {
+    const clientId = rawRow.client_id;
+    if (!clientId) continue;
+
+    const latestActivityAt = getClientLatestActivityAt(rawRow);
+    const existing = activityByClientId.get(clientId);
+
+    if (!existing) {
+      activityByClientId.set(clientId, { jobCount: 1, latestActivityAt });
+      continue;
+    }
+
+    activityByClientId.set(clientId, {
+      jobCount: existing.jobCount + 1,
+      latestActivityAt:
+        existing.latestActivityAt && existing.latestActivityAt > latestActivityAt
+          ? existing.latestActivityAt
+          : latestActivityAt,
+    });
+  }
+
+  const data = (clients ?? []).map((client) => {
+    const activity = activityByClientId.get(client.id);
+    return {
+      ...client,
+      jobCount: activity?.jobCount ?? 0,
+      latestActivityAt: activity?.latestActivityAt ?? null,
+    };
+  });
+
+  return { data, error: null };
 };
 
 export const upsertClient = async (client: Partial<Client> & { user_id: string }) => {

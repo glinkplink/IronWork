@@ -145,6 +145,7 @@ scope-lock/
 │   │   ├── AuthPage.tsx              # Sign-in only (email + password)
 │   │   ├── BusinessProfileForm.tsx   # Signed-in user with no profile row (edge case)
 │   │   ├── CaptureModal.tsx          # Anonymous first Download & Save / Send: account + optional defaults opt-in
+│   │   ├── ClientsPage.tsx           # Saved clients list with inline contact editing + work-order activity context
 │   │   ├── EditProfilePage.tsx       # Edit profile + agreement defaults
 │   │   ├── HomePage.tsx              # Guest hero + signed-in dashboard (`get_work_orders_dashboard_summary` + first page of `list_work_orders_dashboard_page` for recent rows)
 │   │   ├── WorkOrdersPage.tsx        # List jobs + invoice actions; row opens detail
@@ -203,7 +204,7 @@ scope-lock/
 │   │   ├── payment-methods.ts, tax.ts
 │   │   └── db/
 │   │       ├── profile.ts            # getProfile, upsertProfile, updateNextWoNumber (counter patch)
-│   │       ├── clients.ts            # listClients / upsertClient / deleteClient (JobForm search when authed)
+│   │       ├── clients.ts            # listClients / listClientItems / upsertClient / deleteClient (JobForm search + Clients page)
 │   │       ├── jobs.ts               # listJobs, saveWorkOrder, dashboard page/summary RPC mapping, create/update/delete
 │   │       ├── change-orders.ts      # list/create/update/delete change orders; computeCOTotal
 │   │       └── invoices.ts           # createInvoice (RPC counter), updateInvoice, list/get, issuance tracking
@@ -270,6 +271,8 @@ First Download & Save → CaptureModal → signUp + upsertProfile (+ optional WO
       ↓
 [Signed in + profile] → HomePage (dashboard summary + recent WOs; **Back** from detail opened here still returns to Work Orders until a `backTarget` stack exists)
       ↓
+Clients → ClientsPage (saved clients; real-time search on name/phone/email/address; inline edit for phone/email/address only)
+      ↓
 Work Orders → WorkOrdersPage → row → WorkOrderDetailPage (agreement + change orders + PDFs + offline-sign controls)
                       → Change Order → ChangeOrderWizard → detail (refresh list)
                       → Invoice → InvoiceWizard (optional CO lines on **new** invoices) → InvoiceFinalPage (PDF + send/payment-link issuance gate; back returns to Work Orders)
@@ -290,6 +293,7 @@ Edit profile (gear) → EditProfilePage
 - **Returning users:** **AuthPage** is sign-in only (email + password).
 - **Missing profile row** while signed in: **BusinessProfileForm** blocks the rest of the app until `business_profiles` exists.
 - **Profile data** (defaults, counters, payment methods, tax, etc.) lives in **`business_profiles`**; jobs, clients, invoices, and change orders are separate tables with RLS. See **What Is and Isn't Persisted** below.
+- **Clients page enrichment:** The app reads editable client fields from **`clients`** and derives list context from related **`jobs`** by **`client_id`**. The displayed count is **all linked jobs**; latest activity uses the most recent job **`agreement_date`** when present, otherwise that job’s **`created_at`**.
 - **Stripe Connect entrypoint:** **Edit Profile** owns the Stripe onboarding CTA. The CTA is a separate `type="button"` action, not a second form submit: it saves the profile first, then starts Stripe onboarding if save succeeds.
 
 ## Domain Logic vs UI Logic
@@ -304,7 +308,7 @@ Edit profile (gear) → EditProfilePage
 - `supabase.ts`: Supabase client, reads env vars
 - `auth.ts`: Thin wrappers over `supabase.auth`
 - `db/profile.ts`: Profile CRUD; **`updateNextWoNumber`** uses `.update()` (partial `upsert` 400s on `business_profiles` because `business_name` is NOT NULL)
-- `db/clients.ts`: Client CRUD; **JobForm** searches/suggests clients when `userId` is set; **saveWorkOrder** upserts client by `name_normalized`
+- `db/clients.ts`: Client CRUD + enriched client-list query; **JobForm** searches/suggests clients when `userId` is set; **ClientsPage** lists/edits saved contact fields; **saveWorkOrder** upserts client by `name_normalized`
 - `db/jobs.ts`: Job CRUD + **saveWorkOrder** (insert/update, client upsert); UI lists jobs on **Work Orders**
 - `db/invoices.ts`: Invoice CRUD; **`createInvoice`** calls Postgres **`next_invoice_number(p_user_id)`** for atomic numbering (increments `business_profiles.next_invoice_number`); **`updateInvoice`** full-row overwrite; **`mapInvoiceRow`** normalizes **`line_items[].source`**; invoice business state derives from **`issued_at`** (no invoice row → `Invoice`, `issued_at = null` → `Draft`, `issued_at != null` → `Invoiced`). PDF sharing is manual or via future payment links. **`listInvoiceStatusByJob`** skips malformed rows and returns a non-blocking warning instead of disabling all invoice actions
 - `db/change-orders.ts`: **`listChangeOrders`**, **`createChangeOrder`** (RPC to **`public.create_change_order`**: per-job advisory lock + `MAX(co_number)+1` in SQL; rejects when an **issued job-level** invoice exists for the job), **`updateChangeOrder`**, **`deleteChangeOrder`**, **`computeCOTotal`**
@@ -375,7 +379,7 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 | Auth session | Yes | Supabase session (survives refresh) |
 | Work Agreement (current job) | In-memory while editing | **Download & Save** persists via `saveWorkOrder` |
 | Invoices | Yes | Created at wizard step 3. Business state is **Draft** until `issued_at` is set (Stripe payment-link creation sets this), then **Invoiced**. `payment_status` (`unpaid`/`paid`/`offline`) and `paid_at` are set by the Stripe webhook. **`InvoiceFinalPage`** refetches the invoice row once on mount so **Paid** reflects webhook updates when the user opens that screen; `WorkOrdersPage` and `WorkOrderDetailPage` use list/detail loads (no interval polling). Downloading the PDF does **not** transition invoice lifecycle. |
-| Clients | Yes (rows) | Upsert on **Download & Save**; **JobForm** customer-name combobox searches when authenticated |
+| Clients | Yes (rows) | Upsert on **Download & Save**; **JobForm** customer-name combobox searches when authenticated; **ClientsPage** edits saved `phone` / `email` / `address` only and does **not** rewrite historical jobs |
 | Change orders | Yes | **ChangeOrderWizard** + detail page; **`create_change_order`** RPC allocates `co_number` under an advisory lock (see **0006**); no client-side retry loop |
 | Completion signoffs | No | Schema only |
 
@@ -409,7 +413,7 @@ All tables use `auth.uid()` RLS policies: users can only read/write their own ro
 ### Top priorities (current focus)
 
 1. **Deploy to production**
-2. **Richer client management UI**
+2. **Custom branding**
 3. **ACH / bank payments** (Stripe Connect + payment links are shipped; ACH is next)
 
 The checkbox sections below track shipped work and the longer backlog; the three items above are the **near-term product focus** regardless of where they also appear.
@@ -429,6 +433,7 @@ The checkbox sections below track shipped work and the longer backlog; the three
 - [x] Edit Profile page
 - [x] Work Orders list + saved job detail + re-download PDF
 - [x] Job + client persistence on Download & Save
+- [x] Clients tab with inline saved-client management
 
 ### Near-Term
 - [x] Research standard welder work agreements/ contracts and edit ours to match
@@ -437,7 +442,7 @@ The checkbox sections below track shipped work and the longer backlog; the three
 - [x] Stripe Connect Express onboarding (Edit Profile CTA, return/refresh flow, status reconciliation)
 - [x] Stripe invoice payment links (create, copy, webhook-driven `payment_status` / `paid_at`)
 - [ ] Deploy the app server and Puppeteer route alongside production hosting
-- [ ] Richer client management UI (beyond JobForm search + save-time upsert)
+- [x] Richer client management UI (beyond JobForm search + save-time upsert)
 - [ ] Custom branding (logo)
 
 ### Later

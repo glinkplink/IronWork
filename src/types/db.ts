@@ -41,6 +41,11 @@ export interface Client {
   updated_at: string;
 }
 
+export interface ClientListItem extends Client {
+  jobCount: number;
+  latestActivityAt: string | null;
+}
+
 export interface Job {
   id: string;
   user_id: string;

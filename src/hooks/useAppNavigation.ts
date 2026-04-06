@@ -5,6 +5,7 @@ export type AppView =
   | 'form'
   | 'preview'
   | 'profile'
+  | 'clients'
   | 'work-orders'
   | 'work-order-detail'
   | 'co-detail'
@@ -21,6 +22,7 @@ const APP_VIEWS: AppView[] = [
   'form',
   'preview',
   'profile',
+  'clients',
   'work-orders',
   'work-order-detail',
   'co-detail',

@@ -8,7 +8,7 @@ Work agreement generator for contractors (initially welders). Contractors fill o
 
 **Canonical short rules for all agents:** **[AGENTS.md](./AGENTS.md)** (Codex and others should start there for shared repo rules).
 
-**Cursor:** **[.cursor/rules/ScopeLock-Project-Rules.mdc](./.cursor/rules/ScopeLock-Project-Rules.mdc)** (full rules, `alwaysApply`) and **[.cursor/rules/high-priority.mdc](./.cursor/rules/high-priority.mdc)** (terse guardrails, `alwaysApply`).
+**Cursor:** **[.cursor/rules/ScopeLock-Project-Rules.mdc](./.cursor/rules/ScopeLock-Project-Rules.mdc)** (full rules, `alwaysApply`) and **[.cursor/rules/high-priority.mdc](./.cursor/rules/high-priority.mdc)** (terse guardrails, `alwaysApply`). Optional project workflow skill: **[.cursor/skills/ironwork-workflow/SKILL.md](./.cursor/skills/ironwork-workflow/SKILL.md)** (quality gates and touchpoints).
 
 **Architecture reference:** **[ARCHITECTURE.md](./ARCHITECTURE.md)** (system design, deployment constraints, portability, and roadmap detail).
 
@@ -44,7 +44,10 @@ npm run dev       # one process: Vite (HMR) + SPA + POST /api/pdf + e-sign route
 npm run build     # tsc + vite bundle → dist/  (set VITE_* first for production builds)
 npm run preview   # NODE_ENV=production: serve dist/ + /api/pdf + same API routes  — run build first
 npm run lint      # eslint
+npm run test      # vitest
 ```
+
+**CI:** `.github/workflows/ci.yml` runs `lint`, `test`, and `build` on `main` pushes and pull requests. Optional local pre-push: `git config core.hooksPath .githooks` (see **AGENTS.md** / **ironwork-workflow** skill).
 
 **Client env** (Vite, `.env.local` — see `.env.example`):
 
@@ -83,6 +86,8 @@ src/
     BusinessProfileForm.css  # BusinessProfileForm-only styles
     CaptureModal.tsx         # Anonymous Download & Save / Send: account fields + optional “Save defaults?” onboarding opt-in
     CaptureModal.css         # CaptureModal-only dark modal styling and capture form overrides
+    ClientsPage.tsx          # Saved clients list with inline contact-field editing + work-order activity context
+    ClientsPage.css          # ClientsPage-only Forge card list, search, and inline edit layout
     HomePage.tsx             # Guest hero + signed-in dashboard (summary + recent WOs via same RPCs as list); clears dashboard state on sign-out
     HomePage.css             # HomePage-only styles (Forge dashboard + guest hero)
     JobForm.tsx              # Work agreement form (structured job site + Geoapify autocomplete); optional “Your Information” when no profile
@@ -143,7 +148,7 @@ src/
     payment-methods.ts, tax.ts, defaults.ts
     db/
       profile.ts             # getProfile, upsertProfile, updateNextWoNumber
-      clients.ts             # listClients, upsertClient, deleteClient
+      clients.ts             # listClients, listClientItems, upsertClient, deleteClient
       jobs.ts                # listJobs, saveWorkOrder, dashboard page/summary RPC mapping, create/update/delete
       invoices.ts            # Invoice CRUD + issuance
       change-orders.ts       # Change order CRUD + totals
@@ -194,9 +199,11 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 
 **Signed in but no `business_profiles` row** (edge case): full-screen **BusinessProfileForm** until a profile exists.
 
-**After sign-in (with profile):** **Home**, **Work Orders**, **gear (Edit profile)**; session persists via Supabase (refresh-safe).
+**After sign-in (with profile):** **Home**, **Work Orders**, **Clients**, **Invoices**, **Profile** in the bottom nav (plus center create FAB for a new work order draft); session persists via Supabase (refresh-safe).
 
 **Home (signed in):** Loads `get_work_orders_dashboard_summary` plus the first page of `list_work_orders_dashboard_page` (small limit for “recent” rows). Failed load shows a single error with **Retry** (both RPCs re-run). Opening work-order detail from Home still returns via **Work Orders** when using **Back** (no `backTarget` stack yet).
+
+**Clients (signed in):** Loads enriched client rows from `clients` plus related `jobs` activity. Search filters in real time by `name`, `phone`, `email`, and `address` only. Each row shows work-order count, latest activity (`agreement_date` fallback `created_at`), and inline `Save` / `Cancel` editing for `phone`, `email`, and `address`; edits update `clients` only and do not rewrite historical job rows.
 
 **Work Orders details worth remembering:**
 - `WorkOrdersPage` shows **Contract value** rollups from `job.price`, not invoice totals.
@@ -212,8 +219,8 @@ All user- or client-supplied text interpolated into HTML string generators (`inv
 - **`jobs.esign_*` and `change_orders.esign_*`:** detail surfaces show e-sign progress, signing actions, and signed artifacts. Opening work-order or change-order detail triggers **one** authenticated **`GET /api/esign/work-orders/:id/status`** or **`GET /api/esign/change-orders/:id/status`** (plus send/resend flows that already refresh); **webhooks** update the same fields. **Email** subject/body for DocuSeal notifications and **signed PDF** layout are best verified on the **deployed** app (public URL + production-like env), not assumed identical to every local setup.
 - **Offline signature:** Work orders can be manually marked as signed offline via `jobs.offline_signed_at`. This is a signature-satisfied state alongside DocuSeal `completed`. Invoice issuance (payment-link creation and send) is blocked until the parent work order is signature-satisfied. Invoice drafts can be created regardless of signature state.
 
-**`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'invoices' | 'auth'` (plus `pushState` / `popstate` for back/forward).
-- `App.tsx` lazy-loads preview, Work Orders, detail, change-order, and invoice screens. The initial shell stays eager; heavy document/dashboard flows load on demand, and the Work Orders and Invoices chunks are idle-prefetched after sign-in.
+**`view` in `App.tsx`:** `'home' | 'form' | 'preview' | 'profile' | 'clients' | 'work-orders' | 'work-order-detail' | 'co-detail' | 'change-order-wizard' | 'invoice-wizard' | 'invoice-final' | 'invoices' | 'auth'` (plus `pushState` / `popstate` for back/forward).
+- `App.tsx` lazy-loads preview, Work Orders, Clients, detail, change-order, and invoice screens. The initial shell stays eager; heavy document/dashboard flows load on demand, and the Work Orders, Clients, and Invoices chunks are idle-prefetched after sign-in.
 
 ---
 
@@ -241,7 +248,7 @@ Migrations are in `supabase/migrations/` — apply via Supabase CLI (`npx supaba
 | Auth session | Yes — Supabase session (survives refresh) |
 | Current work order **draft** (form state) | No — in-memory until **Download & Save** |
 | Jobs | Yes — on **Download & Save** (`saveWorkOrder`); listed on **Work Orders** |
-| Clients | Yes — upserted on **Download & Save** keyed by `name_normalized`; **JobForm** can search/suggest when `userId` is set |
+| Clients | Yes — upserted on **Download & Save** keyed by `name_normalized`; **JobForm** can search/suggest when `userId` is set, and **Clients** can edit saved `phone` / `email` / `address` rows without changing historical jobs |
 | Invoices | Yes — wizard + final page; business state derives from `issued_at` (set when first Stripe payment link is created) and `payment_status` / `paid_at` (set by Stripe webhook). `payment_status = 'paid'` drives the Work Orders dashboard badge, `InvoiceFinalPage`, and `WorkOrderDetailPage`. |
 | Change orders | Yes — wizard + detail; `create_change_order` RPC + migration **0006_change_order_creation_lock.sql** for atomic numbering |
 
@@ -249,7 +256,7 @@ Migrations are in `supabase/migrations/` — apply via Supabase CLI (`npx supaba
 
 ## Design system — Forge shell + light documents
 
-**App shell (Forge):** Dark iron surfaces (`--iron-*`), spark orange accent (`--spark`), mobile-first. Signed-in users get a **bottom nav** (Home, Work Orders, center create FAB → new work order draft, Invoices, Profile). The work-order **draft flow** keeps the shell **`tab-nav`** for **Edit Work Order / Preview** (not replaced by bottom nav). Optional subtle grain on `body`. Shell chrome uses **`--shell-radius-*`** where larger radii are intentional (e.g. FAB); keep components simple—no animation libraries. Shared **shell form panels** (`.form-section`, `.form-group` in the main flow) use **`--form-panel-*` / `--form-control-*`** in `App.css`; primary actions use **spark** (`.btn-primary`), not legacy navy, except where a **light** surface still applies (see below).
+**App shell (Forge):** Dark iron surfaces (`--iron-*`), spark orange accent (`--spark`), mobile-first. Signed-in users get a **bottom nav** (Home, Work Orders, center create FAB → new work order draft, Clients, Invoices, Profile). The work-order **draft flow** keeps the shell **`tab-nav`** for **Edit Work Order / Preview** (not replaced by bottom nav). Optional subtle grain on `body`. Shell chrome uses **`--shell-radius-*`** where larger radii are intentional (e.g. FAB); keep components simple—no animation libraries. Shared **shell form panels** (`.form-section`, `.form-group` in the main flow) use **`--form-panel-*` / `--form-control-*`** in `App.css`; primary actions use **spark** (`.btn-primary`), not legacy navy, except where a **light** surface still applies (see below).
 
 **Light documents (agreements, invoices, PDFs):** Preview sheets and generated PDFs stay **light**. Legacy light tokens in `App.css :root` (`--surface`, `--surface-white`, `--border`, `--text-primary`, `--agreement-*`, etc.) remain for **light UI surfaces** (e.g. agreement preview sheet, e-sign timeline card, capture **modal** fields, invoice wizard summary box, payment-method document copy) and document markup. **`buildPdfHtml`** inlines raw `App.css`—do not redefine those semantics to dark values without pinning light values in the PDF HTML wrapper. On-screen document roots use **`font-family: var(--font-document)`** (Barlow stack) so preview matches PDF while **`body`** uses Outfit.
 

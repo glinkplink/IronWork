@@ -11,7 +11,7 @@ import { signUp } from './lib/auth';
 import { buildInitialProfileDefaults } from './lib/defaults';
 import { getInvoice } from './lib/db/invoices';
 import type { BusinessProfile, ChangeOrder, Job } from './types/db';
-import { ClipboardList, FileText, Home, Plus, Settings, User } from 'lucide-react';
+import { ClipboardList, FileText, Home, Plus, Settings, User, Users } from 'lucide-react';
 import { useInvoiceFlow } from './hooks/useInvoiceFlow';
 import { useChangeOrderFlow } from './hooks/useChangeOrderFlow';
 import { useWorkOrderDraft } from './hooks/useWorkOrderDraft';
@@ -34,6 +34,8 @@ const loadChangeOrderWizard = () =>
   import('./components/ChangeOrderWizard').then((module) => ({ default: module.ChangeOrderWizard }));
 const loadInvoicesPage = () =>
   import('./components/InvoicesPage').then((module) => ({ default: module.InvoicesPage }));
+const loadClientsPage = () =>
+  import('./components/ClientsPage').then((module) => ({ default: module.ClientsPage }));
 
 const AgreementPreview = lazy(loadAgreementPreview);
 const WorkOrdersPage = lazy(loadWorkOrdersPage);
@@ -43,6 +45,7 @@ const WorkOrderDetailPage = lazy(loadWorkOrderDetailPage);
 const ChangeOrderDetailPage = lazy(loadChangeOrderDetailPage);
 const ChangeOrderWizard = lazy(loadChangeOrderWizard);
 const InvoicesPage = lazy(loadInvoicesPage);
+const ClientsPage = lazy(loadClientsPage);
 
 function scheduleIdleTask(task: () => void): () => void {
   if (typeof window === 'undefined') return () => {};
@@ -205,6 +208,7 @@ function App() {
     return scheduleIdleTask(() => {
       void loadWorkOrdersPage();
       void loadInvoicesPage();
+      void loadClientsPage();
     });
   }, [user]);
 
@@ -445,6 +449,9 @@ function App() {
         />
       );
     }
+    if (view === 'clients' && user) {
+      return renderLazyPage(<ClientsPage userId={user.id} />);
+    }
     if (view === 'form') {
       return (
         <JobForm
@@ -610,6 +617,14 @@ function App() {
             <span className="app-bottom-nav-fab-inner">
               <Plus className="app-bottom-nav-fab-icon" aria-hidden="true" />
             </span>
+          </button>
+          <button
+            type="button"
+            className={`app-bottom-nav-item ${view === 'clients' ? 'active' : ''}`}
+            onClick={() => navigateTo('clients')}
+          >
+            <Users className="app-bottom-nav-icon" aria-hidden="true" />
+            <span className="app-bottom-nav-label">Clients</span>
           </button>
           <button
             type="button"

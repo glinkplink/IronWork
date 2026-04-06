@@ -1,0 +1,220 @@
+.clients-page {
+  width: 100%;
+  padding-bottom: var(--space-md);
+}
+
+.app-main--bottom-nav .clients-page {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-xl));
+}
+
+.clients-toolbar {
+  padding: 0 var(--space-md) var(--space-md);
+}
+
+.clients-title {
+  margin: 0;
+  font-family: 'Chakra Petch', var(--font-app);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--iron-50);
+  letter-spacing: 0.02em;
+}
+
+.clients-subtitle {
+  margin: 0.45rem 0 0;
+  color: var(--iron-300);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.clients-search-group {
+  margin: 0 var(--space-md) var(--space-lg);
+}
+
+.clients-status {
+  margin: 0 var(--space-md) var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--iron-600);
+  border-radius: var(--shell-radius-sm);
+  background: var(--iron-750);
+  color: var(--iron-200);
+  font-size: 0.9rem;
+}
+
+.clients-status--error {
+  color: #ffb4a8;
+}
+
+.clients-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.clients-card {
+  background: var(--iron-750);
+  border: 1px solid var(--iron-600);
+  border-radius: var(--shell-radius-sm);
+  padding: var(--space-md);
+  box-shadow: 0 14px 30px rgba(4, 6, 9, 0.18);
+}
+
+.clients-card--saving {
+  opacity: 0.72;
+}
+
+.clients-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.clients-card-title {
+  margin: 0;
+  color: var(--iron-50);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.clients-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.85rem;
+  margin-top: 0.4rem;
+  color: var(--iron-300);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.clients-card-edit {
+  border: none;
+  background: none;
+  color: var(--spark);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+}
+
+.clients-card-edit:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-spark);
+  border-radius: 2px;
+}
+
+.clients-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: var(--space-md);
+}
+
+.clients-field-chip {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--iron-600);
+  border-radius: var(--shell-radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.8rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.clients-field-chip:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.clients-field-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-spark);
+}
+
+.clients-field-chip--missing {
+  border-color: rgba(255, 140, 0, 0.3);
+  background: rgba(255, 140, 0, 0.08);
+}
+
+.clients-field-chip--address {
+  min-height: 84px;
+}
+
+.clients-field-label {
+  color: var(--iron-300);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.clients-field-value {
+  color: var(--iron-50);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.clients-field-chip--missing .clients-field-value {
+  color: var(--spark);
+}
+
+.clients-card-notes {
+  margin: var(--space-md) 0 0;
+  padding-top: var(--space-md);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--iron-200);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.clients-inline-form {
+  margin-top: var(--space-md);
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.clients-inline-form .form-group {
+  margin-bottom: 0;
+}
+
+.clients-inline-error {
+  margin: 0;
+  color: #ffb4a8;
+  font-size: 0.85rem;
+}
+
+.clients-inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.clients-inline-actions .btn-primary,
+.clients-inline-actions .btn-secondary {
+  min-width: 110px;
+}
+
+@media (min-width: 640px) {
+  .clients-title {
+    font-size: calc(1.65rem + 4px);
+  }
+
+  .clients-contact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clients-field-chip--address {
+    grid-column: 1 / -1;
+  }
+}
