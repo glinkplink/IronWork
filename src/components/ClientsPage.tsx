@@ -123,7 +123,11 @@ export function ClientsPage({ userId }: ClientsPageProps) {
     const trimmedAddress = editDraft.address.trim();
 
     const result = await upsertClient({
-      ...client,
+      id: client.id,
+      user_id: client.user_id,
+      name: client.name,
+      name_normalized: client.name_normalized,
+      notes: client.notes,
       phone: trimmedPhone || null,
       email: trimmedEmail || null,
       address: trimmedAddress || null,
