@@ -19,7 +19,9 @@ future/
 
 # Local agent / IDE state (do not commit)
 .sally/
-.claude/
+# .claude/ — settings.json and hooks/ are committed; exclude only local/ephemeral files
+.claude/settings.local.json
+.claude/command-log.txt
 .cursor/plans/
 .cursor/sandbox.json
 
