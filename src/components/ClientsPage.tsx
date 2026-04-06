@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ClientListItem } from '../types/db';
 import { listClientItems, upsertClient } from '../lib/db/clients';
 import './ClientsPage.css';
@@ -58,16 +58,19 @@ export function ClientsPage({ userId }: ClientsPageProps) {
   const [editDraft, setEditDraft] = useState<ClientEditDraft | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingClientId, setSavingClientId] = useState<string | null>(null);
-  const focusFieldRef = useRef<EditableField | null>(null);
+  /** Which inline-edit field should receive autofocus when the form opens (not read from a ref during render). */
+  const [focusField, setFocusField] = useState<EditableField | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setClients([]);
 
-    void listClientItems(userId)
-      .then((result) => {
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      setClients([]);
+
+      try {
+        const result = await listClientItems(userId);
         if (cancelled) return;
         if (result.error || !result.data) {
           setError('Failed to load clients.');
@@ -78,12 +81,12 @@ export function ClientsPage({ userId }: ClientsPageProps) {
 
         setClients(result.data);
         setLoading(false);
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) return;
         setError('Failed to load clients.');
         setLoading(false);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -99,14 +102,14 @@ export function ClientsPage({ userId }: ClientsPageProps) {
     setEditingClientId(client.id);
     setEditDraft(buildEditDraft(client));
     setEditError(null);
-    focusFieldRef.current = field ?? null;
+    setFocusField(field ?? null);
   };
 
   const cancelEdit = () => {
     setEditingClientId(null);
     setEditDraft(null);
     setEditError(null);
-    focusFieldRef.current = null;
+    setFocusField(null);
   };
 
   const saveEdit = async (client: ClientListItem) => {
@@ -260,7 +263,7 @@ export function ClientsPage({ userId }: ClientsPageProps) {
                         id={`client-phone-${client.id}`}
                         type="text"
                         value={editDraft.phone}
-                        autoFocus={focusFieldRef.current === 'phone'}
+                        autoFocus={focusField === 'phone'}
                         onChange={(event) =>
                           setEditDraft((current) =>
                             current
@@ -279,7 +282,7 @@ export function ClientsPage({ userId }: ClientsPageProps) {
                         id={`client-email-${client.id}`}
                         type="email"
                         value={editDraft.email}
-                        autoFocus={focusFieldRef.current === 'email'}
+                        autoFocus={focusField === 'email'}
                         onChange={(event) =>
                           setEditDraft((current) =>
                             current
@@ -297,7 +300,7 @@ export function ClientsPage({ userId }: ClientsPageProps) {
                       <textarea
                         id={`client-address-${client.id}`}
                         rows={3}
-                        autoFocus={focusFieldRef.current === 'address'}
+                        autoFocus={focusField === 'address'}
                         value={editDraft.address}
                         onChange={(event) =>
                           setEditDraft((current) =>
