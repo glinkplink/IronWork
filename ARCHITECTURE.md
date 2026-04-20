@@ -2,17 +2,15 @@
 
 ## Agent documentation & living documents
 
-**Canonical short rules for all agents:** **[AGENTS.md](./AGENTS.md)**.
+**Canonical short rules for all agents:** **[AGENTS.md](./AGENTS.md)**. `CLAUDE.md` is a pointer to AGENTS.md for Claude Code auto-loading.
 
-**Detailed project context:** **[CLAUDE.md](./CLAUDE.md)**.
+**Cursor enforcement:** **[.cursor/rules/ScopeLock-Project-Rules.mdc](./.cursor/rules/ScopeLock-Project-Rules.mdc)** and **[.cursor/rules/high-priority.mdc](./.cursor/rules/high-priority.mdc)** — aligned with AGENTS.md.
 
-**Cursor enforcement:** **[.cursor/rules/ScopeLock-Project-Rules.mdc](./.cursor/rules/ScopeLock-Project-Rules.mdc)** and **[.cursor/rules/high-priority.mdc](./.cursor/rules/high-priority.mdc)**.
-
-`AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, and those Cursor rule files are **living documents** and should stay aligned.
+`AGENTS.md`, `ARCHITECTURE.md`, and the Cursor rule files are **living documents** and should stay aligned.
 
 - **After each substantive code change** that affects architecture, deployment, system boundaries, routes, patterns, stack/dependencies, or cross-cutting implementation conventions, update whichever of these files are affected.
 - **When editing any of these agent-facing files**, compare the same topic across the others and keep them aligned, especially for architecture/deployment constraints, CSS co-location, HTML/`esc()` rules, and minimal-diff/file-discipline guidance.
-- `AGENTS.md` remains the first-stop rules file; this document is the deeper system and deployment reference.
+- `AGENTS.md` is the first-stop rules file; this document is the deeper system and deployment reference and should only be loaded by agents as needed.
 - **Public branding:** Use **IronWork** in product prose and user-facing copy. Legacy internal identifiers, repo paths, storage keys, and factual filenames such as **`ScopeLock-Project-Rules.mdc`** may remain where renaming would be risky or inaccurate.
 
 ## Product Purpose
@@ -80,6 +78,13 @@ A contractor can **start a work order without signing in**. They fill the job fo
 
 - **Optional `SENTRY_DSN`:** **Production stance:** external error tracking is **intentionally omitted**—leave `SENTRY_DSN` unset unless you explicitly adopt Sentry later. When set, `@sentry/node` is initialized in `server/app-server.mjs` after dotenv loads. Uncaught exceptions flush the Sentry client then exit the process; unhandled promise rejections are reported without exiting. The main HTTP listener callback is wrapped in try/catch so unexpected errors still log and can be sent to Sentry before a generic **500** response (when headers are not yet sent).
 - **Uptime:** External monitors should probe **`GET /api/pdf/health`** (returns **`{ "ok": true }`**) on the public origin; the app does not ship a separate heartbeat endpoint. **Runbook** (Better Stack MCP verification, optional Render logs/metrics): **[PRODUCTION.md](./PRODUCTION.md)** → *Human Intervention* → **Better Stack** / **Render**.
+
+### Design system tokens (`src/App.css :root`)
+
+- **Forge shell (dark app UI):** `--iron-*` (iron palette), `--spark` (orange accent), `--nav-height`, `--header-height`, `--shell-radius-*`, `--font-app` (Outfit stack).
+- **Shared shell form panels:** `--form-panel-bg`, `--form-panel-border`, `--form-control-bg`, `--form-control-border`, `--form-control-text`, `--form-label`, `--form-placeholder`, `--focus-ring-spark`. Primary CTAs use `.btn-primary` (spark), not legacy navy.
+- **Light document tokens:** `--primary`, `--surface`, `--surface-white`, `--border`, `--text-primary`, `--agreement-section-blue`, `--radius`, `--radius-lg`, `--font-document` (Barlow stack). These remain the semantics for light UI surfaces (agreement preview sheet, e-sign timeline card, CaptureModal fields, invoice wizard summary box, payment-method document copy) and for document markup. **`buildPdfHtml`** inlines raw `App.css`; do not redefine these to dark semantics without pinning light values in the PDF HTML wrapper.
+- **`body` font** is Outfit; on-screen agreement/invoice preview sheets set `font-family: var(--font-document)` on scoped document containers so preview matches PDF.
 
 ### PDF vs preview (`server/app-server.mjs` + `AgreementPreview.tsx`)
 - **Web fonts**: **`index.html`** loads Outfit, Chakra Petch, Barlow, and Dancing Script (Forge shell + document faces). **`buildPdfHtml`** (`agreement-pdf.ts`) embeds its **own** Google Fonts `<link>` for **Barlow + Dancing Script** and sets PDF `body` to Barlow; it does **not** depend on the SPA font link. The server waits for `document.fonts.ready`, loads Dancing Script explicitly, then a short delay before `page.pdf()` so the script face renders. **On-screen** agreement/invoice preview sheets use **`--font-document`** (Barlow stack) on scoped containers so typography matches PDF while the app `body` uses Outfit.
