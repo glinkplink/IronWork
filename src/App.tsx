@@ -432,6 +432,7 @@ function App() {
           onBack={invoiceFlow.handleInvoiceFinalBack}
           onEditInvoice={invoiceFlow.handleEditInvoice}
           onInvoiceUpdated={invoiceFlow.handleInvoiceUpdated}
+          onOpenStripeSetup={() => navigateTo('profile')}
         />
       );
     }

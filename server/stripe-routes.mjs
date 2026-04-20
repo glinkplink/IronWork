@@ -1,10 +1,11 @@
 import {
+  assertStripeInvoicePaymentsReady,
   createAccountOnboardingLink,
   createConnectedAccount,
   createInvoicePaymentLink,
   constructWebhookEvent,
-  getConnectedAccount,
   createOrReuseInvoicePaymentLink,
+  getConnectedAccount,
 } from './lib/stripe.mjs';
 import { log } from './lib/logger.mjs';
 import { createClient } from '@supabase/supabase-js';
@@ -351,21 +352,9 @@ async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
     return;
   }
 
-  // Guard: verify card_payments capability is active before attempting to create a payment link.
-  // Without this, Stripe returns: "You cannot create a charge on a connected account without
-  // the card_payments capability enabled."
-  const { data: connectedAccount, error: capErr } = await getConnectedAccount(profile.stripe_account_id);
-  if (capErr || !connectedAccount) {
-    sendJson(res, 502, { error: 'Could not verify Stripe account capabilities.' });
-    return;
-  }
-  if (connectedAccount.card_payments_status !== 'active') {
-    sendJson(res, 409, {
-      error:
-        connectedAccount.card_payments_status === 'pending'
-          ? 'Your Stripe account is still being verified. Complete onboarding and wait for Stripe approval before sending invoices.'
-          : 'Your Stripe account is not approved to accept payments yet. Complete Stripe onboarding to enable card payments.',
-    });
+  const cap = await assertStripeInvoicePaymentsReady(profile.stripe_account_id);
+  if (!cap.ok) {
+    sendJson(res, cap.status, { error: cap.error });
     return;
   }
 

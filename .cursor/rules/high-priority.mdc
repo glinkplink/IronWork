@@ -21,9 +21,9 @@ alwaysApply: true
 - If a rule is meant to be global, mirror it across AGENTS.md and the Cursor rule files, or replace duplication with a single explicit pointer.
 - **Public branding:** Use **IronWork** in user-facing copy and product prose. Legacy internal identifiers, repo paths, storage keys, and factual filenames such as **`ScopeLock-Project-Rules.mdc`** may remain when renaming would risk breakage or make the reference inaccurate.
 - **DocuSeal / e-sign:** Server env on the **running** process (not only `VITE_*` at build); validate webhooks and notification email on the **deployed** URL when checking production parity — **ARCHITECTURE.md** (*E-sign*) and **AGENTS.md**.
-- **Invoice lifecycle:** No row → `Invoice`, `issued_at = null` → `Draft`, `issued_at != null` → `Invoiced` (payment-link creation sets `issued_at`). `payment_status`/`paid_at` set by Stripe webhook. No invoice e-sign tracking. **`InvoiceFinalPage`** refetches the invoice once on mount.
+- **Invoice lifecycle:** No row → `Invoice`, `issued_at = null` → `Draft`, `issued_at != null` → `Invoiced` (**first successful** `POST /api/invoices/:id/send` sets `issued_at`; payment-link-only does not). `payment_status`/`paid_at` set by Stripe webhook. No invoice e-sign tracking. **`InvoiceFinalPage`** refetches the invoice once on mount.
 - **E-sign UI:** No interval polling; WO/CO detail sync status on open (plus send/resend refreshes).
-- **Invoice issuance gate:** Invoice issuance (payment-link creation and send) is blocked until the parent work order is signature-satisfied (DocuSeal `completed` or `offline_signed_at` set). Invoice drafts can be created regardless of signature state.
+- **Invoice issuance gate:** Invoice email send (with or without payment link) and payment-link creation are blocked until the parent work order is signature-satisfied (DocuSeal `completed` or `jobs.offline_signed_at` set); server enforces on `/send`. Invoice drafts can be created regardless of signature state.
 
 ## CSS (mandatory)
 - Co-locate styles: `ComponentName.tsx` + `ComponentName.css`; owner imports its own CSS.
