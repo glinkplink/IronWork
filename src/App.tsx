@@ -20,7 +20,7 @@ import { signUp } from './lib/auth';
 import { buildInitialProfileDefaults } from './lib/defaults';
 import { getInvoice } from './lib/db/invoices';
 import type { BusinessProfile, ChangeOrder, Job } from './types/db';
-import { ClipboardList, FileText, Home, Plus, Settings, User, Users } from 'lucide-react';
+import { ClipboardList, FileText, Home, Plus, Settings, Users } from 'lucide-react';
 import { useInvoiceFlow } from './hooks/useInvoiceFlow';
 import { useChangeOrderFlow } from './hooks/useChangeOrderFlow';
 import { useWorkOrderDraft } from './hooks/useWorkOrderDraft';
@@ -672,6 +672,19 @@ function App() {
               </button>
             </>
           )}
+          {showBottomNav && (
+            <button
+              type="button"
+              className="btn-header-settings"
+              onClick={() => {
+                setProfileEntrySource(null);
+                navigateTo('profile');
+              }}
+              aria-label="Edit profile"
+            >
+              <Settings className="btn-header-settings-icon" aria-hidden="true" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -744,14 +757,6 @@ function App() {
           </button>
           <button
             type="button"
-            className={`app-bottom-nav-item ${view === 'clients' ? 'active' : ''}`}
-            onClick={() => navigateTo('clients')}
-          >
-            <Users className="app-bottom-nav-icon" aria-hidden="true" />
-            <span className="app-bottom-nav-label">Clients</span>
-          </button>
-          <button
-            type="button"
             className={`app-bottom-nav-item ${view === 'invoices' ? 'active' : ''}`}
             onClick={() => navigateTo('invoices')}
           >
@@ -760,14 +765,11 @@ function App() {
           </button>
           <button
             type="button"
-            className={`app-bottom-nav-item ${view === 'profile' ? 'active' : ''}`}
-            onClick={() => {
-              setProfileEntrySource(null);
-              navigateTo('profile');
-            }}
+            className={`app-bottom-nav-item ${view === 'clients' ? 'active' : ''}`}
+            onClick={() => navigateTo('clients')}
           >
-            <User className="app-bottom-nav-icon" aria-hidden="true" />
-            <span className="app-bottom-nav-label">Profile</span>
+            <Users className="app-bottom-nav-icon" aria-hidden="true" />
+            <span className="app-bottom-nav-label">Clients</span>
           </button>
         </nav>
       )}
