@@ -1,4 +1,13 @@
-import { Component, Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react';
+import {
+  Component,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { JobForm } from './components/JobForm';
 import { AuthPage } from './components/AuthPage';
 import { BusinessProfileForm } from './components/BusinessProfileForm';
@@ -138,6 +147,12 @@ function App() {
   const [pendingCaptureRestoring, setPendingCaptureRestoring] = useState(false);
   const [pendingCaptureRestoreError, setPendingCaptureRestoreError] = useState<string | null>(null);
   const [pendingCaptureNotice, setPendingCaptureNotice] = useState<string | null>(null);
+  /** One-shot: scroll to Stripe section on profile when coming from invoice "Connect Stripe". */
+  const profileScrollToStripeRef = useRef(false);
+
+  const clearProfileStripeScrollIntent = useCallback(() => {
+    profileScrollToStripeRef.current = false;
+  }, []);
 
   const clearGuestInformationFields = useCallback(() => {
     setOwnerFirstName('');
@@ -414,6 +429,8 @@ function App() {
           profile={profile}
           onSave={handleEditProfileSaved}
           stripeConnectNotice={stripeConnectNotice}
+          scrollToStripeOnMount={profileScrollToStripeRef.current}
+          onConsumedStripeScrollIntent={clearProfileStripeScrollIntent}
           onCancel={() => {
             if (profileEntrySource === 'work-orders') {
               setProfileEntrySource(null);
@@ -534,7 +551,10 @@ function App() {
           onBack={invoiceFlow.handleInvoiceFinalBack}
           onEditInvoice={invoiceFlow.handleEditInvoice}
           onInvoiceUpdated={invoiceFlow.handleInvoiceUpdated}
-          onOpenStripeSetup={() => navigateTo('profile')}
+          onOpenStripeSetup={() => {
+            profileScrollToStripeRef.current = true;
+            navigateTo('profile');
+          }}
         />
       );
     }

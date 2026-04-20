@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { ChangeOrder, Job, Invoice, InvoiceLineItem } from '../types/db';
+import type { ChangeOrder, Job, Invoice, InvoiceLineItem, WorkOrdersDashboardSummary } from '../types/db';
 import type { InvoiceWithCustomerName } from '../lib/db/invoices';
 import { listInvoicesWithCustomerName, getInvoiceBusinessStatus } from '../lib/db/invoices';
-import { getJobById } from '../lib/db/jobs';
+import { getJobById, getWorkOrdersDashboardSummary } from '../lib/db/jobs';
 import { getChangeOrderById } from '../lib/db/change-orders';
 import { formatUsd } from '../lib/work-order-dashboard-display';
 import './WorkOrdersPage.css';
@@ -58,7 +58,7 @@ function invoiceRowStatusPill(invoice: InvoiceWithCustomerName): { className: st
     return { className: 'wo-row-invoice-btn wo-row-invoice-btn--offline', label: 'Paid Offline' };
   }
   if (businessStatus === 'draft') {
-    return { className: 'wo-row-invoice-btn wo-row-invoice-btn--draft', label: 'Draft' };
+    return { className: 'wo-row-invoice-btn wo-row-invoice-btn--draft', label: 'Invoice draft' };
   }
   return { className: 'wo-row-invoice-btn wo-row-invoice-btn--invoiced', label: 'Invoiced' };
 }
@@ -75,33 +75,34 @@ function InvoiceRow({ invoice, busy, onOpen }: InvoiceRowProps) {
 
   return (
     <li className={`work-orders-row${busy ? ' work-orders-row--busy' : ''}`}>
-      <div className="work-orders-row-main">
-        <button
-          type="button"
-          className="work-orders-row-detail-hit"
-          onClick={() => onOpen(invoice)}
-          disabled={busy}
-        >
+      <button
+        type="button"
+        className="invoices-row-full-hit"
+        disabled={busy}
+        onClick={() => onOpen(invoice)}
+      >
+        <div className="work-orders-row-main">
           <span className="work-orders-row-heading">
             <span className="work-orders-wo">{formatInvoiceLabel(invoice.invoice_number)}</span>
             <span className="work-orders-wo-date">{`· ${formatInvoiceDate(invoice.invoice_date)}`}</span>
           </span>
           <span className="work-orders-customer">{invoice.customer_name ?? '—'}</span>
           <span className="invoices-row-wo-line">{formatWoLabel(invoice.wo_number)}</span>
-        </button>
-      </div>
-      <div className="work-orders-row-actions">
-        <div className="invoices-row-actions-stack">
-          <span className="invoices-row-amount">{formatUsd(invoice.total)}</span>
-          <span className={pill.className}>{pill.label}</span>
         </div>
-      </div>
+        <div className="work-orders-row-actions">
+          <div className="invoices-row-actions-stack">
+            <span className="invoices-row-amount">{formatUsd(invoice.total)}</span>
+            <span className={pill.className}>{pill.label}</span>
+          </div>
+        </div>
+      </button>
     </li>
   );
 }
 
 export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: InvoicesPageProps) {
   const [invoices, setInvoices] = useState<InvoiceWithCustomerName[]>([]);
+  const [summary, setSummary] = useState<WorkOrdersDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -112,18 +113,21 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
     setLoading(true);
     setError(null);
     setInvoices([]);
+    setSummary(null);
     /* eslint-enable react-hooks/set-state-in-effect */
 
-    void listInvoicesWithCustomerName(userId)
-      .then((result) => {
+    void Promise.all([listInvoicesWithCustomerName(userId), getWorkOrdersDashboardSummary(userId)])
+      .then(([listResult, summaryResult]) => {
         if (cancelled) return;
-        if (result.error) {
+        if (listResult.error) {
           setError('Failed to load invoices.');
           setInvoices([]);
+          setSummary(null);
           setLoading(false);
           return;
         }
-        setInvoices(result.data);
+        setInvoices(listResult.data);
+        setSummary(summaryResult.error ? null : summaryResult.data);
         setLoading(false);
       })
       .catch(() => {
@@ -132,7 +136,9 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
         setLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   const handleRowOpen = async (invoice: InvoiceWithCustomerName) => {
@@ -174,6 +180,23 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
 
       {!loading && !error && invoices.length === 0 && (
         <div className="work-orders-loading">No invoices yet.</div>
+      )}
+
+      {!loading && !error && summary !== null && (
+        <div
+          className="work-orders-stat-strip"
+          role="group"
+          aria-label="Invoiced and pending invoice totals from dashboard summary"
+        >
+          <div className="work-orders-stat-card work-orders-stat-card--blue">
+            <div className="work-orders-stat-num">{formatUsd(summary.invoicedContractTotal)}</div>
+            <div className="work-orders-stat-label">Invoiced</div>
+          </div>
+          <div className="work-orders-stat-card work-orders-stat-card--green">
+            <div className="work-orders-stat-num">{formatUsd(summary.pendingContractTotal)}</div>
+            <div className="work-orders-stat-label">Pending invoice</div>
+          </div>
+        </div>
       )}
 
       {!loading && !error && invoices.length > 0 && (

@@ -90,6 +90,14 @@
   background: var(--status-signed);
 }
 
+.work-orders-stat-card--spark::before {
+  background: var(--spark);
+}
+
+.work-orders-stat-card--paid::before {
+  background: var(--status-paid);
+}
+
 .work-orders-filters {
   display: flex;
   flex-direction: column;
@@ -416,6 +424,15 @@
   outline: none;
   box-shadow: var(--focus-ring-spark);
   border-radius: var(--shell-radius-sm);
+}
+
+/* Row opens detail on click; main block is not a focusable button (invoice / CO buttons stay interactive). */
+.work-orders-page .work-orders-row-detail-hit--static {
+  cursor: default;
+}
+
+.work-orders-page .work-orders-row {
+  cursor: pointer;
 }
 
 /* Invoice column — page-owned (no global .badge-* coupling) */

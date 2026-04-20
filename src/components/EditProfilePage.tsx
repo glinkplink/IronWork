@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { upsertProfile } from '../lib/db/profile';
 import { signOut } from '../lib/auth';
 import { getDefaultCustomerObligations, getDefaultExclusions } from '../lib/defaults';
@@ -25,6 +25,9 @@ interface EditProfilePageProps {
   onSave: (savedProfile: BusinessProfile | null) => void | Promise<void>;
   onCancel: () => void;
   stripeConnectNotice?: StripeConnectNotice | null;
+  /** Ephemeral: scroll Stripe section into view once (e.g. from invoice flow). Parent clears via callback. */
+  scrollToStripeOnMount?: boolean;
+  onConsumedStripeScrollIntent?: () => void;
 }
 
 export function EditProfilePage({
@@ -32,6 +35,8 @@ export function EditProfilePage({
   onSave,
   onCancel,
   stripeConnectNotice = null,
+  scrollToStripeOnMount = false,
+  onConsumedStripeScrollIntent,
 }: EditProfilePageProps) {
   const [businessName, setBusinessName] = useState(profile.business_name);
   const [ownerName, setOwnerName] = useState(profile.owner_name ?? '');
@@ -79,6 +84,13 @@ export function EditProfilePage({
   useEffect(() => {
     setStripeNotice(stripeConnectNotice);
   }, [stripeConnectNotice]);
+
+  useLayoutEffect(() => {
+    if (!scrollToStripeOnMount) return;
+    const el = document.getElementById('edit-profile-stripe-section');
+    el?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    onConsumedStripeScrollIntent?.();
+  }, [scrollToStripeOnMount, onConsumedStripeScrollIntent]);
 
   const addExclusion = () => setDefaultExclusions([...defaultExclusions, '']);
   const updateExclusion = (index: number, value: string) => {
@@ -468,7 +480,10 @@ export function EditProfilePage({
               </div>
             </section>
 
-            <section className="form-section edit-profile-section edit-profile-stripe-section">
+            <section
+              className="form-section edit-profile-section edit-profile-stripe-section"
+              id="edit-profile-stripe-section"
+            >
               <h2>Stripe Connect</h2>
               <p className="section-description">
                 Connect Stripe when you are ready to accept invoice payments through IronWork. Existing Stripe users may be able to sign in and reuse details during setup.

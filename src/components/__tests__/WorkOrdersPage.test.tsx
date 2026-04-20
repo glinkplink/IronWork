@@ -337,8 +337,11 @@ describe('WorkOrdersPage', () => {
 
     expect(listWorkOrdersDashboardPage).toHaveBeenCalledWith('u1', 25);
     expect(getWorkOrdersDashboardSummary).toHaveBeenCalledWith('u1');
-    expect(screen.getByText('$150')).toBeInTheDocument();
-    expect(screen.getByText('$250')).toBeInTheDocument();
+    const statGroup = screen.getByRole('group', {
+      name: /Work order count and paid contract total from dashboard summary/i,
+    });
+    expect(within(statGroup).getByText('2')).toBeInTheDocument();
+    expect(within(statGroup).getByText('$0')).toBeInTheDocument();
   });
 
   it('loads more rows with cursor pagination and appends without replacing earlier rows', async () => {
@@ -377,7 +380,7 @@ describe('WorkOrdersPage', () => {
     const { onOpenWorkOrderDetail } = renderPage(minimalProfileWithPhone());
 
     await screen.findByText('Customer A');
-    await user.click(screen.getByRole('button', { name: /Customer A/i }));
+    await user.click(screen.getByText('Customer A'));
 
     expect(onOpenWorkOrderDetail).toHaveBeenCalledWith('job-a');
     expect(getJobById).not.toHaveBeenCalled();
@@ -443,7 +446,7 @@ describe('WorkOrdersPage', () => {
     expect(link.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('renders Draft and Invoiced actions from dashboard invoice fields', async () => {
+  it('renders Invoice draft and Invoiced actions from dashboard invoice fields', async () => {
     listWorkOrdersDashboardPage.mockResolvedValue(
       makePageResult([
         {
@@ -475,7 +478,7 @@ describe('WorkOrdersPage', () => {
 
     await waitFor(() => {
       const list = latestWorkOrdersListUl();
-      expect(within(list).getByRole('button', { name: /^Draft$/i })).toBeInTheDocument();
+      expect(within(list).getByRole('button', { name: /^Invoice draft$/i })).toBeInTheDocument();
       expect(within(list).getByRole('button', { name: /^Invoiced$/i })).toBeInTheDocument();
     });
   });
@@ -533,8 +536,8 @@ describe('WorkOrdersPage', () => {
     const user = userEvent.setup();
     const { onOpenPendingInvoice } = renderPage(minimalProfileWithPhone());
 
-    await screen.findByRole('button', { name: /^Draft$/i });
-    await user.click(screen.getByRole('button', { name: /^Draft$/i }));
+    await screen.findByRole('button', { name: /^Invoice draft$/i });
+    await user.click(screen.getByRole('button', { name: /^Invoice draft$/i }));
 
     await waitFor(() => {
       expect(onOpenPendingInvoice).toHaveBeenCalledTimes(1);

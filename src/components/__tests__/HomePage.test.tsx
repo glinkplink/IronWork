@@ -208,7 +208,7 @@ describe('HomePage', () => {
     render(<HomePage {...signedInProps()} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/No work orders yet — create your first one below/i)).toBeInTheDocument();
+      expect(screen.getByText(/No work orders yet — tap \+ to create one/i)).toBeInTheDocument();
     });
     expect(screen.getByText('0')).toBeInTheDocument();
     expect(screen.getByText('No work orders yet.')).toBeInTheDocument();
@@ -300,7 +300,7 @@ describe('HomePage', () => {
     });
   });
 
-  it('View all and Work Orders quick action call onOpenWorkOrders', async () => {
+  it('View all calls onOpenWorkOrders', async () => {
     const user = userEvent.setup();
     const onOpenWorkOrders = vi.fn();
     listWorkOrdersDashboardPage.mockResolvedValue({
@@ -321,8 +321,7 @@ describe('HomePage', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'View all' }));
-    await user.click(screen.getByRole('button', { name: 'Work Orders' }));
 
-    expect(onOpenWorkOrders).toHaveBeenCalledTimes(2);
+    expect(onOpenWorkOrders).toHaveBeenCalledTimes(1);
   });
 });

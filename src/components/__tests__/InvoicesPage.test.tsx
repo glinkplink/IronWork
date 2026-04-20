@@ -10,6 +10,7 @@ import { InvoicesPage } from '../InvoicesPage';
 const listInvoicesWithCustomerName = vi.fn();
 const getJobById = vi.fn();
 const getChangeOrderById = vi.fn();
+const getWorkOrdersDashboardSummary = vi.fn();
 
 vi.mock('../../lib/db/invoices', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/db/invoices')>();
@@ -22,6 +23,7 @@ vi.mock('../../lib/db/invoices', async (importOriginal) => {
 
 vi.mock('../../lib/db/jobs', () => ({
   getJobById: (...args: unknown[]) => getJobById(...args),
+  getWorkOrdersDashboardSummary: (...args: unknown[]) => getWorkOrdersDashboardSummary(...args),
 }));
 
 vi.mock('../../lib/db/change-orders', () => ({
@@ -149,6 +151,15 @@ describe('InvoicesPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    getWorkOrdersDashboardSummary.mockResolvedValue({
+      data: {
+        jobCount: 0,
+        invoicedContractTotal: 0,
+        pendingContractTotal: 0,
+        paidContractTotal: 0,
+      },
+      error: null,
+    });
   });
 
   afterEach(() => {
@@ -215,13 +226,23 @@ describe('InvoicesPage', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Draft')).toBeInTheDocument();
+      expect(screen.getByText('Invoice draft')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Draft')).toHaveClass('wo-row-invoice-btn', 'wo-row-invoice-btn--draft');
-    expect(screen.getByText('Invoiced')).toHaveClass('wo-row-invoice-btn', 'wo-row-invoice-btn--invoiced');
-    expect(screen.getByText('Paid')).toHaveClass('wo-row-invoice-btn', 'wo-row-invoice-btn--paid');
-    expect(screen.getByText('Paid Offline')).toHaveClass('wo-row-invoice-btn', 'wo-row-invoice-btn--offline');
+    expect(screen.getByText('Invoice draft')).toHaveClass(
+      'wo-row-invoice-btn',
+      'wo-row-invoice-btn--draft'
+    );
+    const list = screen.getByRole('list');
+    expect(within(list).getByText('Invoiced')).toHaveClass(
+      'wo-row-invoice-btn',
+      'wo-row-invoice-btn--invoiced'
+    );
+    expect(within(list).getByText('Paid')).toHaveClass('wo-row-invoice-btn', 'wo-row-invoice-btn--paid');
+    expect(within(list).getByText('Paid Offline')).toHaveClass(
+      'wo-row-invoice-btn',
+      'wo-row-invoice-btn--offline'
+    );
   });
 
   it('opens normal invoice path when no single change order id is present', async () => {

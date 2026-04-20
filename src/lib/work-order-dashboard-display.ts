@@ -44,7 +44,7 @@ export function compactWorkOrderDashboardStatusLabel(job: WorkOrderDashboardJob)
   if (inv) {
     if (inv.payment_status === 'paid') return 'Paid';
     if (inv.payment_status === 'offline') return 'Paid Offline';
-    if (getInvoiceBusinessStatus(inv) === 'draft') return 'Draft';
+    if (getInvoiceBusinessStatus(inv) === 'draft') return 'Invoice draft';
     return 'Invoiced';
   }
 

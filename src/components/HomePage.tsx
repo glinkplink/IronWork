@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { ClipboardList, Plus } from 'lucide-react';
 import type { BusinessProfile, WorkOrderDashboardJob, WorkOrdersDashboardSummary } from '../types/db';
 import { getWorkOrdersDashboardSummary, listWorkOrdersDashboardPage } from '../lib/db/jobs';
 import { splitFullNameForForm } from '../lib/owner-name';
@@ -115,7 +114,7 @@ export function HomePage({
     summary === null
       ? ''
       : jobCount === 0
-        ? 'No work orders yet — create your first one below.'
+        ? 'No work orders yet — tap + to create one.'
         : `You have ${jobCount} work order${jobCount === 1 ? '' : 's'}.`;
 
   return (
@@ -160,21 +159,6 @@ export function HomePage({
               <div className="home-stat-num">{formatUsd(summary?.pendingContractTotal)}</div>
               <div className="home-stat-label">Pending invoice</div>
             </div>
-          </div>
-
-          <div className="home-quick-actions">
-            <button type="button" className="btn-primary home-quick-action" onClick={onCreateAgreement}>
-              <span className="home-quick-action-icon" aria-hidden="true">
-                <Plus size={20} strokeWidth={2.5} />
-              </span>
-              New Work Order
-            </button>
-            <button type="button" className="btn-secondary home-quick-action" onClick={onOpenWorkOrders}>
-              <span className="home-quick-action-icon" aria-hidden="true">
-                <ClipboardList size={18} strokeWidth={2} />
-              </span>
-              Work Orders
-            </button>
           </div>
 
           <div className="home-section-head">

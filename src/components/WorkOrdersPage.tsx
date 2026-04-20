@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import type {
   BusinessProfile,
   Invoice,
@@ -133,7 +133,7 @@ function getRowInvoiceLabel(job: WorkOrderDashboardJob): string | null {
   if (!invoice) return null;
   if (invoice.payment_status === 'paid') return 'Paid';
   if (invoice.payment_status === 'offline') return 'Paid Offline';
-  if (getInvoiceBusinessStatus(invoice) === 'draft') return 'Draft';
+  if (getInvoiceBusinessStatus(invoice) === 'draft') return 'Invoice draft';
   return 'Invoiced';
 }
 
@@ -209,21 +209,22 @@ const WorkOrderRow = memo(function WorkOrderRow({
   const invoice = job.latestInvoice;
   const jobMetaLabel = formatWorkOrderDashboardRowDate(job);
 
+  const handleRowClick = (e: MouseEvent<HTMLLIElement>) => {
+    if (rowBusy) return;
+    if ((e.target as HTMLElement).closest('button')) return;
+    onOpenDetail(job);
+  };
+
   return (
-    <li className="work-orders-row">
+    <li className="work-orders-row" onClick={handleRowClick}>
       <div className="work-orders-row-main">
-        <button
-          type="button"
-          className="work-orders-row-detail-hit"
-          disabled={rowBusy}
-          onClick={() => onOpenDetail(job)}
-        >
+        <div className="work-orders-row-detail-hit work-orders-row-detail-hit--static">
           <span className="work-orders-row-heading">
             <span className="work-orders-wo">{woLabel}</span>
             <span className="work-orders-wo-date">{`· ${jobMetaLabel}`}</span>
           </span>
           <span className="work-orders-customer">{job.customer_name}</span>
-        </button>
+        </div>
         {job.changeOrderCount > 0 ? (
           <button
             type="button"
@@ -271,7 +272,7 @@ const WorkOrderRow = memo(function WorkOrderRow({
             disabled={rowBusy}
             onClick={() => onOpenPendingInvoice(job)}
           >
-            Draft
+            Invoice draft
           </button>
         ) : (
           <button
@@ -439,8 +440,8 @@ export function WorkOrdersPage({
     });
   }, [hasMore, loadMoreLoading, nextCursor, userId]);
 
-  const summaryInvoicedDisplay = formatUsd(summary?.invoicedContractTotal);
-  const summaryPendingDisplay = formatUsd(summary?.pendingContractTotal);
+  const summaryJobCountDisplay = summary?.jobCount ?? 0;
+  const summaryPaidDisplay = formatUsd(summary?.paidContractTotal);
   const filteredJobs = useMemo(
     () =>
       jobs.filter(
@@ -511,15 +512,15 @@ export function WorkOrdersPage({
           <div
             className="work-orders-stat-strip"
             role="group"
-            aria-label="Invoiced and pending invoice totals from work order prices"
+            aria-label="Work order count and paid contract total from dashboard summary"
           >
-            <div className="work-orders-stat-card work-orders-stat-card--blue">
-              <div className="work-orders-stat-num">{summaryInvoicedDisplay}</div>
-              <div className="work-orders-stat-label">Invoiced</div>
+            <div className="work-orders-stat-card work-orders-stat-card--spark">
+              <div className="work-orders-stat-num">{summaryJobCountDisplay}</div>
+              <div className="work-orders-stat-label">Work orders</div>
             </div>
-            <div className="work-orders-stat-card work-orders-stat-card--green">
-              <div className="work-orders-stat-num">{summaryPendingDisplay}</div>
-              <div className="work-orders-stat-label">Pending invoice</div>
+            <div className="work-orders-stat-card work-orders-stat-card--paid">
+              <div className="work-orders-stat-num">{summaryPaidDisplay}</div>
+              <div className="work-orders-stat-label">Paid</div>
             </div>
           </div>
           <div className="work-orders-filters" aria-label="Work order filters">
