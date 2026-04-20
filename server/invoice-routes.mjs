@@ -4,6 +4,8 @@ import {
 } from './lib/stripe.mjs';
 import { esc } from './lib/html-escape.mjs';
 import { log } from './lib/logger.mjs';
+import { preparePdfPageForRendering } from './lib/pdf-puppeteer.mjs';
+import { isPayloadTooLarge } from './lib/payload-error.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -139,9 +141,10 @@ async function renderInvoicePdf({ invoice, html, profile }) {
   try {
     // Wrap HTML with CSS document structure
     const fullHtml = buildPdfHtml(html);
-    
+
+    await preparePdfPageForRendering(page);
     await page.setViewport({ width: 816, height: 1056 });
-    await page.setContent(fullHtml, { waitUntil: 'networkidle0', timeout: 20_000 });
+    await page.setContent(fullHtml, { waitUntil: 'load', timeout: 20_000 });
     await page.emulateMediaType('screen');
 
     await page.evaluate(async () => {
@@ -193,9 +196,12 @@ export async function tryHandleInvoiceRoute(req, res, helpers) {
     try {
       return await handleInvoiceSend(req, res, { readJsonBody, sendJson });
     } catch (err) {
+      if (isPayloadTooLarge(err)) {
+        sendJson(res, 413, { error: 'Request body too large.' });
+        return true;
+      }
       log.error('Invoice send error', log.errCtx(err));
-      const msg = err instanceof Error ? err.message : 'Internal server error';
-      sendJson(res, 500, { error: msg });
+      sendJson(res, 500, { error: 'Could not send invoice.' });
       return true;
     }
   }
@@ -233,7 +239,8 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
     .maybeSingle();
 
   if (invoiceErr) {
-    sendJson(res, 500, { error: invoiceErr.message });
+    log.error('invoice load error', log.errCtx(invoiceErr));
+    sendJson(res, 500, { error: 'Could not load invoice.' });
     return true;
   }
   if (!invoice) {
@@ -249,7 +256,8 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
     .maybeSingle();
 
   if (jobErr) {
-    sendJson(res, 500, { error: jobErr.message });
+    log.error('invoice send job load error', log.errCtx(jobErr));
+    sendJson(res, 500, { error: 'Could not load work order.' });
     return true;
   }
   if (!job) {
@@ -264,7 +272,8 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
     .maybeSingle();
 
   if (profileErr) {
-    sendJson(res, 500, { error: profileErr.message });
+    log.error('invoice send profile load error', log.errCtx(profileErr));
+    sendJson(res, 500, { error: 'Could not load profile.' });
     return true;
   }
   if (!profile) {
@@ -334,7 +343,7 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
       paymentUrl = result.url;
       paymentLinkId = result.payment_link_id ?? null;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not create payment link';
+      const msg = err instanceof Error ? err.message : '';
       if (msg.includes('not signed')) {
         sendJson(res, 409, { error: msg });
         return true;
@@ -343,7 +352,12 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
         sendJson(res, 400, { error: msg });
         return true;
       }
-      sendJson(res, msg.includes('not configured') ? 503 : 502, { error: msg });
+      if (msg.includes('not configured')) {
+        sendJson(res, 503, { error: 'Stripe is not configured.' });
+        return true;
+      }
+      log.error('invoice send payment link error', log.errCtx(err));
+      sendJson(res, 502, { error: 'Could not create payment link.' });
       return true;
     }
 

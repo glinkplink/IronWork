@@ -73,7 +73,7 @@ export async function createConnectedAccount(profile = null) {
   } catch (error) {
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Could not create Stripe account.',
+      error: 'Could not create Stripe account.',
     };
   }
 }
@@ -100,7 +100,7 @@ export async function createAccountOnboardingLink(accountId, returnUrl, refreshU
   } catch (error) {
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Could not create onboarding link.',
+      error: 'Could not create onboarding link.',
     };
   }
 }
@@ -127,7 +127,7 @@ export async function getConnectedAccount(accountId) {
   } catch (error) {
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Could not load Stripe account.',
+      error: 'Could not load Stripe account.',
     };
   }
 }
@@ -198,7 +198,7 @@ export async function createInvoicePaymentLink(input) {
   } catch (error) {
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Could not create payment link.',
+      error: 'Could not create payment link.',
     };
   }
 }
@@ -284,7 +284,7 @@ export function constructWebhookEvent(payload, signature, secret) {
   } catch (error) {
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Could not verify Stripe webhook.',
+      error: 'Could not verify Stripe webhook.',
     };
   }
 }

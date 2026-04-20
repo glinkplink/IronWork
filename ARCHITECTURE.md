@@ -44,8 +44,13 @@ A contractor can **start a work order without signing in**. They fill the job fo
 
 ### Known Trade-offs
 - **Puppeteer requires an app server** instead of pure static hosting for PDF generation.
-  The frontend sends the rendered agreement HTML to the app's `/api/pdf` route so Chrome can
-  render the file with much closer parity to the on-screen preview.
+  The frontend sends the rendered agreement HTML to the app's **`POST /api/pdf`** route so Chrome can
+  render the file with much closer parity to the on-screen preview. **`POST /api/pdf` requires**
+  **`Authorization: Bearer <Supabase access_token>`**; the Node process must define **`SUPABASE_URL`**
+  and **`SUPABASE_SERVICE_ROLE_KEY`** at **runtime** (same as invoice/e-sign) so the server can verify
+  the JWT. **`GET /api/pdf/health`** remains unauthenticated for uptime checks. Puppeteer uses
+  **`setRequestInterception`** with an allowlist (**`data:`**, **`about:`**, **`fonts.googleapis.com`**,
+  **`fonts.gstatic.com`**) and **`setJavaScriptEnabled(false)`** to reduce SSRF risk from untrusted HTML.
 - **PWA install support is metadata-first:** the app includes a manifest, platform icons, and a
   minimal service worker for installability and shell caching, but it is **not** an offline-first
   product. Auth, PDFs, Stripe, DocuSeal, and data mutations still require network access.
@@ -87,7 +92,7 @@ A contractor can **start a work order without signing in**. They fill the job fo
 - **`body` font** is Outfit; on-screen agreement/invoice preview sheets set `font-family: var(--font-document)` on scoped document containers so preview matches PDF.
 
 ### PDF vs preview (`server/app-server.mjs` + `AgreementPreview.tsx`)
-- **Web fonts**: **`index.html`** loads Outfit, Chakra Petch, Barlow, and Dancing Script (Forge shell + document faces). **`buildPdfHtml`** (`agreement-pdf.ts`) embeds its **own** Google Fonts `<link>` for **Barlow + Dancing Script** and sets PDF `body` to Barlow; it does **not** depend on the SPA font link. The server waits for `document.fonts.ready`, loads Dancing Script explicitly, then a short delay before `page.pdf()` so the script face renders. **On-screen** agreement/invoice preview sheets use **`--font-document`** (Barlow stack) on scoped containers so typography matches PDF while the app `body` uses Outfit.
+- **Web fonts**: **`index.html`** loads Outfit, Chakra Petch, Barlow, and Dancing Script (Forge shell + document faces). **`buildPdfHtml`** (`agreement-pdf.ts`) embeds its **own** Google Fonts `<link>` for **Barlow + Dancing Script** and sets PDF `body` to Barlow; it does **not** depend on the SPA font link. The server uses **`waitUntil: 'load'`** (bounded by aborted non-allowlisted requests), then waits for `document.fonts.ready`, loads Dancing Script explicitly, then a short delay before `page.pdf()` so the script face renders. **On-screen** agreement/invoice preview sheets use **`--font-document`** (Barlow stack) on scoped containers so typography matches PDF while the app `body` uses Outfit.
 - **Raw `App.css` in PDF HTML:** The client inlines raw `App.css` into PDF HTML. **Light document tokens** in `:root` (`--text-primary`, `--agreement-*`, etc.) must stay valid for markup; Forge shell tokens are additive. If legacy document variables are ever switched to dark semantics, **pin light values** in `buildPdfHtml` after the inlined CSS.
 - **Viewport**: PDF generation uses **`page.setViewport({ width: 816, height: 1056 })`** (Letter at
   96dpi) so layout is consistent regardless of client screen size.

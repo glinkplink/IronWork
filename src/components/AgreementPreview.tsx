@@ -25,6 +25,7 @@ import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-i
 import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { CaptureModal } from './CaptureModal';
 import { useScaledPreview } from '../hooks/useScaledPreview';
+import { supabase } from '../lib/supabase';
 import './AgreementPreview.css';
 
 const VALID_PRICE_TYPES: readonly PriceType[] = ['fixed', 'estimate', 'time_and_materials'];
@@ -251,7 +252,10 @@ export function AgreementPreview({
       }
 
       let pdfOk = false;
-      if (documentRef.current) {
+      const { data: sessionAfterCapture } = await supabase.auth.getSession();
+      if (!sessionAfterCapture.session?.access_token) {
+        setSaveError('Account created — sign in to download your PDF.');
+      } else if (documentRef.current) {
         try {
           const blob = await fetchAgreementPdfBlob(job, capturedProfile, documentRef.current);
           downloadAgreementPdfBlob(blob, job);
