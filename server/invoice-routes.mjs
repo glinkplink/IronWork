@@ -22,6 +22,25 @@ function env(name) {
   return value != null && String(value).trim() !== '' ? String(value).trim() : '';
 }
 
+function emailAddressCandidate(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  const angleMatch = trimmed.match(/<([^<>]+)>$/);
+  return (angleMatch?.[1] ?? trimmed).trim();
+}
+
+function isLikelyEmailAddress(value) {
+  const candidate = emailAddressCandidate(value);
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(candidate);
+}
+
+function optionalEmailHeader(value) {
+  if (!isLikelyEmailAddress(value)) return undefined;
+  return String(value).trim();
+}
+
 /**
  * Wrap inner HTML with PDF document structure (CSS + markup shell).
  * Server-side equivalent of client-side buildPdfHtml().
@@ -286,6 +305,12 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
     sendJson(res, 400, { error: 'Customer email is required. Add it to the work order first.' });
     return true;
   }
+  if (!isLikelyEmailAddress(customerEmail)) {
+    sendJson(res, 400, {
+      error: 'Customer email must be a valid email address. Update the work order first.',
+    });
+    return true;
+  }
 
   const body = await readJsonBody(req);
   const html = body?.html;
@@ -308,6 +333,10 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
   const resendFromEmail = env('RESEND_FROM_EMAIL');
   if (!resendApiKey || !resendFromEmail) {
     sendJson(res, 503, { error: 'Email delivery is temporarily unavailable.' });
+    return true;
+  }
+  if (!isLikelyEmailAddress(resendFromEmail)) {
+    sendJson(res, 503, { error: 'Email sender is not configured with a valid address.' });
     return true;
   }
 
@@ -386,7 +415,7 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
       profile,
       paymentUrl: paymentUrl ?? undefined,
     }),
-    reply_to: profile.email || undefined,
+    reply_to: optionalEmailHeader(profile.email),
     attachments: [
       {
         filename: `Invoice-${String(invoice.invoice_number).padStart(4, '0')}.pdf`,

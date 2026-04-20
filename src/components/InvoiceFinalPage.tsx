@@ -71,7 +71,6 @@ export function InvoiceFinalPage({
   const stripeReady = Boolean(
     profile.stripe_account_id && profile.stripe_onboarding_complete
   );
-  const customerTitle = job.customer_name.trim() || 'Customer';
   const invoiceSubline = `Invoice #${String(invoiceProp.invoice_number).padStart(4, '0')}`;
 
   const {
@@ -268,73 +267,11 @@ export function InvoiceFinalPage({
 
   return (
     <div className={`invoice-final-page${!isReadOnly ? ' invoice-final-page--draft' : ''}`}>
-      <section className="invoice-final-overview">
-        <div className="invoice-final-nav">
-          <button type="button" className="invoice-final-nav-plain" onClick={onBack}>
-            Go Back
-          </button>
-        </div>
-
-        <div className="invoice-final-hero">
-          <hgroup className="invoice-final-hero-copy">
-            <p className="invoice-final-eyebrow">Invoice</p>
-            <h1 className="invoice-final-heading">{customerTitle}</h1>
-            <p className="invoice-final-heading-sub">{invoiceSubline}</p>
-          </hgroup>
-          <div className="invoice-final-status-stack">
-            <span className={`invoice-final-status-badge${invoiceStatusClass}`}>
-              {invoiceStatusLabel}
-            </span>
-            {invoiceProp.payment_status === 'paid' && invoiceProp.paid_at ? (
-              <span className="invoice-final-status-date">
-                Paid{' '}
-                {new Date(invoiceProp.paid_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        {!isReadOnly ? (
-          <div className="invoice-final-notes-heading-slot">
-            {!notesOpen ? (
-              <button
-                type="button"
-                className="btn-text invoice-final-notes-toggle"
-                onClick={() => setNotesOpen(true)}
-              >
-                Add Notes
-              </button>
-            ) : (
-              <div className="invoice-final-notes-panel">
-                <div className="form-group">
-                  <label htmlFor="invoice-notes">Notes</label>
-                  <textarea
-                    id="invoice-notes"
-                    className="invoice-final-notes-input"
-                    rows={3}
-                    value={notesDraft}
-                    onChange={(e) => setNotesDraft(e.target.value)}
-                    autoComplete="off"
-                  />
-                </div>
-                {notesError ? <p className="invoice-notes-error">{notesError}</p> : null}
-                <button
-                  type="button"
-                  className="btn-primary btn-large invoice-final-notes-save"
-                  disabled={savingNotes}
-                  onClick={() => void handleSaveNotes()}
-                >
-                  {savingNotes ? 'Saving…' : 'Save Notes'}
-                </button>
-              </div>
-            )}
-          </div>
-        ) : null}
-      </section>
+      <div className="invoice-final-nav">
+        <button type="button" className="invoice-final-nav-plain" onClick={onBack}>
+          Go Back
+        </button>
+      </div>
 
       {downloadError ? (
         <div className="error-banner" role="alert">
@@ -457,6 +394,62 @@ export function InvoiceFinalPage({
             Preview
           </h2>
           <p className="invoice-final-preview-copy">Tap the preview to open the full sheet.</p>
+        </div>
+
+        <div className="invoice-final-preview-meta">
+          <div className="invoice-final-preview-status-row">
+            <p className="invoice-final-preview-invoice-number">{invoiceSubline}</p>
+            <span className={`invoice-final-status-badge${invoiceStatusClass}`}>
+              {invoiceStatusLabel}
+            </span>
+          </div>
+          {invoiceProp.payment_status === 'paid' && invoiceProp.paid_at ? (
+            <span className="invoice-final-status-date">
+              Paid{' '}
+              {new Date(invoiceProp.paid_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </span>
+          ) : null}
+
+          {!isReadOnly ? (
+            <div className="invoice-final-notes-heading-slot">
+              {!notesOpen ? (
+                <button
+                  type="button"
+                  className="btn-text invoice-final-notes-toggle"
+                  onClick={() => setNotesOpen(true)}
+                >
+                  Add Notes
+                </button>
+              ) : (
+                <div className="invoice-final-notes-panel">
+                  <div className="form-group">
+                    <label htmlFor="invoice-notes">Notes</label>
+                    <textarea
+                      id="invoice-notes"
+                      className="invoice-final-notes-input"
+                      rows={3}
+                      value={notesDraft}
+                      onChange={(e) => setNotesDraft(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  {notesError ? <p className="invoice-notes-error">{notesError}</p> : null}
+                  <button
+                    type="button"
+                    className="btn-primary btn-large invoice-final-notes-save"
+                    disabled={savingNotes}
+                    onClick={() => void handleSaveNotes()}
+                  >
+                    {savingNotes ? 'Saving…' : 'Save Notes'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <div

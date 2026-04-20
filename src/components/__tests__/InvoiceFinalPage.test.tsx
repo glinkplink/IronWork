@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { BusinessProfile, Invoice, Job } from '../../types/db';
 import { InvoiceFinalPage } from '../InvoiceFinalPage';
@@ -10,6 +10,7 @@ const fetchInvoicePdfBlob = vi.fn();
 const downloadPdfBlobToFile = vi.fn();
 const updateInvoice = vi.fn();
 const getInvoice = vi.fn();
+const sendInvoiceMock = vi.fn();
 
 vi.mock('../../lib/agreement-pdf', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/agreement-pdf')>();
@@ -28,6 +29,10 @@ vi.mock('../../lib/db/invoices', async (importOriginal) => {
     getInvoice: (...args: unknown[]) => getInvoice(...args),
   };
 });
+
+vi.mock('../../lib/invoice-send', () => ({
+  sendInvoice: (...args: unknown[]) => sendInvoiceMock(...args),
+}));
 
 vi.mock('../../hooks/useScaledPreview', () => ({
   useScaledPreview: () => ({
@@ -192,6 +197,7 @@ describe('InvoiceFinalPage', () => {
     downloadPdfBlobToFile.mockResolvedValue(undefined);
     updateInvoice.mockResolvedValue({ data: baseInvoice(), error: null });
     getInvoice.mockImplementation(async (id: string) => baseInvoice({ id }));
+    sendInvoiceMock.mockResolvedValue({ data: baseInvoice(), error: null });
   });
 
   afterEach(() => {
@@ -221,6 +227,25 @@ describe('InvoiceFinalPage', () => {
 
     await user.click(screen.getByRole('button', { name: /connect stripe account/i }));
     expect(onOpenStripeSetup).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends an email-only invoice when Stripe is not connected', async () => {
+    const user = userEvent.setup();
+    const signedJob = { ...baseJob(), esign_status: 'completed' as const };
+    const sentInvoice = baseInvoice({ issued_at: '2025-01-05T10:00:00Z' });
+    sendInvoiceMock.mockResolvedValueOnce({ data: sentInvoice, error: null });
+    renderPage(baseInvoice(), signedJob, baseProfile());
+
+    await user.click(screen.getByRole('button', { name: /^Send Invoice$/i }));
+
+    await waitFor(() => {
+      expect(sendInvoiceMock).toHaveBeenCalledWith(
+        'inv-1',
+        expect.stringContaining('invoice-document'),
+        false
+      );
+    });
+    expect(onInvoiceUpdated).toHaveBeenCalledWith(sentInvoice);
   });
 
   it('shows Send with payment link and Create payment link when Stripe is ready', () => {
@@ -296,5 +321,16 @@ describe('InvoiceFinalPage', () => {
     const signedJob = { ...baseJob(), esign_status: 'completed' as const };
     renderPage(baseInvoice(), signedJob);
     expect(screen.getByRole('heading', { name: /^Preview$/i })).toBeInTheDocument();
+  });
+
+  it('places draft metadata and notes inside the Preview block', () => {
+    const signedJob = { ...baseJob(), esign_status: 'completed' as const };
+    renderPage(baseInvoice(), signedJob);
+
+    const preview = screen.getByRole('region', { name: /^Preview$/i });
+
+    expect(within(preview).getByText('Invoice #0001')).toBeInTheDocument();
+    expect(within(preview).getByText('Draft')).toBeInTheDocument();
+    expect(within(preview).getByRole('button', { name: /add notes/i })).toBeInTheDocument();
   });
 });

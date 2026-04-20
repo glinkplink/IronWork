@@ -10,16 +10,24 @@ export async function sendInvoice(
   error: Error | null;
 }> {
   try {
-    const res = await fetchWithSupabaseAuth(`/api/invoices/${invoiceId}/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        html,
-        include_payment_link: includePaymentLink,
-      }),
-    });
+    const body = {
+      html,
+      ...(includePaymentLink ? { include_payment_link: true } : {}),
+    };
 
-    const json = (await res.json()) as { invoice?: Invoice; error?: string };
+    const res = await fetchWithSupabaseAuth(
+      `/api/invoices/${encodeURIComponent(invoiceId)}/send`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }
+    );
+
+    const json = (await res.json().catch(() => ({}))) as {
+      invoice?: Invoice;
+      error?: string;
+    };
 
     if (!res.ok) {
       return {
