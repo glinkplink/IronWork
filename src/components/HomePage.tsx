@@ -95,13 +95,65 @@ export function HomePage({
   if (!signedIn) {
     return (
       <div className="home-page home-page--guest">
-        <div className="home-hero">
+        <section className="home-hero">
           <h1 className="home-hero-title">IronWork</h1>
           <p className="home-hero-lead">Stop working for free. Get it in writing.</p>
+          <p className="home-hero-sub">
+            Work orders, change orders, and invoices for solo welders. Ready in 2 minutes.
+          </p>
           <button type="button" className="btn-primary btn-large home-hero-cta" onClick={onCreateAgreement}>
-            Create Work Order
+            Try it free
           </button>
-        </div>
+        </section>
+
+        <section className="home-pain" aria-labelledby="home-pain-heading">
+          <h2 id="home-pain-heading" className="home-section-heading">Sound familiar?</h2>
+          <ul className="home-pain-list">
+            <li>Clients change the scope mid-job.</li>
+            <li>You chase payments for weeks.</li>
+            <li>Your handwritten invoices don't look professional.</li>
+          </ul>
+        </section>
+
+        <section className="home-shots" aria-labelledby="home-shots-heading">
+          <h2 id="home-shots-heading" className="home-section-heading">What you get</h2>
+          <div className="home-shots-grid">
+            <div className="home-shot-placeholder" aria-label="Work order PDF preview (coming soon)">
+              <span>Work Order PDF</span>
+            </div>
+            <div className="home-shot-placeholder" aria-label="Invoice PDF preview (coming soon)">
+              <span>Invoice PDF</span>
+            </div>
+            <div className="home-shot-placeholder home-shot-placeholder--phone" aria-label="Mobile app preview (coming soon)">
+              <span>On your phone</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="home-steps" aria-labelledby="home-steps-heading">
+          <h2 id="home-steps-heading" className="home-section-heading">How it works</h2>
+          <ol className="home-steps-list">
+            <li>
+              <span className="home-step-num">1</span>
+              <span className="home-step-text">Fill in the job details.</span>
+            </li>
+            <li>
+              <span className="home-step-num">2</span>
+              <span className="home-step-text">Preview the agreement.</span>
+            </li>
+            <li>
+              <span className="home-step-num">3</span>
+              <span className="home-step-text">Download it or send for e-signature.</span>
+            </li>
+          </ol>
+        </section>
+
+        <section className="home-cta-footer">
+          <h2 className="home-section-heading">Ready to get paid for the work you actually did?</h2>
+          <button type="button" className="btn-primary btn-large home-hero-cta" onClick={onCreateAgreement}>
+            Try it free
+          </button>
+        </section>
       </div>
     );
   }
