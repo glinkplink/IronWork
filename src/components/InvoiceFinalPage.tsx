@@ -408,25 +408,26 @@ export function InvoiceFinalPage({
           </div>
         ) : (
           <>
-            {!canIssueInvoice && (
-              <p className="invoice-gate-message">
-                Invoice drafts can be created before signature. To issue an invoice, the work order
-                must be signed via DocuSeal or marked as signed offline.
-              </p>
-            )}
             {sendError ? <p className="invoice-final-payment-feedback">{sendError}</p> : null}
             <div className="invoice-final-payment-primary">
               <button
                 type="button"
                 className="btn-primary btn-large invoice-final-send-primary"
                 disabled={sending || !canIssueInvoice}
+                title={!canIssueInvoice ? 'Work order must be e-signed or marked signed offline' : undefined}
                 onClick={() => void handleSendInvoice()}
               >
                 {sending ? 'Sending...' : invoiceProp.issued_at ? 'Resend Invoice' : 'Send Invoice'}
               </button>
-              <p className="invoice-final-payment-primary-hint">
-                Emails the PDF invoice to the customer.
-              </p>
+              {!canIssueInvoice ? (
+                <p className="invoice-final-payment-primary-hint invoice-final-gate-hint">
+                  Requires work order signature<br />(e-signed or marked signed offline).
+                </p>
+              ) : (
+                <p className="invoice-final-payment-primary-hint">
+                  Emails the PDF invoice to the customer.
+                </p>
+              )}
             </div>
 
             {invoiceProp.issued_at && (
@@ -463,6 +464,7 @@ export function InvoiceFinalPage({
                       type="button"
                       className="btn-primary invoice-final-online-btn"
                       disabled={sendingStripe || paymentLinkLoading || !canIssueInvoice}
+                      title={!canIssueInvoice ? 'Work order must be e-signed or marked signed offline' : undefined}
                       onClick={() => void handleSendWithPaymentLink()}
                     >
                       {sendingStripe
@@ -475,6 +477,7 @@ export function InvoiceFinalPage({
                       type="button"
                       className="btn-primary invoice-final-online-btn"
                       disabled={sendingStripe || paymentLinkLoading || !canIssueInvoice}
+                      title={!canIssueInvoice ? 'Work order must be e-signed or marked signed offline' : undefined}
                       onClick={() => void handleCopyPaymentLink()}
                     >
                       {paymentLinkButtonLabel}
@@ -489,7 +492,7 @@ export function InvoiceFinalPage({
                   </p>
                   <button
                     type="button"
-                    className="btn-secondary btn-action invoice-final-connect-cta"
+                    className="btn-primary btn-action invoice-final-connect-cta"
                     onClick={onOpenStripeSetup}
                   >
                     Connect Stripe Account
@@ -610,14 +613,22 @@ export function InvoiceFinalPage({
       </section>
 
       <div className="invoice-final-actions">
-        <button
-          type="button"
-          className="btn-primary btn-large invoice-final-download-btn"
-          disabled={downloading}
-          onClick={() => void handleDownload()}
-        >
-          {downloading ? 'Downloading…' : 'Download Invoice'}
-        </button>
+        <div className="invoice-final-download-slot">
+          <button
+            type="button"
+            className="btn-primary btn-large invoice-final-download-btn"
+            disabled={downloading || !canIssueInvoice}
+            title={!canIssueInvoice ? 'Work order must be e-signed or marked signed offline' : undefined}
+            onClick={() => void handleDownload()}
+          >
+            {downloading ? 'Downloading…' : 'Download Invoice'}
+          </button>
+          {!canIssueInvoice && (
+            <p className="invoice-final-gate-hint invoice-final-gate-hint--actions">
+              Requires work order signature<br />(e-signed or marked signed offline).
+            </p>
+          )}
+        </div>
         {!isReadOnly ? (
           <button
             type="button"

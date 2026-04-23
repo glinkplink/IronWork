@@ -127,6 +127,9 @@
 
 .invoice-final-send-primary {
   width: 100%;
+  margin-top: 2px;
+  padding-top: 16px;
+  padding-bottom: 16px;
   box-sizing: border-box;
 }
 
@@ -317,11 +320,25 @@
   outline-offset: 2px;
 }
 
+.invoice-final-gate-hint {
+  margin: var(--space-sm) 0 0;
+  color: var(--iron-200, #ccc);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .invoice-final-actions {
   display: flex;
   flex-direction: column;
   gap: 16px;
   margin-top: var(--space-lg);
+}
+
+.invoice-final-download-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .invoice-final-actions .invoice-final-download-btn {
@@ -358,6 +375,11 @@
 
   .invoice-final-actions {
     flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .invoice-final-download-slot {
+    flex: 1 1 0;
   }
 
   .invoice-final-actions .invoice-final-download-btn {
