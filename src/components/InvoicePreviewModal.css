@@ -29,19 +29,13 @@
 }
 
 .invoice-preview-modal-kicker {
-  margin: 0 0 0.2rem;
+  margin: 0;
   font-family: var(--font-display);
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--spark);
-}
-
-.invoice-preview-modal-subtitle {
-  margin: 0;
-  color: var(--iron-250);
-  font-size: 0.875rem;
 }
 
 .invoice-preview-modal-close {
@@ -81,30 +75,27 @@
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y pinch-zoom;
-  padding: clamp(0.9rem, 3vw, 1.4rem);
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
 }
 
-.invoice-preview-modal-sheet-frame {
-  width: 100%;
-  max-width: min(880px, 100%);
-  margin: 0 auto;
-  padding: clamp(0.45rem, 1.8vw, 0.85rem);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 30px;
-  background:
-    linear-gradient(180deg, rgba(19, 20, 23, 0.92), rgba(11, 12, 14, 0.96)),
-    radial-gradient(circle at top, rgba(255, 140, 0, 0.05), transparent 48%);
-  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.32);
-  box-sizing: border-box;
+.invoice-preview-modal-stage {
+  position: relative;
+  flex-shrink: 0;
 }
 
 .invoice-preview-modal-sheet {
-  width: 100%;
-  box-sizing: border-box;
+  position: absolute;
+  top: 0;
+  left: 0;
   background: #fff;
-  border-radius: 22px;
+  border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.32);
+  box-sizing: border-box;
 }
 
 @media (max-width: 639px) {
@@ -115,5 +106,9 @@
 
   .invoice-preview-modal-close {
     width: 100%;
+  }
+
+  .invoice-preview-modal-scroll {
+    padding: 1rem;
   }
 }

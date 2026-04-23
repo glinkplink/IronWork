@@ -70,24 +70,22 @@ function partiesMarkup(
         </div>
       </div>
       <table class="content-table parties-party-table">
-        <tbody>
+        <thead>
           <tr class="party-table-header-row">
-            <th class="party-header-cell party-header-spacer" scope="col" aria-hidden="true">&nbsp;</th>
             <th scope="col" class="party-header-cell">Service Provider</th>
             <th scope="col" class="party-header-cell">Customer</th>
           </tr>
+        </thead>
+        <tbody>
           <tr>
-            <td class="table-label">Name</td>
             <td class="table-value">${spName}</td>
             <td class="table-value">${cuName}</td>
           </tr>
           <tr>
-            <td class="table-label">Phone</td>
             <td class="table-value">${spPhone}</td>
             <td class="table-value">${cuPhone}</td>
           </tr>
           <tr>
-            <td class="table-label">Email</td>
             <td class="table-value">${spEmail}</td>
             <td class="table-value">${cuEmail}</td>
           </tr>
@@ -111,9 +109,9 @@ function lineItemsRows(items: InvoiceLineItem[]): string {
       (row) => `
     <tr>
       <td class="table-value invoice-line-description">${esc(row.description)}</td>
-      <td class="table-value invoice-line-number" style="text-align:right">${esc(String(row.qty))}</td>
-      <td class="table-value invoice-line-number" style="text-align:right">${esc(formatPrice(row.unit_price))}</td>
-      <td class="table-value invoice-line-number" style="text-align:right">${esc(formatPrice(row.total))}</td>
+      <td class="table-value invoice-line-number" style="text-align:center">${esc(String(row.qty))}</td>
+      <td class="table-value invoice-line-number" style="text-align:center">${esc(formatPrice(row.unit_price))}</td>
+      <td class="table-value invoice-line-number" style="text-align:center">${esc(formatPrice(row.total))}</td>
     </tr>
   `
     )
@@ -198,9 +196,9 @@ export function generateInvoiceHtml(
         <thead>
           <tr>
             <th class="table-label" scope="col">Description</th>
-            <th class="table-label" scope="col" style="text-align:right">Qty</th>
-            <th class="table-label" scope="col" style="text-align:right">Unit price</th>
-            <th class="table-label" scope="col" style="text-align:right">Total</th>
+            <th class="table-label" scope="col" style="text-align:center">Qty</th>
+            <th class="table-label" scope="col" style="text-align:center">Unit price</th>
+            <th class="table-label" scope="col" style="text-align:center">Total</th>
           </tr>
         </thead>
         <tbody>

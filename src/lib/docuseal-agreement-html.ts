@@ -70,11 +70,8 @@ export function docusealAgreementEmbeddedStyles(): string {
     .parties-plain-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1rem; row-gap: 0.25rem; }
     .parties-plain-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1C3A5E; flex-shrink: 0; }
     .parties-plain-value { flex: 1 1 0; font-size: 0.95rem; line-height: 1.55; color: #1A1917; overflow-wrap: break-word; }
-    .content-table.parties-party-table td.table-label { width: 26%; }
-    .content-table.parties-party-table td.table-value { width: 37%; overflow-wrap: anywhere; word-break: break-word; }
-    .content-table.parties-party-table tr.party-table-header-row th.party-header-cell { width: 26%; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; background: #E8EEF5; color: #1C3A5E; padding: 0.7rem 0.8rem; border: 1px solid #C8C4BC; }
-    .content-table.parties-party-table tr.party-table-header-row th.party-header-cell:nth-child(2),
-    .content-table.parties-party-table tr.party-table-header-row th.party-header-cell:nth-child(3) { width: 37%; }
+    .content-table.parties-party-table td.table-value { width: 50%; overflow-wrap: anywhere; word-break: break-word; }
+    .content-table.parties-party-table tr.party-table-header-row th.party-header-cell { width: 50%; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; vertical-align: middle; background: #E8EEF5; color: #1C3A5E; padding: 0.7rem 0.8rem; border: 1px solid #C8C4BC; }
     .signature-blocks {
       margin-top: 1.75rem; padding-top: 1rem; display: flex; gap: 2rem;
       break-inside: avoid; page-break-inside: avoid;
@@ -132,24 +129,22 @@ function docusealBlockHtml(
     </div>
   </div>
   <table class="content-table parties-party-table">
-    <tbody>
+    <thead>
       <tr class="party-table-header-row">
-        <th class="party-header-cell party-header-spacer" scope="col" aria-hidden="true">&nbsp;</th>
         <th scope="col" class="party-header-cell">Service Provider</th>
         <th scope="col" class="party-header-cell">Customer</th>
       </tr>
+    </thead>
+    <tbody>
       <tr>
-        <td class="table-label">Name</td>
         <td class="table-value">${esc(sp.businessName)}</td>
         <td class="table-value">${esc(cu.name)}</td>
       </tr>
       <tr>
-        <td class="table-label">Phone</td>
         <td class="table-value">${esc(sp.phone)}</td>
         <td class="table-value">${esc(cu.phone)}</td>
       </tr>
       <tr>
-        <td class="table-label">Email</td>
         <td class="table-value">${esc(sp.email)}</td>
         <td class="table-value">${esc(cu.email)}</td>
       </tr>

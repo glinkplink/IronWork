@@ -32,24 +32,22 @@ function blockHtml(block: SectionContentBlock, signatureData: SignatureBlockData
     </div>
   </div>
   <table class="content-table parties-party-table">
-    <tbody>
+    <thead>
       <tr class="party-table-header-row">
-        <th class="party-header-cell party-header-spacer" scope="col" aria-hidden="true">&nbsp;</th>
         <th scope="col" class="party-header-cell">Service Provider</th>
         <th scope="col" class="party-header-cell">Customer</th>
       </tr>
+    </thead>
+    <tbody>
       <tr>
-        <td class="table-label">Name</td>
         <td class="table-value">${esc(sp.businessName)}</td>
         <td class="table-value">${esc(cu.name)}</td>
       </tr>
       <tr>
-        <td class="table-label">Phone</td>
         <td class="table-value">${esc(sp.phone)}</td>
         <td class="table-value">${esc(cu.phone)}</td>
       </tr>
       <tr>
-        <td class="table-label">Email</td>
         <td class="table-value">${esc(sp.email)}</td>
         <td class="table-value">${esc(cu.email)}</td>
       </tr>

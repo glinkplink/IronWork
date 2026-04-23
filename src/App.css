@@ -895,7 +895,7 @@ body::before {
 
 .content-table td {
   padding: 0.7rem 0.8rem;
-  vertical-align: top;
+  vertical-align: middle;
   border: 1px solid var(--agreement-margin-line);
   min-width: 0;
   box-sizing: border-box;
@@ -907,6 +907,8 @@ body::before {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-align: center;
+  vertical-align: middle;
   background: var(--agreement-label-column-bg);
   color: var(--agreement-section-blue);
 }
@@ -965,38 +967,28 @@ body::before {
   table-layout: fixed;
 }
 
-/* Match header column split; long emails/phones must wrap (mobile modal + PDF) */
-.content-table.parties-party-table td.table-label {
-  width: 26%;
-}
-
+/* 2-column parties table — no label column, values split 50/50 */
 .content-table.parties-party-table td.table-value {
-  width: 37%;
+  width: 50%;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-/* Header row: all three cells — full light-blue band + blue text */
+/* Header row */
 .content-table.parties-party-table tr.party-table-header-row th.party-header-cell {
-  width: 26%;
-  min-width: 4.5rem;
+  width: 50%;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  text-align: left;
-  vertical-align: bottom;
+  text-align: center;
+  vertical-align: middle;
   background: var(--agreement-label-column-bg);
   color: var(--agreement-section-blue);
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--agreement-margin-line);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
-}
-
-.content-table.parties-party-table tr.party-table-header-row th.party-header-cell:nth-child(2),
-.content-table.parties-party-table tr.party-table-header-row th.party-header-cell:nth-child(3) {
-  width: 37%;
 }
 
 .signature-blocks {
@@ -2034,14 +2026,15 @@ body::before {
 }
 
 .invoice-document .invoice-line-col-qty {
-  width: 9%;
+  width: 8%;
 }
 
 .invoice-document .invoice-line-col-money {
-  width: 16.5%;
+  width: 17%;
 }
 
 .invoice-line-table th {
+  width: auto;
   border: 1px solid var(--agreement-margin-line);
   padding: 0.7rem 0.8rem;
   font-size: 0.75rem;
@@ -2057,9 +2050,8 @@ body::before {
 .invoice-document .invoice-line-table th:nth-child(3),
 .invoice-document .invoice-line-table th:nth-child(4),
 .invoice-document .invoice-line-number {
-  text-align: right;
-  white-space: nowrap;
-  overflow-wrap: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
   word-break: normal;
 }
 
@@ -2068,9 +2060,10 @@ body::before {
   word-break: normal;
 }
 
+
 .invoice-totals-block {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   margin-bottom: var(--space-sm);
 }
 
@@ -2090,7 +2083,7 @@ body::before {
 }
 
 .invoice-payment-methods-line {
-  margin: 0 0 var(--space-lg);
+  margin: 12px 0 var(--space-lg);
   color: var(--text-muted);
   font-size: 0.84rem;
   line-height: 1.35;
