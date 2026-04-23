@@ -877,9 +877,7 @@ export function WorkOrderDetailPage({
           </p>
         ) : coLoading ? (
           <p className="work-orders-loading">Loading change orders…</p>
-        ) : changeOrders.length === 0 ? (
-          <p className="work-orders-empty">No change orders yet.</p>
-        ) : (
+        ) : changeOrders.length > 0 ? (
           <ul className="work-orders-list" style={{ listStyle: 'none', margin: '0 0 var(--space-lg)', padding: 0 }}>
             {changeOrders.map((co) => {
               return (
@@ -903,7 +901,9 @@ export function WorkOrderDetailPage({
               );
             })}
           </ul>
-        )}
+        ) : !coNewCoBlockedByInvoice ? (
+          <p className="work-orders-empty wo-co-no-change-orders">No change orders yet.</p>
+        ) : null}
       </section>
 
       <div className="work-order-detail-footer">

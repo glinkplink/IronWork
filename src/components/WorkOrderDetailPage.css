@@ -371,7 +371,7 @@
   color: var(--spark);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  text-align: left;
+  text-align: center;
 }
 
 .co-list-heading span {
@@ -456,6 +456,10 @@
 }
 
 .work-orders-empty.wo-co-finalized-block {
+  text-align: center;
+}
+
+.work-orders-empty.wo-co-no-change-orders {
   text-align: center;
 }
 
