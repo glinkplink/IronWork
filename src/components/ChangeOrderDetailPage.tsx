@@ -177,12 +177,11 @@ export function ChangeOrderDetailPage({
     [co.esign_status, coEsignWasResent, signatureState.isSignatureSatisfied]
   );
   const isOfflineMarked = Boolean(co.offline_signed_at && co.esign_status !== 'completed');
-  const showCopySigningLink = Boolean(
-    co.esign_embed_src &&
-    co.esign_status !== 'not_sent' &&
-    co.esign_status !== 'completed' &&
-    !isOfflineMarked
-  );
+  // Show Copy signing link whenever the CO hasn't been signed yet. The handler creates
+  // a DocuSeal submission (send_email: false) if one doesn't exist yet, so the button
+  // works even before the user clicks "Send for signature".
+  const showCopySigningLink =
+    co.esign_status !== 'completed' && !isOfflineMarked;
 
   const refreshCoRow = useCallback(async () => {
     try {
@@ -291,15 +290,51 @@ export function ChangeOrderDetailPage({
     }
   };
 
-  const handleCopySigningLink = () => {
-    const link = co.esign_embed_src;
-    if (!link) return;
-    navigator.clipboard.writeText(link).then(() => {
+  const handleCopySigningLink = async () => {
+    setPdfError('');
+    let link = co.esign_embed_src;
+
+    // No submission yet — create one without emailing, then copy the returned link.
+    if (!link) {
+      if (!(job.customer_email || '').trim()) {
+        setPdfError('Customer email is missing on this work order. Edit the job to add it.');
+        return;
+      }
+      setCoEsignBusy(true);
+      try {
+        const providerSignatureDataUrl = await buildDocusealProviderSignatureImage(
+          profile?.owner_name?.trim() || ''
+        );
+        const payload = {
+          ...buildChangeOrderEsignSendPayload(co, job, profile, { providerSignatureDataUrl }),
+          send_email: false,
+        };
+        const r = await sendChangeOrderForSignature(co.id, payload);
+        const merged = mergeEsignResponseIntoChangeOrder(co, r);
+        onCoUpdated?.(merged);
+        link = merged.esign_embed_src ?? null;
+      } catch (e) {
+        setPdfError(e instanceof Error ? e.message : 'Could not create signing link.');
+        return;
+      } finally {
+        setCoEsignBusy(false);
+      }
+    }
+
+    if (!link) {
+      setPdfError('Signing link not available.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(link);
       setCoSigningLinkCopied(true);
       copySigningLinkTimeoutRef.current = setTimeout(() => {
         setCoSigningLinkCopied(false);
       }, 2000);
-    });
+    } catch {
+      setPdfError('Could not copy to clipboard.');
+    }
   };
 
   const handleViewSignedDoc = async () => {
@@ -521,11 +556,20 @@ export function ChangeOrderDetailPage({
             <button
               type="button"
               className="btn-secondary btn-action wo-esign-actions-copy"
-              disabled={coEsignBusy}
+              disabled={coEsignBusy || (!co.esign_embed_src && !job.customer_email?.trim())}
+              title={
+                !co.esign_embed_src && !job.customer_email?.trim()
+                  ? 'Customer email is required to create a signing link'
+                  : undefined
+              }
               onClick={() => void handleCopySigningLink()}
             >
               <span aria-live="polite">
-                {coSigningLinkCopied ? 'Copied to clipboard' : 'Copy signing link'}
+                {coSigningLinkCopied
+                  ? 'Copied to clipboard'
+                  : coEsignBusy && !co.esign_embed_src
+                    ? 'Preparing…'
+                    : 'Copy signing link'}
               </span>
             </button>
           ) : null}
