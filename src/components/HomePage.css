@@ -61,6 +61,7 @@
   font-weight: 600;
   font-size: 0.98rem;
   color: var(--iron-100);
+  padding-top: 0.5rem;
 }
 
 .home-hero-trust {
@@ -194,16 +195,38 @@
 }
 
 @media (max-width: 639px) {
+  .home-journey-rows {
+    gap: 1.25rem;
+  }
+
+  .home-journey-rows::before {
+    content: '';
+    position: absolute;
+    left: 1.5rem;
+    top: 2.5rem;
+    bottom: 2.5rem;
+    width: 2px;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      var(--iron-600) 8%,
+      var(--iron-600) 92%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
   .home-journey-row {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 3rem 1fr;
     grid-template-rows: auto auto;
-    gap: var(--space-xs, 0.5rem) var(--space-sm);
+    column-gap: 0.75rem;
+    row-gap: var(--space-sm);
   }
 
   .home-journey-step {
     grid-column: 1;
     grid-row: 1 / 3;
-    align-self: stretch;
+    align-self: center;
     justify-self: center;
   }
 
@@ -661,6 +684,12 @@
   font-size: 0.9375rem;
 }
 
+@media (max-width: 639px) {
+  .home-hero-cta {
+    margin-top: clamp(1.25rem, 4vh, 2rem);
+  }
+}
+
 @media (min-width: 900px) {
   .home-hero {
     max-width: min(44rem, 100%);
@@ -737,12 +766,13 @@
   font-size: 0.9rem;
 }
 
-/* Stat strip — 2×2 grid on phones so all four fit without horizontal scroll */
+/* Stat strip — 2×2 on phones, 4 cards across on wider screens */
 .home-stat-strip {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   padding: var(--space-sm) var(--space-md) var(--space-md);
+  box-sizing: border-box;
 }
 
 .home-stat-card {
@@ -753,11 +783,12 @@
   border-radius: var(--shell-radius-sm);
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
   .home-stat-strip {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -783,15 +814,16 @@
 }
 
 .home-stat-card--green::before {
-  background: var(--status-signed);
+  background: #f3d978;
 }
 
 .home-stat-num {
   font-family: 'Chakra Petch', var(--font-app);
   font-weight: 700;
-  font-size: 1.75rem;
+  font-size: clamp(1.35rem, 5vw, 1.75rem);
   color: var(--iron-50);
   line-height: 1;
+  white-space: nowrap;
 }
 
 .home-stat-label {

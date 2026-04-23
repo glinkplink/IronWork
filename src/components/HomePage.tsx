@@ -1,6 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import type { BusinessProfile, WorkOrderDashboardJob, WorkOrdersDashboardSummary } from '../types/db';
+import type {
+  BusinessProfile,
+  InvoiceDashboardSummary,
+  WorkOrderDashboardJob,
+  WorkOrdersDashboardSummary,
+} from '../types/db';
 import { getWorkOrdersDashboardSummary, listWorkOrdersDashboardPage } from '../lib/db/jobs';
+import { getInvoiceDashboardSummary } from '../lib/db/invoices';
 import { splitFullNameForForm } from '../lib/owner-name';
 import {
   compactWorkOrderDashboardStatusLabel,
@@ -374,6 +380,7 @@ export function HomePage({
   onOpenWorkOrderDetail,
 }: HomePageProps) {
   const [summary, setSummary] = useState<WorkOrdersDashboardSummary | null>(null);
+  const [invoiceSummary, setInvoiceSummary] = useState<InvoiceDashboardSummary | null>(null);
   const [recentJobs, setRecentJobs] = useState<WorkOrderDashboardJob[]>([]);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const loadSeq = useRef(0);
@@ -386,6 +393,7 @@ export function HomePage({
     if (!uid || !prof) {
       loadSeq.current += 1;
       setSummary(null);
+      setInvoiceSummary(null);
       setRecentJobs([]);
       setDashboardError(null);
       retryLoadRef.current = () => {};
@@ -401,19 +409,25 @@ export function HomePage({
       void Promise.all([
         listWorkOrdersDashboardPage(uid, HOME_RECENT_LIMIT, null),
         getWorkOrdersDashboardSummary(uid),
-      ]).then(([pageResult, summaryResult]) => {
+        getInvoiceDashboardSummary(uid),
+      ]).then(([pageResult, summaryResult, invoiceSummaryResult]) => {
         if (cancelled || seq !== loadSeq.current) return;
 
-        if (pageResult.error || summaryResult.error) {
+        if (pageResult.error || summaryResult.error || invoiceSummaryResult.error) {
           const msg =
-            pageResult.error?.message ?? summaryResult.error?.message ?? 'Unknown error';
+            pageResult.error?.message ??
+            summaryResult.error?.message ??
+            invoiceSummaryResult.error?.message ??
+            'Unknown error';
           setSummary(null);
+          setInvoiceSummary(null);
           setRecentJobs([]);
           setDashboardError(`Could not load dashboard (${msg}).`);
           return;
         }
 
         setSummary(summaryResult.data);
+        setInvoiceSummary(invoiceSummaryResult.data);
         setRecentJobs(pageResult.data ?? []);
         setDashboardError(null);
       });
@@ -710,22 +724,22 @@ export function HomePage({
           <div
             className="home-stat-strip"
             role="group"
-            aria-label="Work order totals from dashboard summary"
+            aria-label="Work order count and invoice totals"
           >
             <div className="home-stat-card home-stat-card--spark">
               <div className="home-stat-num">{jobCount}</div>
               <div className="home-stat-label">Work orders</div>
             </div>
             <div className="home-stat-card home-stat-card--blue">
-              <div className="home-stat-num">{formatUsd(summary?.invoicedContractTotal)}</div>
+              <div className="home-stat-num">{formatUsd(invoiceSummary?.invoicedTotal)}</div>
               <div className="home-stat-label">Invoiced</div>
             </div>
             <div className="home-stat-card home-stat-card--paid">
-              <div className="home-stat-num">{formatUsd(summary?.paidContractTotal)}</div>
+              <div className="home-stat-num">{formatUsd(invoiceSummary?.paidTotal)}</div>
               <div className="home-stat-label">Paid</div>
             </div>
             <div className="home-stat-card home-stat-card--green">
-              <div className="home-stat-num">{formatUsd(summary?.pendingContractTotal)}</div>
+              <div className="home-stat-num">{formatUsd(invoiceSummary?.pendingInvoiceTotal)}</div>
               <div className="home-stat-label">Pending invoice</div>
             </div>
           </div>
