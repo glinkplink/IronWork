@@ -110,10 +110,10 @@ function lineItemsRows(items: InvoiceLineItem[]): string {
     .map(
       (row) => `
     <tr>
-      <td class="table-value">${esc(row.description)}</td>
-      <td class="table-value" style="text-align:right">${esc(String(row.qty))}</td>
-      <td class="table-value" style="text-align:right">${esc(formatPrice(row.unit_price))}</td>
-      <td class="table-value" style="text-align:right">${esc(formatPrice(row.total))}</td>
+      <td class="table-value invoice-line-description">${esc(row.description)}</td>
+      <td class="table-value invoice-line-number" style="text-align:right">${esc(String(row.qty))}</td>
+      <td class="table-value invoice-line-number" style="text-align:right">${esc(formatPrice(row.unit_price))}</td>
+      <td class="table-value invoice-line-number" style="text-align:right">${esc(formatPrice(row.total))}</td>
     </tr>
   `
     )
@@ -131,12 +131,12 @@ export function generateInvoiceHtml(
   const rows = lineItemsRows(invoice.line_items);
 
   const paymentMethods = normalizePaymentMethods(invoice.payment_methods);
-  const paymentList =
+  const paymentMethodsLine =
     paymentMethods.length > 0
-      ? `<ul class="content-bullets invoice-payment-list">${paymentMethods
-          .map((m) => `<li>${esc(m)}</li>`)
-          .join('')}</ul>`
-      : '<p class="content-note">No payment methods listed.</p>';
+      ? `<p class="invoice-payment-methods-line">Payment methods: ${paymentMethods
+          .map((m) => esc(m))
+          .join(' &middot; ')}</p>`
+      : '';
 
   const notesBlock =
     invoice.notes?.trim()
@@ -189,6 +189,12 @@ export function generateInvoiceHtml(
       ${pricingReferenceBlock}
       <h3 class="section-title">${lineItemsHeading}</h3>
       <table class="content-table invoice-line-table">
+        <colgroup>
+          <col class="invoice-line-col-description" />
+          <col class="invoice-line-col-qty" />
+          <col class="invoice-line-col-money" />
+          <col class="invoice-line-col-money" />
+        </colgroup>
         <thead>
           <tr>
             <th class="table-label" scope="col">Description</th>
@@ -219,8 +225,7 @@ export function generateInvoiceHtml(
           </tbody>
         </table>
       </div>
-      <h3 class="section-title">Payment methods</h3>
-      ${paymentList}
+      ${paymentMethodsLine}
       ${notesBlock}
       ${options.extraSectionsHtml ?? ''}
     </div>

@@ -8,10 +8,15 @@ import { HomePage } from '../HomePage';
 
 const listWorkOrdersDashboardPage = vi.fn();
 const getWorkOrdersDashboardSummary = vi.fn();
+const getInvoiceDashboardSummary = vi.fn();
 
 vi.mock('../../lib/db/jobs', () => ({
   listWorkOrdersDashboardPage: (...args: unknown[]) => listWorkOrdersDashboardPage(...args),
   getWorkOrdersDashboardSummary: (...args: unknown[]) => getWorkOrdersDashboardSummary(...args),
+}));
+
+vi.mock('../../lib/db/invoices', () => ({
+  getInvoiceDashboardSummary: (...args: unknown[]) => getInvoiceDashboardSummary(...args),
 }));
 
 const minimalProfile: BusinessProfile = {
@@ -46,6 +51,12 @@ const summaryOk: WorkOrdersDashboardSummary = {
   invoicedContractTotal: 100,
   pendingContractTotal: 200,
   paidContractTotal: 0,
+};
+
+const invoiceSummaryOk = {
+  invoicedTotal: 100,
+  pendingInvoiceTotal: 200,
+  paidTotal: 0,
 };
 
 const listJob: WorkOrderDashboardJob = {
@@ -88,6 +99,7 @@ function signedInProps() {
 describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getInvoiceDashboardSummary.mockResolvedValue({ data: invoiceSummaryOk, error: null });
   });
 
   afterEach(() => {
@@ -150,6 +162,12 @@ describe('HomePage', () => {
           setTimeout(() => resolve({ data: summaryOk, error: null }), 20);
         })
     );
+    getInvoiceDashboardSummary.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve({ data: invoiceSummaryOk, error: null }), 20);
+        })
+    );
 
     render(<HomePage {...signedInProps()} />);
 
@@ -179,6 +197,9 @@ describe('HomePage', () => {
     getWorkOrdersDashboardSummary
       .mockResolvedValueOnce({ data: null, error: new Error('ignored') })
       .mockResolvedValueOnce({ data: summaryOk, error: null });
+    getInvoiceDashboardSummary
+      .mockResolvedValueOnce({ data: null, error: new Error('ignored') })
+      .mockResolvedValueOnce({ data: invoiceSummaryOk, error: null });
 
     render(<HomePage {...signedInProps()} />);
 
@@ -194,6 +215,7 @@ describe('HomePage', () => {
     });
     expect(listWorkOrdersDashboardPage).toHaveBeenCalledTimes(2);
     expect(getWorkOrdersDashboardSummary).toHaveBeenCalledTimes(2);
+    expect(getInvoiceDashboardSummary).toHaveBeenCalledTimes(2);
   });
 
   it('empty jobs shows zero subline and empty recent copy', async () => {
@@ -205,6 +227,10 @@ describe('HomePage', () => {
     });
     getWorkOrdersDashboardSummary.mockResolvedValue({
       data: { jobCount: 0, invoicedContractTotal: 0, pendingContractTotal: 0, paidContractTotal: 0 },
+      error: null,
+    });
+    getInvoiceDashboardSummary.mockResolvedValue({
+      data: { invoicedTotal: 0, pendingInvoiceTotal: 0, paidTotal: 0 },
       error: null,
     });
 
@@ -225,6 +251,10 @@ describe('HomePage', () => {
       nextCursor: null,
     });
     getWorkOrdersDashboardSummary.mockResolvedValue({ data: summaryOk, error: null });
+    getInvoiceDashboardSummary.mockResolvedValue({
+      data: { invoicedTotal: 100, pendingInvoiceTotal: 200, paidTotal: 300 },
+      error: null,
+    });
 
     render(<HomePage {...signedInProps()} />);
 
@@ -232,8 +262,9 @@ describe('HomePage', () => {
       expect(screen.getByText('$100')).toBeInTheDocument();
     });
     expect(screen.getByText('$200')).toBeInTheDocument();
+    expect(screen.getByText('$300')).toBeInTheDocument();
 
-    const statGroup = screen.getByRole('group', { name: /Work order totals from dashboard summary/i });
+    const statGroup = screen.getByRole('group', { name: /Work order count and invoice totals/i });
     expect(within(statGroup).getByText('2')).toBeInTheDocument();
   });
 
@@ -314,6 +345,10 @@ describe('HomePage', () => {
     });
     getWorkOrdersDashboardSummary.mockResolvedValue({
       data: { jobCount: 0, invoicedContractTotal: 0, pendingContractTotal: 0, paidContractTotal: 0 },
+      error: null,
+    });
+    getInvoiceDashboardSummary.mockResolvedValue({
+      data: { invoicedTotal: 0, pendingInvoiceTotal: 0, paidTotal: 0 },
       error: null,
     });
 

@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { cleanup, render, screen, waitFor, within, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import type { Job, BusinessProfile, ChangeOrder } from '../../types/db';
 import { WorkOrderDetailPage } from '../WorkOrderDetailPage';
@@ -10,6 +11,7 @@ const mockFns = vi.hoisted(() => {
   const listChangeOrders = vi.fn();
   const listInvoiceStatusByChangeOrder = vi.fn();
   const getJobById = vi.fn();
+  const updateJob = vi.fn();
   const sendWorkOrderForSignature = vi.fn();
   const resendWorkOrderSignature = vi.fn();
   const pollWorkOrderEsignStatus = vi.fn();
@@ -29,6 +31,7 @@ const mockFns = vi.hoisted(() => {
       warning: null,
     })),
     getJobById,
+    updateJob,
     sendWorkOrderForSignature,
     resendWorkOrderSignature,
     pollWorkOrderEsignStatus,
@@ -67,6 +70,7 @@ vi.mock('../../lib/db/jobs', async (importOriginal) => {
   return {
     ...actual,
     getJobById: (id: string) => mockFns.getJobById(id),
+    updateJob: (id: string, patch: Partial<Job>) => mockFns.updateJob(id, patch),
   };
 });
 
@@ -246,12 +250,14 @@ describe('WorkOrderDetailPage', () => {
     mockFns.listInvoiceStatusByChangeOrder.mockReset();
     mockFns.listChangeOrders.mockReset();
     mockFns.getJobById.mockReset();
+    mockFns.updateJob.mockReset();
     mockFns.sendWorkOrderForSignature.mockReset();
     mockFns.resendWorkOrderSignature.mockReset();
     mockFns.pollWorkOrderEsignStatus.mockReset();
     mockFns.listInvoiceStatusByChangeOrder.mockResolvedValue({ data: [], error: null, warning: null });
     mockFns.listChangeOrders.mockResolvedValue([makeCO(1, 'First'), makeCO(2, 'Second')]);
     mockFns.getJobById.mockResolvedValue(minimalJob());
+    mockFns.updateJob.mockResolvedValue({ data: minimalJob(), error: null });
     mockFns.sendWorkOrderForSignature.mockResolvedValue({
       jobId: 'job-1',
       esign_submission_id: 'sub-1',
@@ -628,6 +634,44 @@ describe('WorkOrderDetailPage', () => {
     const sentMeta = screen.getByTestId('wo-esign-meta-sent');
     expect(sentMeta.textContent).toContain('Sent');
     expect(sentMeta.textContent).not.toMatch(/:\d{2}:\d{2}/);
+  });
+
+  it('updates the signature timeline immediately after marking signed offline', async () => {
+    const user = userEvent.setup();
+    const offlineSignedAt = '2025-01-02T12:00:00Z';
+    mockFns.updateJob.mockResolvedValueOnce({
+      data: { ...minimalJob(), offline_signed_at: offlineSignedAt },
+      error: null,
+    });
+
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        jobId="job-1"
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /mark signed offline/i }));
+
+    await waitFor(() => {
+      expect(mockFns.updateJob).toHaveBeenCalledWith(
+        'job-1',
+        expect.objectContaining({ offline_signed_at: expect.any(String) })
+      );
+      expect(screen.getByRole('group', { name: /customer signature status: signed/i })).toBeInTheDocument();
+      expect(screen.getByText('Signature recorded manually (not verified through DocuSeal).')).toBeInTheDocument();
+    });
+
+    const timeline = screen.getByRole('group', { name: /customer signature status: signed/i });
+    const signedStep = within(timeline).getByText('Signed').closest('.wo-esign-step');
+    expect(signedStep?.querySelector('.wo-esign-step-dot-filled')).toBeTruthy();
+    expect(screen.getByTestId('wo-esign-meta-offline-signed')).toHaveTextContent('Signed offline');
   });
 
   it('scrolls to the change-order section when opened from the overflow link', async () => {

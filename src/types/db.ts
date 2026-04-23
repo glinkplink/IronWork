@@ -170,6 +170,12 @@ export interface WorkOrdersDashboardSummary {
   paidContractTotal: number;
 }
 
+export interface InvoiceDashboardSummary {
+  invoicedTotal: number;
+  pendingInvoiceTotal: number;
+  paidTotal: number;
+}
+
 /** Invoice fields needed for Work Orders list actions / summary (no line_items). */
 export interface WorkOrderInvoiceStatus {
   id: string;

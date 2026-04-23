@@ -1,7 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 
 // agreement-pdf.ts imports App.css with Vite's ?raw suffix, which is not
 // available in the Node/Vitest environment. Stub it out before importing.
+const fetchWithSupabaseAuthMock = vi.fn();
+
+vi.mock('../fetch-with-supabase-auth', () => ({
+  fetchWithSupabaseAuth: (...args: unknown[]) => fetchWithSupabaseAuthMock(...args),
+}));
 vi.mock('../../App.css?raw', () => ({ default: '/* stubbed */' }));
 vi.mock('../change-order-document.css?raw', () => ({
   default: '.change-order-document .parties-layout.co-doc-parties { padding-top: 5px; }',
@@ -14,6 +19,9 @@ import {
   getPdfFooterBusinessName,
   getPdfFooterPhone,
   buildPdfHtml,
+  fetchAgreementPdfBlob,
+  fetchHtmlPdfBlob,
+  fetchInvoicePdfBlob,
 } from '../agreement-pdf';
 import { agreementSectionsToHtml } from '../agreement-sections-html';
 import {
@@ -187,6 +195,11 @@ const baseInvoiceDraft: InvoiceDraft = {
 
 // ── A. Filename helpers ───────────────────────────────────────────────────────
 
+beforeEach(() => {
+  fetchWithSupabaseAuthMock.mockReset();
+  fetchWithSupabaseAuthMock.mockResolvedValue(new Response(new Blob(['pdf'])));
+});
+
 describe('getPdfFilename', () => {
   it('pads WO number to 4 digits', () => {
     expect(getPdfFilename(7, 'Jane Smith')).toBe('WO-0007_Jane_Smith.pdf');
@@ -225,6 +238,86 @@ describe('work order payload fields', () => {
 
   it('getPdfFooterPhone returns profile phone', () => {
     expect(getPdfFooterPhone(baseProfile, baseWelderJob)).toBe('555-999-0000');
+  });
+});
+
+describe('PDF API payload header fields', () => {
+  function lastPdfBody() {
+    const init = fetchWithSupabaseAuthMock.mock.calls.at(-1)?.[1] as RequestInit | undefined;
+    expect(init?.body).toBeTruthy();
+    return JSON.parse(String(init?.body)) as Record<string, unknown>;
+  }
+
+  it('work order PDF sends a left-only work order header', async () => {
+    await fetchAgreementPdfBlob(
+      baseWelderJob,
+      baseProfile,
+      { outerHTML: '<div class="agreement-document">WO</div>' } as HTMLElement
+    );
+
+    expect(lastPdfBody()).toMatchObject({
+      headerLeft: 'Work Order #0007',
+      headerRight: '',
+    });
+  });
+
+  it('invoice PDF sends invoice left and WO right headers', async () => {
+    await fetchInvoicePdfBlob(
+      {
+        ...baseInvoiceDraft,
+        id: 'inv-1',
+        user_id: 'user-1',
+        job_id: 'job-1',
+        status: 'draft',
+        issued_at: null,
+        stripe_payment_link_id: null,
+        stripe_payment_url: null,
+        payment_status: 'unpaid',
+        paid_at: null,
+        created_at: '2024-06-01T00:00:00Z',
+        updated_at: '2024-06-01T00:00:00Z',
+      },
+      baseDbJob,
+      baseProfile,
+      { outerHTML: '<div class="invoice-document">Invoice</div>' } as HTMLElement
+    );
+
+    expect(lastPdfBody()).toMatchObject({
+      headerLeft: 'Invoice #0001',
+      headerRight: 'WO #0007',
+    });
+  });
+
+  it('change-order style PDF payload can send explicit CO/WO split', async () => {
+    await fetchHtmlPdfBlob({
+      filename: 'CO-0001.pdf',
+      innerMarkup: '<div>CO</div>',
+      headerLeft: 'CO #0001',
+      headerRight: 'WO #0007',
+      providerName: 'Iron & Arc Welding',
+      providerPhone: '555-999-0000',
+    });
+
+    expect(lastPdfBody()).toMatchObject({
+      headerLeft: 'CO #0001',
+      headerRight: 'WO #0007',
+    });
+  });
+
+  it('still allows legacy header fields during the transition', async () => {
+    await fetchHtmlPdfBlob({
+      filename: 'legacy.pdf',
+      innerMarkup: '<div>Legacy</div>',
+      marginHeaderLeft: 'Invoice #0001',
+      workOrderNumber: 'WO #0007',
+      providerName: 'Iron & Arc Welding',
+      providerPhone: '555-999-0000',
+    });
+
+    expect(lastPdfBody()).toMatchObject({
+      marginHeaderLeft: 'Invoice #0001',
+      workOrderNumber: 'WO #0007',
+    });
   });
 });
 
@@ -422,6 +515,44 @@ describe('generateInvoiceHtml', () => {
     expect(out).toContain('&lt;online&gt;');
     expect(out).toContain('&amp;');
     expect(out).toContain('&quot;now&quot;');
+  });
+
+  it('renders invoice-specific line item column classes and colgroup', () => {
+    expect(html).toContain('invoice-line-col-description');
+    expect(html).toContain('invoice-line-col-qty');
+    expect(html).toContain('invoice-line-col-money');
+    expect(html).toContain('invoice-line-description');
+    expect(html).toContain('invoice-line-number');
+  });
+
+  it('keeps totals in a constrained totals table block', () => {
+    expect(html).toContain('class="invoice-totals-block"');
+    expect(html).toContain('class="invoice-totals-table"');
+  });
+
+  it('renders payment methods as a compact centered line under totals', () => {
+    const invoice: InvoiceDraft = {
+      ...baseInvoiceDraft,
+      payment_methods: ['Card', 'Cash', 'Check'],
+    };
+    const out = generateInvoiceHtml(invoice, baseDbJob, baseProfile);
+
+    expect(out).toContain('class="invoice-payment-methods-line"');
+    expect(out).toContain('Payment methods: Card &middot; Cash &middot; Check');
+    expect(out).not.toContain('<h3 class="section-title">Payment methods</h3>');
+    expect(out).not.toContain('invoice-payment-list');
+  });
+
+  it('omits payment methods entirely when none are selected', () => {
+    const invoice: InvoiceDraft = {
+      ...baseInvoiceDraft,
+      payment_methods: [],
+    };
+    const out = generateInvoiceHtml(invoice, baseDbJob, baseProfile);
+
+    expect(out).not.toContain('invoice-payment-methods-line');
+    expect(out).not.toContain('Payment methods:');
+    expect(out).not.toContain('No payment methods listed.');
   });
 
   it('is deterministic', () => {

@@ -8,6 +8,10 @@
 }
 
 .clients-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   padding: 0 var(--space-md) var(--space-md);
 }
 
@@ -30,6 +34,10 @@
 
 .clients-search-group {
   margin: 0 var(--space-md) var(--space-lg);
+}
+
+.clients-search-group label {
+  margin-bottom: var(--space-xs);
 }
 
 .clients-status {

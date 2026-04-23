@@ -1,8 +1,9 @@
 import { supabase } from '../supabase';
 import type {
   ChangeOrderInvoiceStatus,
-  InvoiceBusinessStatus,
   Invoice,
+  InvoiceBusinessStatus,
+  InvoiceDashboardSummary,
   InvoiceLineItem,
   InvoiceLineItemSource,
   WorkOrderInvoiceStatus,
@@ -248,14 +249,27 @@ function parseWorkOrderInvoiceStatusRow(
   const base = mapBaseInvoiceStatusRow(row);
   if (!base) return null;
   const lineItems = Array.isArray(row.line_items) ? row.line_items : [];
-  for (const item of lineItems) {
-    if (typeof item !== 'object' || item === null) continue;
-    const coId = (item as Record<string, unknown>).change_order_id;
-    if (typeof coId === 'string' && coId.trim()) {
-      return 'ignore';
-    }
-  }
-  return base;
+  return isChangeOrderOnlyInvoiceLineItems(lineItems) ? 'ignore' : base;
+}
+
+function isBaseScopeInvoiceLine(item: unknown): boolean {
+  if (typeof item !== 'object' || item === null) return true;
+  const row = item as Record<string, unknown>;
+  const coId = row.change_order_id;
+  const source = row.source;
+  const hasCoId = typeof coId === 'string' && coId.trim() !== '';
+  return !hasCoId && source !== 'change_order';
+}
+
+function isChangeOrderOnlyInvoiceLineItems(lineItems: unknown[]): boolean {
+  if (lineItems.length === 0) return false;
+  const hasChangeOrderScopeLine = lineItems.some((item) => {
+    if (typeof item !== 'object' || item === null) return false;
+    const row = item as Record<string, unknown>;
+    const coId = row.change_order_id;
+    return (typeof coId === 'string' && coId.trim() !== '') || row.source === 'change_order';
+  });
+  return hasChangeOrderScopeLine && !lineItems.some((item) => isBaseScopeInvoiceLine(item));
 }
 
 /**
@@ -268,14 +282,7 @@ export function isIssuedJobLevelInvoiceRow(row: {
 }): boolean {
   if (typeof row.issued_at !== 'string' || row.issued_at.trim() === '') return false;
   const lineItems = Array.isArray(row.line_items) ? row.line_items : [];
-  for (const item of lineItems) {
-    if (typeof item !== 'object' || item === null) continue;
-    const coId = (item as Record<string, unknown>).change_order_id;
-    if (typeof coId === 'string' && coId.trim()) {
-      return false;
-    }
-  }
-  return true;
+  return !isChangeOrderOnlyInvoiceLineItems(lineItems);
 }
 
 export type GetBlocksNewChangeOrdersForJobResult = {
@@ -317,6 +324,7 @@ function parseChangeOrderInvoiceStatusRow(
   const base = mapBaseInvoiceStatusRow(row);
   if (!base) return null;
   const lineItems = Array.isArray(row.line_items) ? row.line_items : [];
+  if (!isChangeOrderOnlyInvoiceLineItems(lineItems)) return 'ignore';
   const ids = new Set<string>();
   for (const item of lineItems) {
     if (typeof item !== 'object' || item === null) continue;
@@ -458,6 +466,34 @@ export type ListInvoicesWithCustomerNameResult =
   | { data: InvoiceWithCustomerName[]; error: null }
   | { data: []; error: Error };
 
+export type GetInvoiceDashboardSummaryResult =
+  | { data: InvoiceDashboardSummary; error: null }
+  | { data: null; error: Error };
+
+type InvoiceDashboardSummaryRow = Pick<Invoice, 'issued_at' | 'payment_status' | 'total'>;
+
+export function summarizeInvoiceDashboardRows(
+  invoices: InvoiceDashboardSummaryRow[]
+): InvoiceDashboardSummary {
+  return invoices.reduce<InvoiceDashboardSummary>(
+    (totals, invoice) => {
+      const total = Number.isFinite(Number(invoice.total)) ? Number(invoice.total) : 0;
+      const businessStatus = getInvoiceBusinessStatus(invoice);
+
+      if (invoice.payment_status === 'paid' || invoice.payment_status === 'offline') {
+        totals.paidTotal += total;
+      } else if (businessStatus === 'invoiced') {
+        totals.invoicedTotal += total;
+      } else {
+        totals.pendingInvoiceTotal += total;
+      }
+
+      return totals;
+    },
+    { invoicedTotal: 0, pendingInvoiceTotal: 0, paidTotal: 0 }
+  );
+}
+
 export const listInvoicesWithCustomerName = async (
   userId: string
 ): Promise<ListInvoicesWithCustomerNameResult> => {
@@ -485,6 +521,34 @@ export const listInvoicesWithCustomerName = async (
     return { ...inv, customer_name, wo_number };
   });
   return { data: mapped, error: null };
+};
+
+export const getInvoiceDashboardSummary = async (
+  userId: string
+): Promise<GetInvoiceDashboardSummaryResult> => {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('issued_at, payment_status, total')
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error loading invoice dashboard summary:', error);
+    return { data: null, error: new Error(error.message) };
+  }
+
+  const rows = (data ?? []).map((row) => {
+    const r = row as Record<string, unknown>;
+    const paymentStatusRaw = r.payment_status;
+    const payment_status: Invoice['payment_status'] =
+      paymentStatusRaw === 'paid' || paymentStatusRaw === 'offline' ? paymentStatusRaw : 'unpaid';
+    return {
+      issued_at: typeof r.issued_at === 'string' ? r.issued_at : null,
+      payment_status,
+      total: Number(r.total) || 0,
+    };
+  });
+
+  return { data: summarizeInvoiceDashboardRows(rows), error: null };
 };
 
 export const markInvoicePaidOffline = async (

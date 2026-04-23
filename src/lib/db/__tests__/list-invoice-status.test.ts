@@ -210,6 +210,36 @@ describe('listInvoiceStatusByJob', () => {
       },
     ]);
   });
+
+  it('keeps mixed base-scope plus change-order invoices as work-order invoices', async () => {
+    supabaseState.rows = [
+      {
+        id: 'i-mixed',
+        job_id: 'j1',
+        issued_at: '2025-01-03T00:00:00Z',
+        invoice_number: 2,
+        created_at: '2025-01-03T00:00:00Z',
+        line_items: [
+          { description: 'Original scope', source: 'original_scope' },
+          { description: 'Change Order #0001', source: 'change_order', change_order_id: 'co-1' },
+        ],
+        payment_status: 'offline',
+      },
+    ];
+    const result = await listInvoiceStatusByJob('user-1');
+    expect(result.error).toBeNull();
+    expect(result.warning).toBeNull();
+    expect(result.data).toEqual([
+      {
+        id: 'i-mixed',
+        job_id: 'j1',
+        issued_at: '2025-01-03T00:00:00Z',
+        invoice_number: 2,
+        created_at: '2025-01-03T00:00:00Z',
+        payment_status: 'offline',
+      },
+    ]);
+  });
 });
 
 describe('listInvoiceStatusByChangeOrder', () => {
@@ -284,5 +314,26 @@ describe('listInvoiceStatusByChangeOrder', () => {
     expect(result.warning).toMatch(/skipped/i);
     expect(errSpy).toHaveBeenCalled();
     errSpy.mockRestore();
+  });
+
+  it('skips mixed base-scope plus change-order invoices', async () => {
+    supabaseState.rows = [
+      {
+        id: 'i-mixed',
+        job_id: 'j1',
+        issued_at: '2025-01-03T00:00:00Z',
+        invoice_number: 2,
+        created_at: '2025-01-03T00:00:00Z',
+        line_items: [
+          { description: 'Original scope', source: 'original_scope' },
+          { description: 'Change Order #0001', source: 'change_order', change_order_id: 'co-1' },
+        ],
+        payment_status: 'offline',
+      },
+    ];
+    const result = await listInvoiceStatusByChangeOrder('user-1', 'j1');
+    expect(result.error).toBeNull();
+    expect(result.warning).toBeNull();
+    expect(result.data).toEqual([]);
   });
 });

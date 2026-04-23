@@ -39,6 +39,15 @@ declare module '@scope-server/lib/post-pdf-api.mjs' {
   ): Promise<void>;
 }
 
+declare module '@scope-server/lib/pdf-templates.mjs' {
+  export function resolvePdfHeaderSlots(body: unknown): {
+    headerLeft: string;
+    headerRight: string;
+  };
+  export function buildHeaderTemplate(headerLeft?: string, headerRight?: string): string;
+  export function buildFooterTemplate(providerName?: string, providerPhone?: string): string;
+}
+
 declare module '@scope-server/lib/rate-limit.mjs' {
   import type { IncomingMessage } from 'node:http';
   export function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean;
@@ -55,6 +64,18 @@ declare module '@scope-server/stripe-routes.mjs' {
     helpers: {
       readJsonBody: (req: unknown) => Promise<unknown>;
       readRawBody: (req: unknown) => Promise<string>;
+      sendJson: (res: unknown, code: number, payload: unknown) => void;
+      sendText: (res: unknown, code: number, message: string) => void;
+    }
+  ): Promise<boolean>;
+}
+
+declare module '@scope-server/invoice-routes.mjs' {
+  export function tryHandleInvoiceRoute(
+    req: unknown,
+    res: unknown,
+    helpers: {
+      readJsonBody: (req: unknown) => Promise<unknown>;
       sendJson: (res: unknown, code: number, payload: unknown) => void;
       sendText: (res: unknown, code: number, message: string) => void;
     }

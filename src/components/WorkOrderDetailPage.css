@@ -389,14 +389,21 @@
 .work-order-detail-footer {
   flex-shrink: 0;
   padding-top: var(--space-md);
-  display: flex;
-  flex-wrap: wrap;
+  padding-bottom: var(--space-sm);
+  display: grid;
+  grid-template-columns: 1fr;
   gap: var(--space-sm);
-  align-items: center;
+  align-items: stretch;
+}
+
+.app-main--bottom-nav .work-order-detail-footer {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-lg));
 }
 
 .work-order-detail-download {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .work-orders-empty.wo-co-finalized-block {
@@ -404,9 +411,12 @@
 }
 
 @media (min-width: 640px) {
+  .work-order-detail-footer {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .work-order-detail-download {
-    width: auto;
-    min-width: 220px;
+    width: 100%;
   }
 }
 

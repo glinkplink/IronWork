@@ -104,12 +104,15 @@ A contractor can **start a work order without signing in**. They fill the job fo
   **`nativeHeight × scale`**. **`ResizeObserver`** on the measure node + **`matchMedia`** keep scale
   in sync. **`overflow-x: auto`** on the measure when needed; page scroll stays in **`app-main`**.
   Print CSS removes upscale and uses full-width sheet layout.
-- **Header and footer** (Work Order # or optional **invoice** label, Confidential, footer
+- **Header and footer** (explicit left/right document labels, Confidential, footer
   `Service Provider - [business name]`, phone when present, page numbers) use Puppeteer
   `displayHeaderFooter` with `headerTemplate` / `footerTemplate` — they are **not** duplicated in
   the document body HTML. Footer uses `business_profiles.business_name` (not owner/welder name).
-  Invoice PDFs send **`marginHeaderLeft`** (e.g. `Invoice #0001`) in the JSON body; when present it
-  replaces the left header cell. Work Order PDFs omit it and keep **`workOrderNumber`** behavior.
+  `POST /api/pdf` accepts **`headerLeft`** and **`headerRight`**. Work Order PDFs send
+  `headerLeft: "Work Order #0007"` and blank `headerRight`; Invoice PDFs send
+  `headerLeft: "Invoice #0001"` and `headerRight: "WO #0007"` when available; Change Orders use
+  `headerLeft` for CO and `headerRight` for WO. Legacy `marginHeaderLeft` / `workOrderNumber`
+  remain fallback inputs only for older callers during the transition.
 - **Body** includes the centered **Work Order** title, numbered sections, tables, and signatures
   only. Section 1 uses **plain-text** Agreement Date and Job Site Address (blue label, black value,
   no table box). **Job site** is rendered as a **single line** in agreement output (`jobLocationSingleLine`), even when the form stores a multiline `job_location`. Then a **3-column party table** (row labels | Service Provider | Customer): header
@@ -228,7 +231,7 @@ scope-lock/
 ├── server/
 │   ├── app-server.mjs               # App server + /api/pdf + e-sign + Stripe + invoice routes
 │   ├── stripe-routes.mjs            # Stripe Connect start/status, payment-link, Stripe webhook
-│   ├── invoice-routes.mjs           # POST /api/invoices/:id/send — Resend email + PDF; body `include_payment_link` (email-only vs Stripe link); WO signature gate; `issued_at` on first send
+│   ├── invoice-routes.mjs           # POST /api/invoices/:id/send; POST /api/invoices/:id/mark-paid-offline; POST /api/invoices/:id/unmark-paid-offline; email PDF + optional payment link; WO signature gate; `issued_at` on first send
 │   ├── esign-routes.mjs             # JWT send/resend; webhook + service-role e-sign updates
 │   ├── docuseal-esign-state.mjs     # DocuSeal submission → shared esign_* patch fields
 │   └── lib/
@@ -323,7 +326,7 @@ Edit profile (gear) → EditProfilePage
 - `db/profile.ts`: Profile CRUD; **`updateNextWoNumber`** uses `.update()` (partial `upsert` 400s on `business_profiles` because `business_name` is NOT NULL)
 - `db/clients.ts`: Client CRUD + enriched client-list query; **JobForm** searches/suggests clients when `userId` is set; **ClientsPage** lists/edits saved contact fields; **saveWorkOrder** upserts client by `name_normalized`
 - `db/jobs.ts`: Job CRUD + **saveWorkOrder** (insert/update, client upsert); UI lists jobs on **Work Orders**
-- `db/invoices.ts`: Invoice CRUD; **`createInvoice`** calls Postgres **`next_invoice_number(p_user_id)`** for atomic numbering (increments `business_profiles.next_invoice_number`); **`updateInvoice`** full-row overwrite; **`mapInvoiceRow`** normalizes **`line_items[].source`**; invoice business state derives from **`issued_at`** (no invoice row → `Invoice`, `issued_at = null` → `Draft`, `issued_at != null` → `Invoiced`). PDF sharing is manual or via future payment links. **`listInvoiceStatusByJob`** skips malformed rows and returns a non-blocking warning instead of disabling all invoice actions
+- `db/invoices.ts`: Invoice CRUD; **`createInvoice`** calls Postgres **`next_invoice_number(p_user_id)`** for atomic numbering (increments `business_profiles.next_invoice_number`); **`updateInvoice`** full-row overwrite; **`mapInvoiceRow`** normalizes **`line_items[].source`**; invoice business state derives from **`issued_at`** (no invoice row → `Invoice`, `issued_at = null` → `Draft`, `issued_at != null` → `Invoiced`). Offline paid status is server-controlled by `mark-paid-offline` / `unmark-paid-offline` routes; undo is allowed only while `payment_status = 'offline'`. **`listInvoiceStatusByJob`** skips malformed rows and returns a non-blocking warning instead of disabling all invoice actions
 - `db/change-orders.ts`: **`listChangeOrders`**, **`createChangeOrder`** (RPC to **`public.create_change_order`**: per-job advisory lock + `MAX(co_number)+1` in SQL; rejects when an **issued job-level** invoice exists for the job), **`updateChangeOrder`**, **`deleteChangeOrder`**, **`computeCOTotal`**
 - `invoice-generator.ts`: Invoice HTML (parties table pattern, line items, tax, payment methods, notes)
 
@@ -371,17 +374,19 @@ Core domain tables use `auth.uid()` RLS policies: users can only read/write thei
 - **New invoice:** **`InvoiceWizard`** loads change orders for the job; **all** are **selected** by default (uncheck to omit); selected rows add **`change_order`** lines. All new built rows set **`source`**.
 - **Edit invoice:** Partition by **`source`**. **`change_order`** rows (and **`legacy`** rows whose description matches **`/^Change Order #/`**) are **preserved**. Rows **`original_scope`**, **`labor`**, **`material`**, **`manual`** are **replaced** from wizard state on save. **Order:** **fixed** → rebuilt original scope then preserved CO lines; **T&M** → preserved CO lines then all labor lines then all material lines. **T&M** editing round-trips **all** labor and material lines (not only the first).
 
-### Work Orders dashboard rollups (Option B)
+### Dashboard rollups
 
-- **Invoiced** / **Paid** / **Pending Invoice** summary cards use **`job.price`** only (original contract on the saved work order). They **do not** include change-order deltas or invoice totals. These are mutually exclusive buckets from the latest job-level invoice state: paid, issued-but-unpaid, and absent-or-unissued. Using invoice totals for rollups (**Option A**) is deferred.
+- **Home** shows four cards: **Work orders** count from the work-order dashboard summary plus **Invoiced** / **Paid** / **Pending Invoice** money cards from the invoice-financial summary over **`invoices.total`**. Invoice buckets are mutually exclusive from invoice state: paid/offline-paid, issued-but-unpaid, and draft/unissued.
+- **Invoices** shows only invoice-financial money cards from the same invoice summary. Its **Paid** card spans the full row below **Invoiced** and **Pending Invoice**.
+- **Work Orders** shows work-order operational counts only: **Work orders** and **WO's signed**. Signed count includes DocuSeal-completed work orders and work orders marked signed offline.
 - `0014_work_orders_dashboard.sql` remains applied and available for targeted row refresh by `job_id`; the main Work Orders list no longer relies on it for initial page load.
 - **`list_work_orders_dashboard_page`** pages jobs by `(created_at DESC, id DESC)`, aggregates only the current page’s change orders and invoices, uses `DISTINCT ON (job_id)` for latest job-level invoice lookup, and returns:
   - `change_order_count`
   - `change_orders_preview` (first two COs; used for merge/poll payloads, not list chips—the UI uses **`change_order_count`** only to show **View & Create Change Orders**)
   - `has_in_flight_change_orders`
   - `latest_invoice`
-- **`get_work_orders_dashboard_summary`** runs separately from the page RPC so whole-dataset totals do not depend on the currently loaded page.
-- Job-level invoice classification still uses a guarded JSONB scan over **`invoices.line_items`**: an invoice is job-level only when no line item has a non-empty `change_order_id`.
+- **`get_work_orders_dashboard_summary`** runs separately from the page RPC for whole-dataset work-order count.
+- Job-level invoice classification uses a guarded JSONB scan over **`invoices.line_items`**: CO-only invoices stay outside WO row status, but mixed base-scope + change-order invoices still count as job-level for WO status.
 - The Work Orders list reflects each page load from `list_work_orders_dashboard_page` (and “Load more”); it does **not** periodically refetch rows while the user stays on the dashboard.
 
 ## What Is and Isn't Persisted
@@ -392,7 +397,7 @@ Core domain tables use `auth.uid()` RLS policies: users can only read/write thei
 | Default exclusions/assumptions | Yes | Supabase DB, pre-populate new agreements |
 | Auth session | Yes | Supabase session (survives refresh) |
 | Work Agreement (current job) | In-memory while editing | **Download & Save** persists via `saveWorkOrder` |
-| Invoices | Yes | Created at wizard step 3. Business state is **Draft** until **`issued_at`** is set by the **first successful invoice email send** (`POST /api/invoices/:id/send`), then **Invoiced**. Creating a payment link alone (`POST /api/stripe/invoices/:id/payment-link`) does **not** set `issued_at`. `payment_status` (`unpaid`/`paid`/`offline`) and `paid_at` are set by the Stripe webhook. **`InvoiceFinalPage`** refetches the invoice row once on mount so **Paid** reflects webhook updates when the user opens that screen; `WorkOrdersPage` and `WorkOrderDetailPage` use list/detail loads (no interval polling). Downloading the PDF does **not** transition invoice lifecycle. |
+| Invoices | Yes | Created at wizard step 3. Business state is **Draft** until **`issued_at`** is set by the **first successful invoice email send** (`POST /api/invoices/:id/send`), then **Invoiced**. Creating a payment link alone (`POST /api/stripe/invoices/:id/payment-link`) does **not** set `issued_at`. `payment_status` / `paid_at` are updated by the Stripe webhook for online payments, set to `offline` by `POST /api/invoices/:id/mark-paid-offline`, and reset to `unpaid` / `null` by `POST /api/invoices/:id/unmark-paid-offline` only when the current status is `offline`. **`InvoiceFinalPage`** refetches the invoice row once on mount so **Paid** reflects webhook updates when the user opens that screen; `WorkOrdersPage` and `WorkOrderDetailPage` use list/detail loads (no interval polling). Downloading the PDF does **not** transition invoice lifecycle. |
 | Clients | Yes (rows) | Upsert on **Download & Save**; **JobForm** customer-name combobox searches when authenticated; **ClientsPage** edits saved `phone` / `email` / `address` only and does **not** rewrite historical jobs |
 | Change orders | Yes | **ChangeOrderWizard** + detail page; **`create_change_order`** RPC allocates `co_number` under an advisory lock (see **0006**); no client-side retry loop |
 | Completion signoffs | No | Schema only |

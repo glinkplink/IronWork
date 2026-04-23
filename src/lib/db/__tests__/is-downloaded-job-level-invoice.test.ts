@@ -49,19 +49,25 @@ describe('isIssuedJobLevelInvoiceRow', () => {
     ).toBe(false);
   });
 
-  it('is false when any line has change_order_id', () => {
+  it('is false for change-order-only invoices', () => {
     expect(
       isIssuedJobLevelInvoiceRow({
         issued_at: '2025-01-02T00:00:00Z',
         line_items: [{ change_order_id: 'co-1' }],
       })
     ).toBe(false);
+  });
+
+  it('is true for mixed base-scope plus change-order invoices', () => {
     expect(
       isIssuedJobLevelInvoiceRow({
         issued_at: '2025-01-02T00:00:00Z',
-        line_items: [{ description: 'x' }, { change_order_id: 'co-1' }],
+        line_items: [
+          { description: 'Original scope', source: 'original_scope' },
+          { description: 'Change Order #0001', source: 'change_order', change_order_id: 'co-1' },
+        ],
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 
@@ -83,6 +89,21 @@ describe('getBlocksNewChangeOrdersForJob', () => {
     const result = await getBlocksNewChangeOrdersForJob('u1', 'j1');
     expect(result.error).toBeNull();
     expect(result.blocks).toBe(false);
+  });
+
+  it('returns blocks true when an issued mixed invoice exists', async () => {
+    mockState.rows = [
+      {
+        issued_at: '2025-01-02T00:00:00Z',
+        line_items: [
+          { description: 'Original scope', source: 'original_scope' },
+          { description: 'Change Order #0001', source: 'change_order', change_order_id: 'co-1' },
+        ],
+      },
+    ];
+    const result = await getBlocksNewChangeOrdersForJob('u1', 'j1');
+    expect(result.error).toBeNull();
+    expect(result.blocks).toBe(true);
   });
 
   it('returns blocks false for unissued job-level only', async () => {

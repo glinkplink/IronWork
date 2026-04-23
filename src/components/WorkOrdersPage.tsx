@@ -9,6 +9,7 @@ import type {
 } from '../types/db';
 import {
   getJobById,
+  getSignedWorkOrdersCount,
   getWorkOrdersDashboardSummary,
   listWorkOrdersDashboardPage,
 } from '../lib/db/jobs';
@@ -177,6 +178,11 @@ function matchesWorkOrderSearch(job: WorkOrderDashboardJob, searchTerm: string):
   const haystack = [
     formatWorkOrderDashboardWoLabel(job),
     job.customer_name,
+    job.job_type,
+    job.other_classification,
+    formatWorkOrderDashboardRowDate(job),
+    formatUsd(job.price),
+    Number.isFinite(job.price) ? job.price.toFixed(2) : null,
     signatureState.displayLabel,
     progressTitle,
     invoiceLabel,
@@ -320,6 +326,7 @@ export function WorkOrdersPage({
   const [loadMoreLoading, setLoadMoreLoading] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [summary, setSummary] = useState<WorkOrdersDashboardSummary | null>(null);
+  const [signedWorkOrdersCount, setSignedWorkOrdersCount] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<WorkOrderFilterOption>('all');
 
@@ -355,11 +362,13 @@ export function WorkOrdersPage({
     setNextCursor(null);
     setLoadMoreError(null);
     setSummary(null);
+    setSignedWorkOrdersCount(null);
 
     void Promise.all([
       listWorkOrdersDashboardPage(userId, WORK_ORDERS_PAGE_SIZE),
       getWorkOrdersDashboardSummary(userId),
-    ]).then(([pageResult, summaryResult]) => {
+      getSignedWorkOrdersCount(userId),
+    ]).then(([pageResult, summaryResult, signedCountResult]) => {
       if (cancelled) return;
 
       if (pageResult.error) {
@@ -378,6 +387,12 @@ export function WorkOrdersPage({
         setSummary(null);
       } else {
         setSummary(summaryResult.data);
+      }
+
+      if (signedCountResult.error) {
+        setSignedWorkOrdersCount(null);
+      } else {
+        setSignedWorkOrdersCount(signedCountResult.data);
       }
 
       setJobsLoading(false);
@@ -441,7 +456,7 @@ export function WorkOrdersPage({
   }, [hasMore, loadMoreLoading, nextCursor, userId]);
 
   const summaryJobCountDisplay = summary?.jobCount ?? 0;
-  const summaryPaidDisplay = formatUsd(summary?.paidContractTotal);
+  const signedWorkOrdersDisplay = signedWorkOrdersCount ?? 0;
   const filteredJobs = useMemo(
     () =>
       jobs.filter(
@@ -512,15 +527,15 @@ export function WorkOrdersPage({
           <div
             className="work-orders-stat-strip"
             role="group"
-            aria-label="Work order count and paid contract total from dashboard summary"
+            aria-label="Work order counts"
           >
             <div className="work-orders-stat-card work-orders-stat-card--spark">
               <div className="work-orders-stat-num">{summaryJobCountDisplay}</div>
               <div className="work-orders-stat-label">Work orders</div>
             </div>
-            <div className="work-orders-stat-card work-orders-stat-card--paid">
-              <div className="work-orders-stat-num">{summaryPaidDisplay}</div>
-              <div className="work-orders-stat-label">Paid</div>
+            <div className="work-orders-stat-card work-orders-stat-card--signed">
+              <div className="work-orders-stat-num">{signedWorkOrdersDisplay}</div>
+              <div className="work-orders-stat-label">WO&apos;s signed</div>
             </div>
           </div>
           <div className="work-orders-filters" aria-label="Work order filters">

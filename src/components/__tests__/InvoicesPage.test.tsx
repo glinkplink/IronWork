@@ -10,7 +10,6 @@ import { InvoicesPage } from '../InvoicesPage';
 const listInvoicesWithCustomerName = vi.fn();
 const getJobById = vi.fn();
 const getChangeOrderById = vi.fn();
-const getWorkOrdersDashboardSummary = vi.fn();
 
 vi.mock('../../lib/db/invoices', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/db/invoices')>();
@@ -23,7 +22,6 @@ vi.mock('../../lib/db/invoices', async (importOriginal) => {
 
 vi.mock('../../lib/db/jobs', () => ({
   getJobById: (...args: unknown[]) => getJobById(...args),
-  getWorkOrdersDashboardSummary: (...args: unknown[]) => getWorkOrdersDashboardSummary(...args),
 }));
 
 vi.mock('../../lib/db/change-orders', () => ({
@@ -151,15 +149,6 @@ describe('InvoicesPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    getWorkOrdersDashboardSummary.mockResolvedValue({
-      data: {
-        jobCount: 0,
-        invoicedContractTotal: 0,
-        pendingContractTotal: 0,
-        paidContractTotal: 0,
-      },
-      error: null,
-    });
   });
 
   afterEach(() => {
@@ -187,6 +176,105 @@ describe('InvoicesPage', () => {
       expect(screen.getByText('WO #0003')).toBeInTheDocument();
     });
     expect(screen.getByText('WO (no #)')).toBeInTheDocument();
+  });
+
+  it('renders paid stat and filters loaded invoices by search text', async () => {
+    const user = userEvent.setup();
+    listInvoicesWithCustomerName.mockResolvedValue({
+      data: [
+        withListFields(
+          baseInvoice({ id: 'inv-a', invoice_number: 1, total: 125, payment_status: 'unpaid' }),
+          'Alpha Rail',
+          7
+        ),
+        withListFields(
+          baseInvoice({ id: 'inv-b', invoice_number: 2, total: 900, payment_status: 'paid' }),
+          'Bravo Gate',
+          8
+        ),
+      ],
+      error: null,
+    });
+
+    render(
+      <InvoicesPage userId="u1" onOpenInvoice={onOpenInvoice} onOpenCoInvoice={onOpenCoInvoice} />
+    );
+
+    const statGroup = await screen.findByRole('group', {
+      name: /^Invoiced, paid, and pending invoice totals$/i,
+    });
+    expect(within(statGroup).getByText('$900')).toBeInTheDocument();
+    expect(within(statGroup).getByText('Paid')).toBeInTheDocument();
+
+    await user.type(screen.getByRole('searchbox', { name: /search invoices/i }), 'Bravo');
+
+    const list = screen.getByRole('list');
+    expect(within(list).getByText('Bravo Gate')).toBeInTheDocument();
+    expect(within(list).queryByText('Alpha Rail')).not.toBeInTheDocument();
+  });
+
+  it('derives stat totals from invoice row status, including offline paid invoices', async () => {
+    listInvoicesWithCustomerName.mockResolvedValue({
+      data: [
+        withListFields(
+          baseInvoice({
+            id: 'inv-offline-a',
+            invoice_number: 22,
+            total: 23188,
+            issued_at: '2026-04-23T00:00:00Z',
+            payment_status: 'offline',
+          }),
+          'James FrancO',
+          12
+        ),
+        withListFields(
+          baseInvoice({
+            id: 'inv-offline-b',
+            invoice_number: 21,
+            total: 23188,
+            issued_at: '2026-04-23T00:00:00Z',
+            payment_status: 'offline',
+          }),
+          'James FrancO',
+          12
+        ),
+        withListFields(
+          baseInvoice({
+            id: 'inv-unpaid',
+            invoice_number: 20,
+            total: 11496,
+            issued_at: '2026-04-23T00:00:00Z',
+            payment_status: 'unpaid',
+          }),
+          'Unpaid Customer',
+          13
+        ),
+        withListFields(
+          baseInvoice({
+            id: 'inv-draft',
+            invoice_number: 19,
+            total: 1000,
+            issued_at: null,
+            payment_status: 'unpaid',
+          }),
+          'Draft Customer',
+          14
+        ),
+      ],
+      error: null,
+    });
+
+    render(
+      <InvoicesPage userId="u1" onOpenInvoice={onOpenInvoice} onOpenCoInvoice={onOpenCoInvoice} />
+    );
+
+    const statGroup = await screen.findByRole('group', {
+      name: /^Invoiced, paid, and pending invoice totals$/i,
+    });
+    expect(within(statGroup).getByText('$46,376')).toBeInTheDocument();
+    expect(within(statGroup).getByText('$11,496')).toBeInTheDocument();
+    expect(within(statGroup).getByText('$1,000')).toBeInTheDocument();
+    expect(within(screen.getByRole('list')).getAllByText('Paid Offline')).toHaveLength(2);
   });
 
   it('renders draft, invoiced, paid, and paid offline status pills (WO row invoice button styles)', async () => {

@@ -2026,6 +2026,19 @@ body::before {
 .invoice-line-table {
   width: 100%;
   margin-bottom: var(--space-lg);
+  table-layout: fixed;
+}
+
+.invoice-document .invoice-line-col-description {
+  width: 58%;
+}
+
+.invoice-document .invoice-line-col-qty {
+  width: 9%;
+}
+
+.invoice-document .invoice-line-col-money {
+  width: 16.5%;
 }
 
 .invoice-line-table th {
@@ -2040,15 +2053,31 @@ body::before {
   print-color-adjust: exact;
 }
 
+.invoice-document .invoice-line-table th:nth-child(2),
+.invoice-document .invoice-line-table th:nth-child(3),
+.invoice-document .invoice-line-table th:nth-child(4),
+.invoice-document .invoice-line-number {
+  text-align: right;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.invoice-document .invoice-line-description {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
 .invoice-totals-block {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-sm);
 }
 
 .invoice-totals-table {
   border-collapse: collapse;
-  min-width: 240px;
+  width: min(100%, 280px);
+  table-layout: fixed;
 }
 
 .invoice-totals-table td {
@@ -2060,31 +2089,12 @@ body::before {
   background: var(--surface-white);
 }
 
-/* Horizontal row for invoice PDF + preview (overrides .content-bullets) */
-.invoice-payment-list.content-bullets,
-ul.invoice-payment-list {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0;
-  list-style: none;
-  list-style-type: none;
-  padding-left: 0;
+.invoice-payment-methods-line {
   margin: 0 0 var(--space-lg);
-}
-
-.invoice-payment-list li {
-  display: block;
-}
-
-.invoice-payment-list li + li {
-  margin-top: 0;
-}
-
-.invoice-payment-list li:not(:last-child)::after {
-  content: '·';
-  margin: 0 0.65rem;
   color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .invoice-notes-section {

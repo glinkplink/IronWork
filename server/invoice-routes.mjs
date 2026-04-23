@@ -6,6 +6,7 @@ import { esc } from './lib/html-escape.mjs';
 import { log } from './lib/logger.mjs';
 import { preparePdfPageForRendering } from './lib/pdf-puppeteer.mjs';
 import { isPayloadTooLarge } from './lib/payload-error.mjs';
+import { buildHeaderTemplate } from './lib/pdf-templates.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -140,6 +141,21 @@ function getBearerToken(req) {
   return auth.slice(7);
 }
 
+function getRequestPath(req) {
+  return String(req.url || '').split('?')[0] || '/';
+}
+
+function invoiceIdFromPath(req, action) {
+  const pathOnly = getRequestPath(req);
+  const match = pathOnly.match(new RegExp(`^/api/invoices/([^/]+)/${action}$`));
+  if (!match?.[1]) return '';
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Get the browser instance for PDF generation.
  * Reuses existing getBrowser from app-server.mjs
@@ -153,7 +169,7 @@ async function getBrowser() {
  * Render an invoice as a PDF buffer.
  * Wraps the HTML with CSS before generating PDF.
  */
-async function renderInvoicePdf({ invoice, html, profile }) {
+async function renderInvoicePdf({ invoice, html, profile, job }) {
   const browser = await getBrowser();
   const page = await browser.newPage();
 
@@ -177,11 +193,10 @@ async function renderInvoicePdf({ invoice, html, profile }) {
     await new Promise((r) => setTimeout(r, 200));
 
     const invoiceNumber = String(invoice.invoice_number).padStart(4, '0');
-    const headerTemplate = `
-      <div style="font-size:10px;width:100%;text-align:center;">
-        <span style="white-space:nowrap;">Invoice #${invoiceNumber}</span>
-      </div>
-    `;
+    const woHeader = job?.wo_number != null && Number.isFinite(Number(job.wo_number))
+      ? `WO #${String(Number(job.wo_number)).padStart(4, '0')}`
+      : '';
+    const headerTemplate = buildHeaderTemplate(`Invoice #${invoiceNumber}`, woHeader);
     const footerTemplate = `
       <div style="font-size:10px;width:100%;text-align:center;">
         <span style="white-space:nowrap;">${esc(profile.business_name)}</span>
@@ -209,9 +224,10 @@ async function renderInvoicePdf({ invoice, html, profile }) {
 
 export async function tryHandleInvoiceRoute(req, res, helpers) {
   const { readJsonBody, sendJson, sendText } = helpers;
+  const pathOnly = getRequestPath(req);
 
   // POST /api/invoices/:invoiceId/send
-  if (req.method === 'POST' && /^\/api\/invoices\/[\w-]+\/send$/.test(req.url)) {
+  if (req.method === 'POST' && /^\/api\/invoices\/[^/]+\/send$/.test(pathOnly)) {
     try {
       return await handleInvoiceSend(req, res, { readJsonBody, sendJson });
     } catch (err) {
@@ -226,8 +242,13 @@ export async function tryHandleInvoiceRoute(req, res, helpers) {
   }
 
   // POST /api/invoices/:invoiceId/mark-paid-offline
-  if (req.method === 'POST' && /^\/api\/invoices\/[\w-]+\/mark-paid-offline$/.test(req.url)) {
+  if (req.method === 'POST' && /^\/api\/invoices\/[^/]+\/mark-paid-offline$/.test(pathOnly)) {
     return await handleMarkPaidOffline(req, res, { sendJson });
+  }
+
+  // POST /api/invoices/:invoiceId/unmark-paid-offline
+  if (req.method === 'POST' && /^\/api\/invoices\/[^/]+\/unmark-paid-offline$/.test(pathOnly)) {
+    return await handleUnmarkPaidOffline(req, res, { sendJson });
   }
 
   return false;
@@ -248,8 +269,7 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
   }
   const userId = userData.user.id;
 
-  const match = req.url.match(/\/invoices\/([0-9a-f-]+)\/send/);
-  const invoiceId = match?.[1];
+  const invoiceId = invoiceIdFromPath(req, 'send');
   if (!invoiceId) {
     sendJson(res, 400, { error: 'Invalid invoice ID' });
     return true;
@@ -274,7 +294,7 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
 
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
-    .select('customer_email, customer_name, esign_status, offline_signed_at')
+    .select('customer_email, customer_name, esign_status, offline_signed_at, wo_number')
     .eq('id', invoice.job_id)
     .eq('user_id', userId)
     .maybeSingle();
@@ -403,7 +423,7 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
 
   let pdfBuffer;
   try {
-    pdfBuffer = await renderInvoicePdf({ invoice, html, profile });
+    pdfBuffer = await renderInvoicePdf({ invoice, html, profile, job });
   } catch (err) {
     log.error('Invoice PDF generation failed', log.errCtx(err));
     sendJson(res, 500, { error: 'Could not generate invoice PDF.' });
@@ -506,8 +526,7 @@ async function handleMarkPaidOffline(req, res, { sendJson }) {
   }
   const userId = userData.user.id;
 
-  const match = req.url.match(/\/invoices\/([0-9a-f-]+)\/mark-paid-offline/);
-  const invoiceId = match?.[1];
+  const invoiceId = invoiceIdFromPath(req, 'mark-paid-offline');
   if (!invoiceId) {
     sendJson(res, 400, { error: 'Invalid invoice ID' });
     return true;
@@ -553,6 +572,72 @@ async function handleMarkPaidOffline(req, res, { sendJson }) {
   }
 
   log.info('marked invoice paid offline', { invoiceId, userId });
+  sendJson(res, 200, { invoice: updated });
+  return true;
+}
+
+async function handleUnmarkPaidOffline(req, res, { sendJson }) {
+  const token = getBearerToken(req);
+  if (!token) {
+    sendJson(res, 401, { error: 'Missing authorization' });
+    return true;
+  }
+
+  const supabase = getServiceSupabase();
+  const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+  if (userErr || !userData?.user?.id) {
+    sendJson(res, 401, { error: 'Invalid session' });
+    return true;
+  }
+  const userId = userData.user.id;
+
+  const invoiceId = invoiceIdFromPath(req, 'unmark-paid-offline');
+  if (!invoiceId) {
+    sendJson(res, 400, { error: 'Invalid invoice ID' });
+    return true;
+  }
+
+  const { data: invoice, error: invoiceErr } = await supabase
+    .from('invoices')
+    .select('id, user_id, payment_status')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (invoiceErr) {
+    log.error('unmark-paid-offline load error', log.errCtx(invoiceErr));
+    sendJson(res, 500, { error: 'Could not load invoice.' });
+    return true;
+  }
+  if (!invoice) {
+    sendJson(res, 404, { error: 'Invoice not found' });
+    return true;
+  }
+  if (invoice.payment_status !== 'offline') {
+    sendJson(res, 409, {
+      error:
+        invoice.payment_status === 'paid'
+          ? 'Stripe-paid invoices cannot be marked unpaid here.'
+          : 'Only offline-paid invoices can be marked unpaid.',
+    });
+    return true;
+  }
+
+  const { data: updated, error: updateErr } = await supabase
+    .from('invoices')
+    .update({ payment_status: 'unpaid', paid_at: null })
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (updateErr) {
+    log.error('unmark-paid-offline update error', log.errCtx(updateErr));
+    sendJson(res, 500, { error: 'Could not update invoice.' });
+    return true;
+  }
+
+  log.info('unmarked invoice paid offline', { invoiceId, userId });
   sendJson(res, 200, { invoice: updated });
   return true;
 }

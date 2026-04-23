@@ -99,14 +99,14 @@ export function buildPdfHtml(previewMarkup: string): string {
         print-color-adjust: exact;
       }
 
-      .content-bullets:not(.invoice-payment-list) {
+      .content-bullets {
         list-style-type: disc;
         list-style-position: outside;
         padding-left: 1.35rem;
         margin-left: 0;
       }
 
-      .content-bullets:not(.invoice-payment-list) li {
+      .content-bullets li {
         display: list-item;
       }
 
@@ -133,7 +133,8 @@ export async function fetchAgreementPdfBlob(
     body: JSON.stringify({
       filename: getPdfFilename(job.wo_number, job.customer_name),
       html: buildPdfHtml(previewElement.outerHTML),
-      workOrderNumber: getWorkOrderHeaderLabel(job),
+      headerLeft: getWorkOrderHeaderLabel(job),
+      headerRight: '',
       providerName: getPdfFooterBusinessName(profile, job),
       providerPhone: getPdfFooterPhone(profile, job),
     }),
@@ -177,7 +178,8 @@ export async function fetchInvoicePdfBlob(
   return fetchHtmlPdfBlob({
     filename: getInvoicePdfFilename(invoice.invoice_number, job.customer_name),
     innerMarkup: previewRoot.outerHTML,
-    marginHeaderLeft: `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`,
+    headerLeft: `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`,
+    headerRight: job.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : '',
     providerName: profile?.business_name?.trim() ?? '',
     providerPhone: profile?.phone ?? '',
   });
@@ -187,6 +189,8 @@ export async function fetchHtmlPdfBlob(options: {
   filename: string;
   /** Inner markup passed to buildPdfHtml (e.g. one or more `.agreement-document` roots). */
   innerMarkup: string;
+  headerLeft?: string;
+  headerRight?: string;
   workOrderNumber?: string;
   marginHeaderLeft?: string;
   providerName: string;
@@ -197,6 +201,8 @@ export async function fetchHtmlPdfBlob(options: {
     body: JSON.stringify({
       filename: options.filename,
       html: buildPdfHtml(options.innerMarkup),
+      headerLeft: options.headerLeft,
+      headerRight: options.headerRight,
       workOrderNumber: options.workOrderNumber ?? '',
       marginHeaderLeft: options.marginHeaderLeft,
       providerName: options.providerName,

@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
-import type { ChangeOrder, Job, Invoice, InvoiceLineItem, WorkOrdersDashboardSummary } from '../types/db';
+import type { ChangeOrder, Job, Invoice, InvoiceLineItem } from '../types/db';
 import type { InvoiceWithCustomerName } from '../lib/db/invoices';
-import { listInvoicesWithCustomerName, getInvoiceBusinessStatus } from '../lib/db/invoices';
-import { getJobById, getWorkOrdersDashboardSummary } from '../lib/db/jobs';
+import {
+  listInvoicesWithCustomerName,
+  getInvoiceBusinessStatus,
+  summarizeInvoiceDashboardRows,
+} from '../lib/db/invoices';
+import { getJobById } from '../lib/db/jobs';
 import { getChangeOrderById } from '../lib/db/change-orders';
 import { formatUsd } from '../lib/work-order-dashboard-display';
 import './WorkOrdersPage.css';
@@ -63,6 +67,29 @@ function invoiceRowStatusPill(invoice: InvoiceWithCustomerName): { className: st
   return { className: 'wo-row-invoice-btn wo-row-invoice-btn--invoiced', label: 'Invoiced' };
 }
 
+function matchesInvoiceSearch(invoice: InvoiceWithCustomerName, searchTerm: string): boolean {
+  const trimmed = searchTerm.trim().toLowerCase();
+  if (!trimmed) return true;
+
+  const statusLabel = invoiceRowStatusPill(invoice).label;
+  const haystack = [
+    formatInvoiceLabel(invoice.invoice_number),
+    `Invoice #${String(invoice.invoice_number).padStart(4, '0')}`,
+    formatWoLabel(invoice.wo_number),
+    invoice.customer_name,
+    statusLabel,
+    formatUsd(invoice.total),
+    invoice.total.toFixed(2),
+    formatInvoiceDate(invoice.invoice_date),
+    invoice.invoice_date,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .toLowerCase();
+
+  return haystack.includes(trimmed);
+}
+
 interface InvoiceRowProps {
   invoice: InvoiceWithCustomerName;
   busy: boolean;
@@ -102,10 +129,10 @@ function InvoiceRow({ invoice, busy, onOpen }: InvoiceRowProps) {
 
 export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: InvoicesPageProps) {
   const [invoices, setInvoices] = useState<InvoiceWithCustomerName[]>([]);
-  const [summary, setSummary] = useState<WorkOrdersDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -113,21 +140,18 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
     setLoading(true);
     setError(null);
     setInvoices([]);
-    setSummary(null);
     /* eslint-enable react-hooks/set-state-in-effect */
 
-    void Promise.all([listInvoicesWithCustomerName(userId), getWorkOrdersDashboardSummary(userId)])
-      .then(([listResult, summaryResult]) => {
+    void listInvoicesWithCustomerName(userId)
+      .then((listResult) => {
         if (cancelled) return;
         if (listResult.error) {
           setError('Failed to load invoices.');
           setInvoices([]);
-          setSummary(null);
           setLoading(false);
           return;
         }
         setInvoices(listResult.data);
-        setSummary(summaryResult.error ? null : summaryResult.data);
         setLoading(false);
       })
       .catch(() => {
@@ -164,6 +188,9 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
     }
   };
 
+  const visibleInvoices = invoices.filter((inv) => matchesInvoiceSearch(inv, searchTerm));
+  const totalsSummary = summarizeInvoiceDashboardRows(invoices);
+
   return (
     <div className="invoices-page work-orders-page">
       <div className="work-orders-toolbar">
@@ -182,26 +209,53 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
         <div className="work-orders-loading">No invoices yet.</div>
       )}
 
-      {!loading && !error && summary !== null && (
+      {!loading && !error && invoices.length > 0 && (
         <div
           className="work-orders-stat-strip"
           role="group"
-          aria-label="Invoiced and pending invoice totals from dashboard summary"
+          aria-label="Invoiced, paid, and pending invoice totals"
         >
           <div className="work-orders-stat-card work-orders-stat-card--blue">
-            <div className="work-orders-stat-num">{formatUsd(summary.invoicedContractTotal)}</div>
+            <div className="work-orders-stat-num">{formatUsd(totalsSummary.invoicedTotal)}</div>
             <div className="work-orders-stat-label">Invoiced</div>
           </div>
+          <div className="work-orders-stat-card work-orders-stat-card--paid">
+            <div className="work-orders-stat-num">{formatUsd(totalsSummary.paidTotal)}</div>
+            <div className="work-orders-stat-label">Paid</div>
+          </div>
           <div className="work-orders-stat-card work-orders-stat-card--green">
-            <div className="work-orders-stat-num">{formatUsd(summary.pendingContractTotal)}</div>
+            <div className="work-orders-stat-num">{formatUsd(totalsSummary.pendingInvoiceTotal)}</div>
             <div className="work-orders-stat-label">Pending invoice</div>
           </div>
         </div>
       )}
 
       {!loading && !error && invoices.length > 0 && (
+        <div className="work-orders-filters invoices-filters">
+          <div className="form-group work-orders-search-group">
+            <label htmlFor="invoices-search">Search invoices</label>
+            <input
+              id="invoices-search"
+              type="search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search invoice, WO, customer, status, amount, or date"
+              autoComplete="off"
+            />
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && invoices.length > 0 && visibleInvoices.length === 0 && (
+        <div className="work-orders-filtered-empty-state">
+          <p className="work-orders-empty-title">No invoices match</p>
+          <p className="work-orders-empty-lead">Try a different invoice number, customer, amount, date, or status.</p>
+        </div>
+      )}
+
+      {!loading && !error && visibleInvoices.length > 0 && (
         <ul className="work-orders-list">
-          {invoices.map((inv) => (
+          {visibleInvoices.map((inv) => (
             <InvoiceRow
               key={inv.id}
               invoice={inv}

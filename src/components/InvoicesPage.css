@@ -23,6 +23,10 @@
   text-align: center;
 }
 
+.invoices-page.work-orders-page .invoices-filters {
+  margin-bottom: var(--space-md);
+}
+
 /* WO # line under customer — Forge tones (same role as extra meta on WO rows) */
 .invoices-page.work-orders-page .invoices-row-wo-line {
   margin-top: 2px;

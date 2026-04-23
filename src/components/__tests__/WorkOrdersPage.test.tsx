@@ -15,12 +15,14 @@ import { WorkOrdersPage } from '../WorkOrdersPage';
 
 const listWorkOrdersDashboardPage = vi.fn();
 const getWorkOrdersDashboardSummary = vi.fn();
+const getSignedWorkOrdersCount = vi.fn();
 const getJobById = vi.fn();
 const getInvoice = vi.fn();
 
 vi.mock('../../lib/db/jobs', () => ({
   listWorkOrdersDashboardPage: (...args: unknown[]) => listWorkOrdersDashboardPage(...args),
   getWorkOrdersDashboardSummary: (...args: unknown[]) => getWorkOrdersDashboardSummary(...args),
+  getSignedWorkOrdersCount: (...args: unknown[]) => getSignedWorkOrdersCount(...args),
   getJobById: (...args: unknown[]) => getJobById(...args),
 }));
 
@@ -298,10 +300,12 @@ describe('WorkOrdersPage', () => {
     localStorage.clear();
     listWorkOrdersDashboardPage.mockReset();
     getWorkOrdersDashboardSummary.mockReset();
+    getSignedWorkOrdersCount.mockReset();
     getJobById.mockReset();
     getInvoice.mockReset();
     listWorkOrdersDashboardPage.mockResolvedValue(makePageResult([listJobA]));
     getWorkOrdersDashboardSummary.mockResolvedValue({ data: summaryResult, error: null });
+    getSignedWorkOrdersCount.mockResolvedValue({ data: 1, error: null });
     getJobById.mockImplementation((id: string) => Promise.resolve(minimalFullJob(id, id)));
     getInvoice.mockImplementation((id: string) => Promise.resolve(minimalInvoice(id)));
   });
@@ -327,6 +331,7 @@ describe('WorkOrdersPage', () => {
       },
       error: null,
     });
+    getSignedWorkOrdersCount.mockResolvedValue({ data: 1, error: null });
 
     renderPage(minimalProfileWithPhone());
 
@@ -337,11 +342,16 @@ describe('WorkOrdersPage', () => {
 
     expect(listWorkOrdersDashboardPage).toHaveBeenCalledWith('u1', 25);
     expect(getWorkOrdersDashboardSummary).toHaveBeenCalledWith('u1');
+    expect(getSignedWorkOrdersCount).toHaveBeenCalledWith('u1');
     const statGroup = screen.getByRole('group', {
-      name: /Work order count and paid contract total from dashboard summary/i,
+      name: /Work order counts/i,
     });
     expect(within(statGroup).getByText('2')).toBeInTheDocument();
-    expect(within(statGroup).getByText('$0')).toBeInTheDocument();
+    expect(within(statGroup).getByText('1')).toBeInTheDocument();
+    expect(within(statGroup).getByText("WO's signed")).toBeInTheDocument();
+    expect(within(statGroup).queryByText('Invoiced')).not.toBeInTheDocument();
+    expect(within(statGroup).queryByText('Paid')).not.toBeInTheDocument();
+    expect(within(statGroup).queryByText('Pending invoice')).not.toBeInTheDocument();
   });
 
   it('loads more rows with cursor pagination and appends without replacing earlier rows', async () => {
@@ -612,6 +622,64 @@ describe('WorkOrdersPage', () => {
     expect(within(list).getByText('Customer B')).toBeInTheDocument();
     expect(within(list).queryByText('Customer A')).not.toBeInTheDocument();
     expect(within(list).queryByText('Customer C')).not.toBeInTheDocument();
+  });
+
+  it('searches loaded rows by job type, visible date, amount, and status', async () => {
+    const user = userEvent.setup();
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        {
+          ...listJobA,
+          customer_name: 'Alpha Fab',
+          job_type: 'Custom stair rail',
+          agreement_date: '2025-02-14',
+          price: 1234,
+        },
+        {
+          ...listJobB,
+          customer_name: 'Bravo Fab',
+          job_type: 'Gate repair',
+          agreement_date: '2025-03-20',
+          price: 500,
+          latestInvoice: {
+            id: 'inv-b',
+            job_id: 'job-b',
+            issued_at: '2025-03-21T00:00:00Z',
+            invoice_number: 2,
+            created_at: '2025-03-21T00:00:00Z',
+            payment_status: 'unpaid',
+          },
+        },
+      ])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Bravo Fab');
+
+    const search = screen.getByRole('searchbox', { name: /search loaded work orders/i });
+    await user.type(search, 'stair');
+    let list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Alpha Fab')).toBeInTheDocument();
+    expect(within(list).queryByText('Bravo Fab')).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, 'Mar 20');
+    list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Bravo Fab')).toBeInTheDocument();
+    expect(within(list).queryByText('Alpha Fab')).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, '$500');
+    list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Bravo Fab')).toBeInTheDocument();
+    expect(within(list).queryByText('Alpha Fab')).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, 'invoiced');
+    list = latestWorkOrdersListUl();
+    expect(within(list).getByText('Bravo Fab')).toBeInTheDocument();
+    expect(within(list).queryByText('Alpha Fab')).not.toBeInTheDocument();
   });
 
   it('filters by each chip predicate and keeps signed chip inclusive of offline-signed rows', async () => {

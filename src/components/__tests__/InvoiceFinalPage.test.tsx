@@ -11,6 +11,7 @@ const downloadPdfBlobToFile = vi.fn();
 const updateInvoice = vi.fn();
 const getInvoice = vi.fn();
 const sendInvoiceMock = vi.fn();
+const fetchWithSupabaseAuthMock = vi.fn();
 
 vi.mock('../../lib/agreement-pdf', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/agreement-pdf')>();
@@ -32,6 +33,10 @@ vi.mock('../../lib/db/invoices', async (importOriginal) => {
 
 vi.mock('../../lib/invoice-send', () => ({
   sendInvoice: (...args: unknown[]) => sendInvoiceMock(...args),
+}));
+
+vi.mock('../../lib/fetch-with-supabase-auth', () => ({
+  fetchWithSupabaseAuth: (...args: unknown[]) => fetchWithSupabaseAuthMock(...args),
 }));
 
 vi.mock('../../hooks/useScaledPreview', () => ({
@@ -198,6 +203,12 @@ describe('InvoiceFinalPage', () => {
     updateInvoice.mockResolvedValue({ data: baseInvoice(), error: null });
     getInvoice.mockImplementation(async (id: string) => baseInvoice({ id }));
     sendInvoiceMock.mockResolvedValue({ data: baseInvoice(), error: null });
+    fetchWithSupabaseAuthMock.mockResolvedValue(
+      new Response(JSON.stringify({ invoice: baseInvoice({ payment_status: 'offline' }) }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
   });
 
   afterEach(() => {
@@ -300,6 +311,145 @@ describe('InvoiceFinalPage', () => {
         })
       );
     });
+  });
+
+  it('updates active invoice after marking paid offline', async () => {
+    const user = userEvent.setup();
+    const updated = baseInvoice({
+      id: 'inv-1',
+      issued_at: '2025-01-05T10:00:00Z',
+      payment_status: 'offline',
+      paid_at: '2025-01-10T12:00:00Z',
+    });
+    fetchWithSupabaseAuthMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ invoice: updated }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    renderPage(baseInvoice({ id: 'inv-1', issued_at: '2025-01-05T10:00:00Z' }));
+
+    await user.click(screen.getByRole('button', { name: /mark as paid \(offline\)/i }));
+
+    await waitFor(() => {
+      expect(fetchWithSupabaseAuthMock).toHaveBeenCalledWith(
+        '/api/invoices/inv-1/mark-paid-offline',
+        { method: 'POST' }
+      );
+      expect(onInvoiceUpdated).toHaveBeenCalledWith(updated);
+    });
+  });
+
+  it('allows undo only for offline-paid invoices in the UI', async () => {
+    const user = userEvent.setup();
+    const updated = baseInvoice({
+      id: 'inv-1',
+      issued_at: '2025-01-05T10:00:00Z',
+      payment_status: 'unpaid',
+      paid_at: null,
+    });
+    fetchWithSupabaseAuthMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ invoice: updated }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const { rerender } = renderPage(
+      baseInvoice({
+        id: 'inv-1',
+        issued_at: '2025-01-05T10:00:00Z',
+        payment_status: 'offline',
+        paid_at: '2025-01-10T12:00:00Z',
+      })
+    );
+
+    await user.click(screen.getByRole('button', { name: /undo offline paid/i }));
+
+    await waitFor(() => {
+      expect(fetchWithSupabaseAuthMock).toHaveBeenCalledWith(
+        '/api/invoices/inv-1/unmark-paid-offline',
+        { method: 'POST' }
+      );
+      expect(onInvoiceUpdated).toHaveBeenCalledWith(updated);
+    });
+
+    rerender(
+      <InvoiceFinalPage
+        invoice={baseInvoice({
+          id: 'inv-2',
+          issued_at: '2025-01-05T10:00:00Z',
+          payment_status: 'paid',
+          paid_at: '2025-01-10T12:00:00Z',
+        })}
+        job={baseJob()}
+        profile={baseProfile()}
+        onBack={onBack}
+        onEditInvoice={onEditInvoice}
+        onInvoiceUpdated={onInvoiceUpdated}
+        onOpenStripeSetup={onOpenStripeSetup}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /undo offline paid/i })).not.toBeInTheDocument();
+  });
+
+  it('refetches the invoice when undo succeeds without a JSON body', async () => {
+    const user = userEvent.setup();
+    const updated = baseInvoice({
+      id: 'inv-1',
+      issued_at: '2025-01-05T10:00:00Z',
+      payment_status: 'unpaid',
+      paid_at: null,
+    });
+    getInvoice
+      .mockResolvedValueOnce(
+        baseInvoice({
+          id: 'inv-1',
+          issued_at: '2025-01-05T10:00:00Z',
+          payment_status: 'offline',
+          paid_at: '2025-01-10T12:00:00Z',
+        })
+      )
+      .mockResolvedValueOnce(updated);
+    fetchWithSupabaseAuthMock.mockResolvedValueOnce(
+      new Response('', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    renderPage(
+      baseInvoice({
+        id: 'inv-1',
+        issued_at: '2025-01-05T10:00:00Z',
+        payment_status: 'offline',
+        paid_at: '2025-01-10T12:00:00Z',
+      })
+    );
+
+    await user.click(screen.getByRole('button', { name: /undo offline paid/i }));
+
+    await waitFor(() => {
+      expect(getInvoice).toHaveBeenLastCalledWith('inv-1');
+      expect(onInvoiceUpdated).toHaveBeenCalledWith(updated);
+    });
+  });
+
+  it('renders paid metadata without a duplicate paid badge in the Send Invoice block', () => {
+    renderPage(
+      baseInvoice({
+        issued_at: '2025-01-05T10:00:00Z',
+        payment_status: 'offline',
+        paid_at: '2025-01-10T12:00:00Z',
+      })
+    );
+
+    const paymentBlock = screen.getByRole('region', { name: 'Send Invoice' });
+    expect(within(paymentBlock).getByText('Issued: Jan 5, 2025')).toBeInTheDocument();
+    expect(within(paymentBlock).getByText('Paid: Jan 10, 2025')).toBeInTheDocument();
+    expect(within(paymentBlock).queryByText(/^Paid$/)).not.toBeInTheDocument();
   });
 
   it('disables send and payment-link actions before the work order is signed', () => {

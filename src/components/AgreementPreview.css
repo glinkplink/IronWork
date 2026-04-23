@@ -49,8 +49,9 @@
 }
 
 .agreement-preview .btn-action {
-  flex: 1 1 13rem;
+  flex: 1 1 0;
   min-width: min(100%, 13rem);
+  box-sizing: border-box;
 }
 
 .agreement-preview-scale-viewport {

@@ -194,7 +194,7 @@ export function WorkOrderDetailPage({
     };
   }, [initialJob, jobId, onJobLoaded]);
 
-  const job = initialJob && initialJob.id === jobId ? initialJob : hydratedJob;
+  const job = hydratedJob ?? (initialJob && initialJob.id === jobId ? initialJob : null);
 
   const welderJob = useMemo(
     () => (job ? jobRowToWelderJob(job, profile) : null),
@@ -208,14 +208,19 @@ export function WorkOrderDetailPage({
   const woLabel =
     job?.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : 'WO (no #)';
   const customerTitle = job?.customer_name.trim() || 'Customer';
-  const esignWasResent = Boolean(job?.esign_resent_at);
-  const esignProgress = useMemo(
-    () => getEsignProgressModel(job?.esign_status ?? 'not_sent', 'work_order', esignWasResent),
-    [job?.esign_status, esignWasResent]
-  );
   const signatureState = useMemo(
     () => getWorkOrderSignatureState(job?.esign_status ?? null, job?.offline_signed_at ?? null),
     [job?.esign_status, job?.offline_signed_at]
+  );
+  const esignWasResent = Boolean(job?.esign_resent_at);
+  const esignProgress = useMemo(
+    () =>
+      getEsignProgressModel(
+        signatureState.isSignatureSatisfied ? 'completed' : job?.esign_status ?? 'not_sent',
+        'work_order',
+        esignWasResent
+      ),
+    [job?.esign_status, esignWasResent, signatureState.isSignatureSatisfied]
   );
   const isOfflineMarked = Boolean(job?.offline_signed_at && job?.esign_status !== 'completed');
   const showCopySigningLink = Boolean(
@@ -582,7 +587,8 @@ export function WorkOrderDetailPage({
       const blob = await fetchHtmlPdfBlob({
         filename: getPdfFilename(welderJob.wo_number, job.customer_name),
         innerMarkup: combined,
-        workOrderNumber: getWorkOrderHeaderLabel(welderJob),
+        headerLeft: getWorkOrderHeaderLabel(welderJob),
+        headerRight: '',
         providerName: footerMeta.providerName,
         providerPhone: footerMeta.providerPhone,
       });

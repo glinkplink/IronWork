@@ -25,6 +25,24 @@ interface InvoiceFinalPageProps {
   onOpenStripeSetup: () => void;
 }
 
+type InvoiceMutationResponse = {
+  error?: string;
+  invoice?: Invoice;
+};
+
+async function readInvoiceMutationResponse(
+  res: Response,
+  fallbackError: string
+): Promise<InvoiceMutationResponse> {
+  const text = await res.text();
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text) as InvoiceMutationResponse;
+  } catch {
+    return { error: fallbackError };
+  }
+}
+
 // NOTE: payment_status and paid_at come from Postgres (Stripe webhook updates the row).
 // On mount we refetch the invoice once so opening this page picks up webhook-updated state
 // without requiring a full navigation away and back.
@@ -258,14 +276,55 @@ export function InvoiceFinalPage({
         `/api/invoices/${invoiceProp.id}/mark-paid-offline`,
         { method: 'POST' }
       );
-      const json = (await res.json()) as { error?: string; invoice?: Invoice };
-      if (!res.ok) {
+      const json = await readInvoiceMutationResponse(res, 'Could not mark invoice as paid.');
+      if (!res.ok || json.error) {
         setMarkPaidError(json.error ?? 'Could not mark invoice as paid.');
         return;
       }
-      if (json.invoice) onInvoiceUpdated(json.invoice);
+      if (json.invoice) {
+        onInvoiceUpdated(json.invoice);
+        return;
+      }
+      const refreshed = await getInvoice(invoiceProp.id);
+      if (refreshed) {
+        onInvoiceUpdated(refreshed);
+      } else {
+        setMarkPaidError('Paid status was saved, but the invoice could not be refreshed.');
+      }
     } catch (err) {
       setMarkPaidError(err instanceof Error ? err.message : 'Could not mark invoice as paid.');
+    } finally {
+      setMarkingPaid(false);
+    }
+  };
+
+  const handleUnmarkPaidOffline = async () => {
+    setMarkPaidError('');
+    setMarkingPaid(true);
+    try {
+      const res = await fetchWithSupabaseAuth(
+        `/api/invoices/${invoiceProp.id}/unmark-paid-offline`,
+        { method: 'POST' }
+      );
+      const json = await readInvoiceMutationResponse(res, 'Could not undo offline paid status.');
+      if (!res.ok || json.error) {
+        setMarkPaidError(json.error ?? 'Could not undo offline paid status.');
+        return;
+      }
+      if (json.invoice) {
+        onInvoiceUpdated(json.invoice);
+        return;
+      }
+      const refreshed = await getInvoice(invoiceProp.id);
+      if (refreshed) {
+        onInvoiceUpdated(refreshed);
+      } else {
+        setMarkPaidError('Offline paid status was undone, but the invoice could not be refreshed.');
+      }
+    } catch (err) {
+      setMarkPaidError(
+        err instanceof Error ? err.message : 'Could not undo offline paid status.'
+      );
     } finally {
       setMarkingPaid(false);
     }
@@ -309,7 +368,7 @@ export function InvoiceFinalPage({
         {(invoiceProp.issued_at || isPaid) && (
           <div className="invoice-issued-metadata">
             {invoiceProp.issued_at && (
-              <span>
+              <span className="invoice-issued-date">
                 Issued: {new Date(invoiceProp.issued_at).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -317,26 +376,36 @@ export function InvoiceFinalPage({
                 })}
               </span>
             )}
-            {isPaid && (
-              <span className="invoice-paid-indicator">
-                <span className="badge-paid">Paid</span>
-                {invoiceProp.paid_at && (
-                  <span className="invoice-paid-date">
-                    {new Date(invoiceProp.paid_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </span>
-                )}
+            {isPaid && invoiceProp.paid_at && (
+              <span className="invoice-paid-date">
+                Paid: {new Date(invoiceProp.paid_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
               </span>
             )}
           </div>
         )}
         {isPaid ? (
-          <p className="invoice-final-payment-text">
-            This invoice has been paid{isPaidOffline ? ' (recorded offline)' : ''}.
-          </p>
+          <div className="invoice-final-paid-block">
+            <p className="invoice-final-payment-text">
+              This invoice has been paid{isPaidOffline ? ' (recorded offline)' : ''}.
+            </p>
+            {markPaidError ? (
+              <p className="invoice-final-payment-feedback">{markPaidError}</p>
+            ) : null}
+            {isPaidOffline ? (
+              <button
+                type="button"
+                className="btn-secondary invoice-final-mark-paid-btn"
+                disabled={markingPaid}
+                onClick={() => void handleUnmarkPaidOffline()}
+              >
+                {markingPaid ? 'Saving...' : 'Undo offline paid'}
+              </button>
+            ) : null}
+          </div>
         ) : (
           <>
             {!canIssueInvoice && (

@@ -23,6 +23,11 @@ import { runPostPdfApi } from './lib/post-pdf-api.mjs';
 import { preparePdfPageForRendering } from './lib/pdf-puppeteer.mjs';
 import { isPayloadTooLarge } from './lib/payload-error.mjs';
 import { logEnvPreflight } from './lib/env-preflight.mjs';
+import {
+  buildFooterTemplate,
+  buildHeaderTemplate,
+  resolvePdfHeaderSlots,
+} from './lib/pdf-templates.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,64 +119,6 @@ function getMimeType(filePath) {
   }
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-/**
- * Puppeteer margin header: label top-left (WO PDF uses workOrderNumber; invoice PDF uses marginHeaderLeft).
- */
-function buildHeaderTemplate(workOrderNumber, marginHeaderLeft) {
-  const left =
-    marginHeaderLeft != null && String(marginHeaderLeft).trim() !== ''
-      ? escapeHtml(marginHeaderLeft)
-      : workOrderNumber != null && String(workOrderNumber).trim() !== ''
-        ? escapeHtml(workOrderNumber)
-        : '\u00a0';
-
-  return `
-    <div style="width:100%; padding:0 40px; box-sizing:border-box; font-family: Arial, sans-serif; color:#aaaaaa; font-size:9px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #cccccc; padding:0 0 4px; width:100%;">
-        <span style="flex:1; text-align:left; white-space:nowrap;"><span style="font-size:calc(9px + 1pt);font-weight:700;">${left}</span></span>
-        <span style="flex:1; text-align:center; white-space:nowrap; text-transform:uppercase;">Confidential</span>
-        <span style="flex:1; text-align:right; white-space:nowrap;"><span style="font-size:calc(9px + 1pt);font-weight:700;">${workOrderNumber != null && String(workOrderNumber).trim() !== '' ? escapeHtml(workOrderNumber) : '\u00a0'}</span></span>
-      </div>
-      <div style="height:10px;"></div>
-    </div>
-  `;
-}
-
-/** providerName = business name (not individual welder name). */
-function buildFooterTemplate(providerName, providerPhone) {
-  const safeBusinessName = escapeHtml((providerName || '').trim());
-  const safeProviderPhone = escapeHtml(providerPhone || '');
-  let providerText;
-  if (safeBusinessName && safeProviderPhone) {
-    providerText = `Service Provider - ${safeBusinessName} | ${safeProviderPhone}`;
-  } else if (safeBusinessName) {
-    providerText = `Service Provider - ${safeBusinessName}`;
-  } else if (safeProviderPhone) {
-    providerText = `Service Provider | ${safeProviderPhone}`;
-  } else {
-    providerText = 'Service Provider';
-  }
-
-  return `
-    <div style="width:100%; padding:0 40px; box-sizing:border-box; font-family: Arial, sans-serif; color:#aaaaaa; font-size:9px;">
-      <div style="height:10px;"></div>
-      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #cccccc; padding:4px 0 0; width:100%;">
-        <span style="white-space:nowrap;">${providerText}</span>
-        <span style="white-space:nowrap;">Page <span class="pageNumber"></span></span>
-      </div>
-    </div>
-  `;
-}
-
 /**
  * @param {import('node:http').ServerResponse} res
  * @param {Record<string, unknown>} body
@@ -180,7 +127,8 @@ async function handlePdfRequest(res, body) {
   let page;
 
   try {
-    const { html, filename, workOrderNumber, marginHeaderLeft, providerName, providerPhone } = body;
+    const { html, filename, providerName, providerPhone } = body;
+    const { headerLeft, headerRight } = resolvePdfHeaderSlots(body);
 
     if (typeof html !== 'string' || !html.trim()) {
       sendText(res, 400, 'Missing HTML payload.');
@@ -213,7 +161,7 @@ async function handlePdfRequest(res, body) {
       printBackground: true,
       preferCSSPageSize: false,
       displayHeaderFooter: true,
-      headerTemplate: buildHeaderTemplate(workOrderNumber, marginHeaderLeft),
+      headerTemplate: buildHeaderTemplate(headerLeft, headerRight),
       footerTemplate: buildFooterTemplate(providerName, providerPhone),
       margin: {
         top: '70px',

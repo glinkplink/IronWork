@@ -107,8 +107,8 @@ export function ChangeOrderDetailPage({
       const blob = await fetchHtmlPdfBlob({
         filename,
         innerMarkup: inner,
-        marginHeaderLeft: coLabel,
-        workOrderNumber: woLabel,
+        headerLeft: coLabel,
+        headerRight: woLabel,
         providerName: footerMeta.providerName,
         providerPhone: footerMeta.providerPhone,
       });

@@ -48,22 +48,18 @@
 
 /* ─── Summary stat strip (visual parity with Home; layout co-located here) ─── */
 .work-orders-stat-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
   padding: 0 var(--space-md) var(--space-md);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.work-orders-stat-strip::-webkit-scrollbar {
-  display: none;
+  box-sizing: border-box;
 }
 
 .work-orders-stat-card {
-  flex: 1 1 0;
-  min-width: 130px;
-  max-width: 200px;
+  min-width: 0;
   padding: var(--space-md);
   background: var(--iron-750);
   border: 1px solid var(--iron-600);
@@ -86,12 +82,30 @@
   background: var(--status-sent);
 }
 
+.work-orders-stat-card--green {
+  order: 1;
+}
+
 .work-orders-stat-card--green::before {
-  background: var(--status-signed);
+  background: #f3d978;
 }
 
 .work-orders-stat-card--spark::before {
   background: var(--spark);
+}
+
+.work-orders-stat-card--signed::before {
+  background: var(--status-signed);
+}
+
+.work-orders-stat-card--paid {
+  grid-column: 1 / -1;
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .work-orders-stat-card--paid::before {
@@ -163,9 +177,10 @@
 .work-orders-stat-num {
   font-family: 'Chakra Petch', var(--font-app);
   font-weight: 700;
-  font-size: 1.75rem;
+  font-size: clamp(1.35rem, 5vw, 1.75rem);
   color: var(--iron-50);
   line-height: 1;
+  white-space: nowrap;
 }
 
 .work-orders-stat-label {
@@ -175,6 +190,10 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 500;
+}
+
+.work-orders-stat-card--paid .work-orders-stat-label {
+  margin-top: 0;
 }
 
 /* ─── Profile nudge ─── */

@@ -240,6 +240,10 @@ export type GetWorkOrdersDashboardSummaryResult =
   | { data: WorkOrdersDashboardSummary; error: null }
   | { data: null; error: Error };
 
+export type GetSignedWorkOrdersCountResult =
+  | { data: number; error: null }
+  | { data: null; error: Error };
+
 export const listJobsForWorkOrders = async (userId: string): Promise<WorkOrderListJob[]> => {
   const { data, error } = await supabase
     .from('jobs')
@@ -334,6 +338,23 @@ export const getWorkOrdersDashboardSummary = async (
     data: mapWorkOrdersDashboardSummaryRow(data as Record<string, unknown>),
     error: null,
   };
+};
+
+export const getSignedWorkOrdersCount = async (
+  userId: string
+): Promise<GetSignedWorkOrdersCountResult> => {
+  const { count, error } = await supabase
+    .from('jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .or('esign_status.eq.completed,offline_signed_at.not.is.null');
+
+  if (error) {
+    console.error('Error loading signed work orders count:', error);
+    return { data: null, error: new Error(error.message) };
+  }
+
+  return { data: count ?? 0, error: null };
 };
 
 export const listInFlightEsignJobs = async (userId: string): Promise<WorkOrderListJob[]> => {
