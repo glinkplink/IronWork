@@ -129,6 +129,25 @@ function workOrderSignatureSatisfied(job) {
   return job.esign_status === 'completed' || job.offline_signed_at != null;
 }
 
+/**
+ * Returns the count of change orders for a job that are neither e-signed nor
+ * marked signed offline. Callers block invoice issuance when this is > 0.
+ * Throws on query error so the caller can return a 500.
+ */
+export async function countPendingChangeOrders(supabase, jobId, userId) {
+  const { data, error } = await supabase
+    .from('change_orders')
+    .select('esign_status, offline_signed_at')
+    .eq('job_id', jobId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+  const rows = data ?? [];
+  return rows.filter(
+    (co) => co.esign_status !== 'completed' && co.offline_signed_at == null
+  ).length;
+}
+
 function getServiceSupabase() {
   const supabaseUrl = env('SUPABASE_URL');
   const supabaseKey = env('SUPABASE_SERVICE_ROLE_KEY');
@@ -352,6 +371,25 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
         'Cannot send invoice: the work order must be signed via DocuSeal or marked as signed offline first.',
     });
     return true;
+  }
+
+  // Block first-time invoice issuance when any change orders on the job are unresolved.
+  // Resends (issued_at already set) skip this — migration 0008 prevents new COs after issuance.
+  if (!invoice.issued_at) {
+    let pendingCOCount;
+    try {
+      pendingCOCount = await countPendingChangeOrders(supabase, invoice.job_id, userId);
+    } catch (err) {
+      log.error('invoice send pending-CO check failed', log.errCtx(err));
+      sendJson(res, 500, { error: 'Could not verify change order status.' });
+      return true;
+    }
+    if (pendingCOCount > 0) {
+      sendJson(res, 409, {
+        error: `Cannot send invoice: ${pendingCOCount} change order${pendingCOCount === 1 ? ' is' : 's are'} still pending. Sign, mark signed offline, or delete them first.`,
+      });
+      return true;
+    }
   }
 
   const resendApiKey = env('RESEND_API_KEY');

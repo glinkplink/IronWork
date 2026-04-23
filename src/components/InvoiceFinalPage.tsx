@@ -74,6 +74,7 @@ export function InvoiceFinalPage({
   const [paymentLinkError, setPaymentLinkError] = useState('');
   const [markPaidError, setMarkPaidError] = useState('');
   const [paymentLinkCopied, setPaymentLinkCopied] = useState(false);
+  const [pendingCOCount, setPendingCOCount] = useState(0);
 
   const documentRef = useRef<HTMLDivElement | null>(null);
   const paymentLinkCopiedTimeoutRef = useRef<number | null>(null);
@@ -90,7 +91,13 @@ export function InvoiceFinalPage({
     () => getWorkOrderSignatureState(job.esign_status, job.offline_signed_at),
     [job.esign_status, job.offline_signed_at]
   );
-  const canIssueInvoice = signatureState.isSignatureSatisfied;
+  const hasPendingCOs = pendingCOCount > 0;
+  const canIssueInvoice = signatureState.isSignatureSatisfied && !hasPendingCOs;
+  const gateReason = !signatureState.isSignatureSatisfied
+    ? 'Work order must be e-signed or marked signed offline'
+    : hasPendingCOs
+      ? `Resolve ${pendingCOCount} pending change order${pendingCOCount === 1 ? '' : 's'} (sign, mark signed offline, or delete) before invoicing`
+      : undefined;
   const stripeReady = Boolean(
     profile.stripe_account_id && profile.stripe_onboarding_complete
   );
@@ -116,10 +123,16 @@ export function InvoiceFinalPage({
   }, [invoiceProp.id]);
 
   // Recompute CO lines on open for drafts — keeps invoice current if COs were signed after draft was created.
+  // Also tracks unsigned COs so we can block invoice send/download until they're resolved.
   useEffect(() => {
-    if (invoiceProp.issued_at) return;
     void (async () => {
       const allCOs = await listChangeOrders(invoiceProp.job_id);
+      const unsigned = allCOs.filter(
+        (co) => !isChangeOrderSignatureSatisfied(co.esign_status, co.offline_signed_at)
+      );
+      setPendingCOCount(unsigned.length);
+
+      if (invoiceProp.issued_at) return;
       const signedCOs = allCOs.filter((co) =>
         isChangeOrderSignatureSatisfied(co.esign_status, co.offline_signed_at)
       );
@@ -437,14 +450,23 @@ export function InvoiceFinalPage({
                 type="button"
                 className="btn-primary btn-large invoice-final-send-primary"
                 disabled={sending || !canIssueInvoice}
-                title={!canIssueInvoice ? 'Work order must be e-signed or marked signed offline' : undefined}
+                title={gateReason}
                 onClick={() => void handleSendInvoice()}
               >
                 {sending ? 'Sending...' : invoiceProp.issued_at ? 'Resend Invoice' : 'Send Invoice'}
               </button>
               {!canIssueInvoice ? (
                 <p className="invoice-final-payment-primary-hint invoice-final-gate-hint">
-                  Requires work order signature<br />(e-signed or marked signed offline).
+                  {hasPendingCOs ? (
+                    <>
+                      Resolve {pendingCOCount} pending change order{pendingCOCount === 1 ? '' : 's'}
+                      <br />(sign, mark signed offline, or delete).
+                    </>
+                  ) : (
+                    <>
+                      Requires work order signature<br />(e-signed or marked signed offline).
+                    </>
+                  )}
                 </p>
               ) : (
                 <p className="invoice-final-payment-primary-hint">
@@ -487,7 +509,7 @@ export function InvoiceFinalPage({
                       type="button"
                       className="btn-primary invoice-final-online-btn"
                       disabled={sendingStripe || paymentLinkLoading || !canIssueInvoice}
-                      title={!canIssueInvoice ? 'Work order must be e-signed or marked signed offline' : undefined}
+                      title={gateReason}
                       onClick={() => void handleSendWithPaymentLink()}
                     >
                       {sendingStripe
@@ -500,7 +522,7 @@ export function InvoiceFinalPage({
                       type="button"
                       className="btn-primary invoice-final-online-btn"
                       disabled={sendingStripe || paymentLinkLoading || !canIssueInvoice}
-                      title={!canIssueInvoice ? 'Work order must be e-signed or marked signed offline' : undefined}
+                      title={gateReason}
                       onClick={() => void handleCopyPaymentLink()}
                     >
                       {paymentLinkButtonLabel}
@@ -641,14 +663,23 @@ export function InvoiceFinalPage({
             type="button"
             className="btn-primary btn-large invoice-final-download-btn"
             disabled={downloading || !canIssueInvoice}
-            title={!canIssueInvoice ? 'Work order must be e-signed or marked signed offline' : undefined}
+            title={gateReason}
             onClick={() => void handleDownload()}
           >
             {downloading ? 'Downloading…' : 'Download Invoice'}
           </button>
           {!canIssueInvoice && (
             <p className="invoice-final-gate-hint invoice-final-gate-hint--actions">
-              Requires work order signature<br />(e-signed or marked signed offline).
+              {hasPendingCOs ? (
+                <>
+                  Resolve {pendingCOCount} pending change order{pendingCOCount === 1 ? '' : 's'}
+                  <br />(sign, mark signed offline, or delete).
+                </>
+              ) : (
+                <>
+                  Requires work order signature<br />(e-signed or marked signed offline).
+                </>
+              )}
             </p>
           )}
         </div>

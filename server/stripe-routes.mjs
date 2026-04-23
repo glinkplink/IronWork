@@ -7,6 +7,7 @@ import {
   createOrReuseInvoicePaymentLink,
   getConnectedAccount,
 } from './lib/stripe.mjs';
+import { countPendingChangeOrders } from './invoice-routes.mjs';
 import { log } from './lib/logger.mjs';
 import { isPayloadTooLarge } from './lib/payload-error.mjs';
 import { createClient } from '@supabase/supabase-js';
@@ -368,6 +369,24 @@ async function handleInvoicePaymentLink(req, res, sendJson, invoiceId) {
       error: 'Stripe payouts are not set up yet. Start Connect onboarding first.',
     });
     return;
+  }
+
+  // Match send-invoice gate: block payment-link creation while COs are unresolved, unless invoice was already issued.
+  if (!invoice.issued_at) {
+    let pendingCOCount;
+    try {
+      pendingCOCount = await countPendingChangeOrders(supabase, invoice.job_id, userId);
+    } catch (err) {
+      log.error('payment-link pending-CO check failed', log.errCtx(err));
+      sendJson(res, 500, { error: 'Could not verify change order status.' });
+      return;
+    }
+    if (pendingCOCount > 0) {
+      sendJson(res, 409, {
+        error: `Cannot create payment link: ${pendingCOCount} change order${pendingCOCount === 1 ? ' is' : 's are'} still pending. Sign, mark signed offline, or delete them first.`,
+      });
+      return;
+    }
   }
 
   const cap = await assertStripeInvoicePaymentsReady(profile.stripe_account_id);
