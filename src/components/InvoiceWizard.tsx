@@ -16,6 +16,7 @@ import {
 import type { MaterialRow, LaborRow } from '../lib/invoice-line-items';
 import { PAYMENT_METHOD_OPTIONS, normalizePaymentMethods } from '../lib/payment-methods';
 import { DEFAULT_TAX_RATE, normalizeTaxRate, percentValueToTaxRate, taxRateToPercentValue } from '../lib/tax';
+import { getChangeOrderSignatureState, isChangeOrderSignatureSatisfied } from '../lib/change-order-signature';
 import './InvoiceWizard.css';
 
 type PricingSubStep = 'labor' | 'materials';
@@ -64,16 +65,6 @@ function isChangeOrderInvoiceLine(line: InvoiceLineItem): boolean {
     line.source === 'change_order' ||
     (typeof line.change_order_id === 'string' && line.change_order_id.trim() !== '')
   );
-}
-
-function hasEditableBaseScopeLine(lineItems: InvoiceLineItem[]): boolean {
-  return lineItems.some((line) => {
-    if (line.source === 'original_scope' || line.source === 'labor' || line.source === 'material') {
-      return true;
-    }
-    const hasCoId = typeof line.change_order_id === 'string' && line.change_order_id.trim() !== '';
-    return !hasCoId && line.source !== 'change_order';
-  });
 }
 
 function InvoicePreviewSummary({
@@ -131,7 +122,7 @@ function InvoiceWizardStepHeader({
 interface InvoiceWizardProps {
   userId: string;
   job: Job;
-  changeOrder: ChangeOrder | null;
+  changeOrder?: ChangeOrder | null;
   profile: BusinessProfile;
   existingInvoice: Invoice | null;
   onCancel: () => void;
@@ -141,15 +132,11 @@ interface InvoiceWizardProps {
 export function InvoiceWizard({
   userId,
   job,
-  changeOrder,
   profile,
   existingInvoice,
   onCancel,
   onSuccess,
 }: InvoiceWizardProps) {
-  const isChangeOrderInvoice =
-    changeOrder !== null &&
-    (!existingInvoice || !hasEditableBaseScopeLine(existingInvoice.line_items));
   const initial = useMemo(() => {
     if (existingInvoice) {
       return {
@@ -206,26 +193,27 @@ export function InvoiceWizard({
 
   useEffect(() => {
     if (existingInvoice) return;
-    if (isChangeOrderInvoice && changeOrder) {
-      setSelectedCoIds(new Set([changeOrder.id]));
-      setCoInitJobId(job.id);
-      return;
-    }
-    const rowsForJob = changeOrdersOnJob.filter((c) => c.job_id === job.id);
+    const rowsForJob = changeOrdersOnJob.filter(
+      (c) =>
+        c.job_id === job.id &&
+        isChangeOrderSignatureSatisfied(c.esign_status, c.offline_signed_at)
+    );
     if (rowsForJob.length === 0) return;
     if (coInitJobId === job.id) return;
     setSelectedCoIds(new Set(rowsForJob.map((c) => c.id)));
     setCoInitJobId(job.id);
-  }, [changeOrdersOnJob, existingInvoice, isChangeOrderInvoice, changeOrder, job.id, coInitJobId]);
+  }, [changeOrdersOnJob, existingInvoice, job.id, coInitJobId]);
 
   const selectedCOs = useMemo(
     () =>
       existingInvoice
         ? []
-        : changeOrdersOnJob.filter((c) =>
-            isChangeOrderInvoice && changeOrder ? c.id === changeOrder.id : selectedCoIds.has(c.id)
+        : changeOrdersOnJob.filter(
+            (c) =>
+              selectedCoIds.has(c.id) &&
+              isChangeOrderSignatureSatisfied(c.esign_status, c.offline_signed_at)
           ),
-    [existingInvoice, changeOrdersOnJob, isChangeOrderInvoice, changeOrder, selectedCoIds]
+    [existingInvoice, changeOrdersOnJob, selectedCoIds]
   );
 
   const mergedLineItems = useMemo(
@@ -237,10 +225,10 @@ export function InvoiceWizard({
         materialsYes: materialsYes === true,
         materialRows,
         selectedCOs,
-        includeBaseScope: !isChangeOrderInvoice,
+        includeBaseScope: true,
         existingLineItems: existingInvoice?.line_items,
       }),
-    [job, fixedTotal, laborRows, materialsYes, materialRows, selectedCOs, isChangeOrderInvoice, existingInvoice?.line_items]
+    [job, fixedTotal, laborRows, materialsYes, materialRows, selectedCOs, existingInvoice?.line_items]
   );
 
   const { subtotal, changeOrderTotal, originalTotal, taxRate, tax_amount, total } = useMemo(() => {
@@ -283,6 +271,14 @@ export function InvoiceWizard({
   };
 
   const toggleCoSelected = (id: string) => {
+    const changeOrder = changeOrdersOnJob.find((co) => co.id === id);
+    if (
+      !changeOrder ||
+      !isChangeOrderSignatureSatisfied(changeOrder.esign_status, changeOrder.offline_signed_at)
+    ) {
+      return;
+    }
+
     setSelectedCoIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -441,12 +437,10 @@ export function InvoiceWizard({
           notes: null,
         });
         if (cErr || !data) {
-          if (!isChangeOrderInvoice) {
-            const existing = await getInvoiceByJobId(job.id);
-            if (existing) {
-              onSuccess(existing);
-              return;
-            }
+          const existing = await getInvoiceByJobId(job.id);
+          if (existing) {
+            onSuccess(existing);
+            return;
           }
           setError(cErr?.message || 'Could not create invoice.');
           return;
@@ -459,32 +453,49 @@ export function InvoiceWizard({
   };
 
   const coPickerSection =
-    !existingInvoice && !isChangeOrderInvoice && changeOrdersOnJob.length > 0 ? (
+    !existingInvoice && changeOrdersOnJob.length > 0 ? (
       <div className="invoice-co-picker">
         <h3 className="invoice-flow-subsection-title">Change orders on this job</h3>
         <p className="content-note invoice-wizard-note invoice-wizard-note--tight">
-          Include change orders as invoice lines. Uncheck any you do not bill on this invoice.
+          Include signed change orders as invoice lines. Unsigned change orders stay visible but cannot be billed yet.
         </p>
         <ul className="invoice-co-picker-list">
-          {changeOrdersOnJob.map((co) => (
-            <li key={co.id} className="invoice-co-picker-row">
-              <label className="invoice-co-picker-label">
-                <input
-                  type="checkbox"
-                  checked={selectedCoIds.has(co.id)}
-                  onChange={() => toggleCoSelected(co.id)}
-                />
-                <span>
-                  CO #{String(co.co_number).padStart(4, '0')}: {co.description.slice(0, 56)}
-                  {co.description.length > 56 ? '…' : ''}
+          {changeOrdersOnJob.map((co) => {
+            const signatureState = getChangeOrderSignatureState(
+              co.esign_status,
+              co.offline_signed_at
+            );
+            const isSelectable = signatureState.isSignatureSatisfied;
+
+            return (
+              <li
+                key={co.id}
+                className={`invoice-co-picker-row${isSelectable ? '' : ' invoice-co-picker-row-disabled'}`}
+              >
+                <label className="invoice-co-picker-label">
+                  <input
+                    type="checkbox"
+                    checked={selectedCoIds.has(co.id)}
+                    disabled={!isSelectable}
+                    onChange={() => toggleCoSelected(co.id)}
+                  />
+                  <span>
+                    CO #{String(co.co_number).padStart(4, '0')}: {co.description.slice(0, 56)}
+                    {co.description.length > 56 ? '…' : ''}
+                  </span>
+                </label>
+                <span className="invoice-co-picker-amt">${formatChangeOrderPickerAmount(co)}</span>
+                <span className={`co-status-badge ${co.status === 'pending_approval' ? 'pending' : co.status}`}>
+                  {co.status.replace(/_/g, ' ')}
                 </span>
-              </label>
-              <span className="invoice-co-picker-amt">${formatChangeOrderPickerAmount(co)}</span>
-              <span className={`co-status-badge ${co.status === 'pending_approval' ? 'pending' : co.status}`}>
-                {co.status.replace(/_/g, ' ')}
-              </span>
-            </li>
-          ))}
+                {!isSelectable ? (
+                  <p className="invoice-co-picker-gate-hint">
+                    Requires change order signature<br />(e-signed or marked signed offline).
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       </div>
     ) : null;
@@ -541,41 +552,7 @@ export function InvoiceWizard({
         </div>
       ) : null}
 
-      {step === 1 && isChangeOrderInvoice && changeOrder ? (
-        <section className="invoice-wizard-step">
-          <InvoiceWizardStepHeader stepNumber={1} title="Pricing" />
-          {editCoNote}
-          <p className="content-note invoice-wizard-note">
-            This invoice is for CO #{String(changeOrder.co_number).padStart(4, '0')} only.
-          </p>
-          {selectedCOAmountFields}
-          <div className="form-group">
-            <label htmlFor="fixed-tax">Tax (%)</label>
-            <input
-              id="fixed-tax"
-              type="number"
-              min={0}
-              step="0.01"
-              value={taxPercent}
-              onChange={(e) => setTaxPercent(e.target.value)}
-            />
-          </div>
-          <InvoicePreviewSummary
-            originalTotal={originalTotal}
-            changeOrderTotal={changeOrderTotal}
-            tax_amount={tax_amount}
-            total={total}
-            tax_rate={taxRate}
-          />
-          <div className="invoice-wizard-step-actions">
-            <button type="button" className="btn-primary btn-large" onClick={handleFixedConfirm}>
-              Confirm
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {step === 1 && !isChangeOrderInvoice && job.price_type === 'fixed' ? (
+      {step === 1 && job.price_type === 'fixed' ? (
         <section className="invoice-wizard-step">
           <InvoiceWizardStepHeader stepNumber={1} title="Pricing" />
           {editCoNote}
@@ -613,7 +590,7 @@ export function InvoiceWizard({
         </section>
       ) : null}
 
-      {step === 1 && !isChangeOrderInvoice && job.price_type !== 'fixed' && pricingSubStep === 'labor' ? (
+      {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'labor' ? (
         <section className="invoice-wizard-step">
           <InvoiceWizardStepHeader stepNumber={1} title="Labor" />
           {editCoNote}
@@ -693,7 +670,7 @@ export function InvoiceWizard({
         </section>
       ) : null}
 
-      {step === 1 && !isChangeOrderInvoice && job.price_type !== 'fixed' && pricingSubStep === 'materials' ? (
+      {step === 1 && job.price_type !== 'fixed' && pricingSubStep === 'materials' ? (
         <section className="invoice-wizard-step">
           <InvoiceWizardStepHeader stepNumber={1} title="Materials" />
           <button
@@ -809,7 +786,7 @@ export function InvoiceWizard({
             onClick={() => {
               setError('');
               setStep(1);
-              if (!isChangeOrderInvoice && job.price_type !== 'fixed') {
+              if (job.price_type !== 'fixed') {
                 setPricingSubStep('materials');
               }
             }}

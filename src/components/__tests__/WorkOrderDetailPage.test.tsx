@@ -7,6 +7,17 @@ import { useState } from 'react';
 import type { Job, BusinessProfile, ChangeOrder } from '../../types/db';
 import { WorkOrderDetailPage } from '../WorkOrderDetailPage';
 
+vi.mock('../../hooks/useScaledPreview', () => ({
+  useScaledPreview: () => ({
+    viewportRef: { current: null },
+    sheetRef: { current: null },
+    scale: 1,
+    spacerHeight: 400,
+    spacerWidth: 816,
+    letterWidthPx: 816,
+  }),
+}));
+
 const mockFns = vi.hoisted(() => {
   const listChangeOrders = vi.fn();
   const listInvoiceStatusByChangeOrder = vi.fn();
@@ -192,6 +203,7 @@ function makeCO(n: number, description: string): ChangeOrder {
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
     esign_status: 'not_sent',
+    offline_signed_at: null,
   };
 }
 
@@ -309,7 +321,7 @@ describe('WorkOrderDetailPage', () => {
     mockFns.setJobInvoiceResult({ data: null, error: null });
   });
 
-  it('shows one invoice control per change-order row and job-level invoice status when present', async () => {
+  it('shows change-order rows without standalone invoice controls and job-level invoice status when present', async () => {
     // Set up job invoice status to null (no invoice yet)
     mockFns.setJobInvoiceResult({ data: null, error: null });
 
@@ -327,9 +339,7 @@ describe('WorkOrderDetailPage', () => {
     );
 
     await screen.findByText('CO #0001');
-    await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /^Invoice$/i })).toHaveLength(2);
-    });
+    expect(screen.queryByRole('button', { name: /^Invoice$/i })).toBeNull();
 
     // No invoice number shown when no job invoice exists
     expect(screen.queryByText(/^Invoice #/i)).toBeNull();
@@ -339,7 +349,26 @@ describe('WorkOrderDetailPage', () => {
     await waitFor(() => {
       expect(within(coList as HTMLElement).getAllByRole('listitem')).toHaveLength(2);
     });
-    expect(within(coList as HTMLElement).getAllByRole('button', { name: /^Invoice$/i })).toHaveLength(2);
+    expect(within(coList as HTMLElement).queryByRole('button', { name: /^Invoice$/i })).toBeNull();
+  });
+
+  it('opens full document preview lightbox from mini preview', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkOrderDetailPage
+        userId="u1"
+        jobId="job-1"
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onStartChangeOrder={() => {}}
+        onStartChangeOrderInvoice={() => {}}
+        onOpenCODetail={() => {}}
+      />
+    );
+    await screen.findByText('CO #0001');
+    await user.click(screen.getByRole('button', { name: /open full work order preview/i }));
+    expect(screen.getByRole('dialog', { name: /work order preview/i })).toBeInTheDocument();
   });
 
   it('shows paid badge when job invoice has payment_status=paid', async () => {

@@ -53,11 +53,6 @@ function pathForView(view: AppView, params: AppRouteParams = {}): string {
         ? `/work-orders/${params.jobId ?? ''}/change-orders/${params.coId}/edit`
         : `/work-orders/${params.jobId ?? ''}/change-orders/new`;
     case 'invoice-wizard':
-      if (params.coId) {
-        return params.invoiceId
-          ? `/work-orders/${params.jobId ?? ''}/change-orders/${params.coId}/invoice/${params.invoiceId}/edit`
-          : `/work-orders/${params.jobId ?? ''}/change-orders/${params.coId}/invoice/new`;
-      }
       return params.invoiceId
         ? `/work-orders/${params.jobId ?? ''}/invoice/${params.invoiceId}/edit`
         : `/work-orders/${params.jobId ?? ''}/invoice/new`;
@@ -111,17 +106,6 @@ export function useAppNavigation() {
       return { view: 'work-orders' as AppView, params: {} };
     }
 
-    const coInvoiceEdit = matchPath(
-      '/work-orders/:jobId/change-orders/:coId/invoice/:invoiceId/edit',
-      location.pathname
-    );
-    if (coInvoiceEdit) {
-      return { view: 'invoice-wizard' as AppView, params: coInvoiceEdit.params };
-    }
-    const coInvoiceNew = matchPath('/work-orders/:jobId/change-orders/:coId/invoice/new', location.pathname);
-    if (coInvoiceNew) {
-      return { view: 'invoice-wizard' as AppView, params: coInvoiceNew.params };
-    }
     const woInvoiceEdit = matchPath('/work-orders/:jobId/invoice/:invoiceId/edit', location.pathname);
     if (woInvoiceEdit) {
       return { view: 'invoice-wizard' as AppView, params: woInvoiceEdit.params };

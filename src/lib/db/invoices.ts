@@ -277,6 +277,12 @@ export function isJobLevelInvoiceLineItems(lineItems: unknown): boolean {
   return !isChangeOrderOnlyInvoiceLineItems(rows);
 }
 
+export function isStandardInvoiceUiRow(row: {
+  line_items: unknown;
+}): boolean {
+  return isJobLevelInvoiceLineItems(row.line_items);
+}
+
 /**
  * True when the row is an issued job-level invoice (no line item has change_order_id).
  * Aligns with `parseWorkOrderInvoiceStatusRow` job-level semantics and `create_change_order` in the DB.
@@ -424,7 +430,9 @@ export const listInvoices = async (userId: string): Promise<Invoice[]> => {
     return [];
   }
 
-  return (data ?? []).map((row) => mapInvoiceRow(row as Record<string, unknown>));
+  return (data ?? [])
+    .filter((row) => isStandardInvoiceUiRow(row as { line_items: unknown }))
+    .map((row) => mapInvoiceRow(row as Record<string, unknown>));
 };
 
 export const getInvoice = async (id: string): Promise<Invoice | null> => {
@@ -512,7 +520,9 @@ export const listInvoicesWithCustomerName = async (
     return { data: [], error: new Error(error.message) };
   }
 
-  const mapped = (data ?? []).map((row) => {
+  const mapped = (data ?? [])
+    .filter((row) => isStandardInvoiceUiRow(row as { line_items: unknown }))
+    .map((row) => {
     const inv = mapInvoiceRow(row as Record<string, unknown>);
     const jobRelation = (row as Record<string, unknown>).jobs as Record<string, unknown> | null;
     const customer_name =
@@ -522,8 +532,8 @@ export const listInvoicesWithCustomerName = async (
     const rawWo = jobRelation?.wo_number;
     const n = rawWo != null ? Number(rawWo) : NaN;
     const wo_number = Number.isFinite(n) ? n : null;
-    return { ...inv, customer_name, wo_number };
-  });
+      return { ...inv, customer_name, wo_number };
+    });
   return { data: mapped, error: null };
 };
 
@@ -532,7 +542,7 @@ export const getInvoiceDashboardSummary = async (
 ): Promise<GetInvoiceDashboardSummaryResult> => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('issued_at, payment_status, total')
+    .select('issued_at, payment_status, total, line_items')
     .eq('user_id', userId);
 
   if (error) {
@@ -540,7 +550,9 @@ export const getInvoiceDashboardSummary = async (
     return { data: null, error: new Error(error.message) };
   }
 
-  const rows = (data ?? []).map((row) => {
+  const rows = (data ?? [])
+    .filter((row) => isStandardInvoiceUiRow(row as { line_items: unknown }))
+    .map((row) => {
     const r = row as Record<string, unknown>;
     const paymentStatusRaw = r.payment_status;
     const payment_status: Invoice['payment_status'] =

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import type { Job, BusinessProfile, ChangeOrder } from '../types/db';
 import {
   fetchHtmlPdfBlob,
@@ -14,7 +22,12 @@ import {
 } from '../lib/docuseal-change-order-html';
 import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-image';
 import '../lib/change-order-document.css';
-import { computeCOTotal, deleteChangeOrder, getChangeOrderById } from '../lib/db/change-orders';
+import {
+  computeCOTotal,
+  deleteChangeOrder,
+  getChangeOrderById,
+  updateChangeOrder,
+} from '../lib/db/change-orders';
 import { jobRowToWelderJob } from '../lib/job-to-welder-job';
 import { formatEsignTimestamp } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
@@ -25,6 +38,9 @@ import {
   pollChangeOrderEsignStatus,
   downloadSignedDocumentFile,
 } from '../lib/esign-api';
+import { getChangeOrderSignatureState } from '../lib/change-order-signature';
+import { useScaledPreview } from '../hooks/useScaledPreview';
+import { InvoicePreviewModal } from './InvoicePreviewModal';
 import './ChangeOrderDetailPage.css';
 
 const CHANGE_ORDER_STATUS_META: Record<
@@ -76,6 +92,7 @@ export function ChangeOrderDetailPage({
 }: ChangeOrderDetailPageProps) {
   const [pdfError, setPdfError] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [coPreviewModalOpen, setCoPreviewModalOpen] = useState(false);
 
   const coLabel = `CO #${String(co.co_number).padStart(4, '0')}`;
   const customerTitle = job.customer_name.trim() || 'Customer';
@@ -97,16 +114,29 @@ export function ChangeOrderDetailPage({
     providerPhone: getPdfFooterPhone(profile, welderJob),
   }), [profile, welderJob]);
 
+  const innerHtml = useMemo(
+    () => generateChangeOrderHtml(co, job, profile),
+    [co, job, profile]
+  );
+
+  const {
+    viewportRef: coPreviewViewportRef,
+    sheetRef: coPreviewSheetRef,
+    scale: coPreviewScale,
+    spacerHeight: coPreviewSpacerHeight,
+    spacerWidth: coPreviewSpacerWidth,
+    letterWidthPx: coLetterWidthPx,
+  } = useScaledPreview(innerHtml);
+
   const handleDownload = async () => {
     setPdfError('');
     setDownloading(true);
     try {
-      const inner = generateChangeOrderHtml(co, job, profile);
       const filename = getCoPdfFilename(co.co_number, job.customer_name);
       const woLabel = job.wo_number != null ? `WO #${String(job.wo_number).padStart(4, '0')}` : '';
       const blob = await fetchHtmlPdfBlob({
         filename,
-        innerMarkup: inner,
+        innerMarkup: innerHtml,
         headerLeft: coLabel,
         headerRight: woLabel,
         providerName: footerMeta.providerName,
@@ -122,6 +152,7 @@ export function ChangeOrderDetailPage({
 
   const [coEsignBusy, setCoEsignBusy] = useState(false);
   const [signedDocBusy, setSignedDocBusy] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
   const [coSigningLinkCopied, setCoSigningLinkCopied] = useState(false);
   const [coEsignResendNotice, setCoEsignResendNotice] = useState(false);
   const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,15 +162,26 @@ export function ChangeOrderDetailPage({
     onCoUpdatedRef.current = onCoUpdated;
   }, [onCoUpdated]);
 
+  const signatureState = useMemo(
+    () => getChangeOrderSignatureState(co.esign_status, co.offline_signed_at),
+    [co.esign_status, co.offline_signed_at]
+  );
   const coEsignWasResent = Boolean(co?.esign_resent_at);
   const esignProgress = useMemo(
-    () => getEsignProgressModel(co.esign_status, 'change_order', coEsignWasResent),
-    [co.esign_status, coEsignWasResent]
+    () =>
+      getEsignProgressModel(
+        signatureState.isSignatureSatisfied ? 'completed' : co.esign_status,
+        'change_order',
+        coEsignWasResent
+      ),
+    [co.esign_status, coEsignWasResent, signatureState.isSignatureSatisfied]
   );
+  const isOfflineMarked = Boolean(co.offline_signed_at && co.esign_status !== 'completed');
   const showCopySigningLink = Boolean(
     co.esign_embed_src &&
     co.esign_status !== 'not_sent' &&
-    co.esign_status !== 'completed'
+    co.esign_status !== 'completed' &&
+    !isOfflineMarked
   );
 
   const refreshCoRow = useCallback(async () => {
@@ -273,6 +315,50 @@ export function ChangeOrderDetailPage({
     }
   };
 
+  const handleMarkSignedOffline = async () => {
+    setPdfError('');
+    setSaveBusy(true);
+    try {
+      const { data, error } = await updateChangeOrder(userId, co.id, {
+        offline_signed_at: new Date().toISOString(),
+        status: 'approved',
+      });
+      if (error || !data) {
+        throw error ?? new Error('Could not mark as signed offline.');
+      }
+      onCoUpdatedRef.current?.(data);
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : 'Could not mark as signed offline.');
+    } finally {
+      setSaveBusy(false);
+    }
+  };
+
+  const handleUndoOfflineMark = async () => {
+    setPdfError('');
+    setSaveBusy(true);
+    try {
+      const status =
+        co.esign_status === 'declined'
+          ? 'rejected'
+          : co.esign_status === 'completed'
+            ? 'approved'
+            : 'pending_approval';
+      const { data, error } = await updateChangeOrder(userId, co.id, {
+        offline_signed_at: null,
+        status,
+      });
+      if (error || !data) {
+        throw error ?? new Error('Could not undo offline mark.');
+      }
+      onCoUpdatedRef.current?.(data);
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : 'Could not undo offline mark.');
+    } finally {
+      setSaveBusy(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!window.confirm(`Delete ${coLabel}?`)) return;
     const { error } = await deleteChangeOrder(userId, co.id);
@@ -282,8 +368,6 @@ export function ChangeOrderDetailPage({
     }
     onDelete();
   };
-
-  const innerHtml = generateChangeOrderHtml(co, job, profile);
 
   return (
     <div className="work-order-detail-page co-detail-page">
@@ -345,12 +429,12 @@ export function ChangeOrderDetailPage({
 
       <section className="wo-esign-card" aria-labelledby="co-esign-heading">
         <h2 id="co-esign-heading" className="wo-esign-heading">
-          Customer signature
+          {signatureState.displayLabel === 'Signed offline' ? 'Signature (offline)' : 'Customer signature'}
         </h2>
         <div
           className="wo-esign-timeline"
           role="group"
-          aria-label={`Customer signature status: ${esignProgress.title}`}
+          aria-label={`Customer signature status: ${signatureState.displayLabel}`}
         >
           {esignProgress.steps.map((step, index) => (
             <div
@@ -369,8 +453,14 @@ export function ChangeOrderDetailPage({
             </div>
           ))}
         </div>
-        <p className="wo-esign-summary">{esignProgress.summary}</p>
+        <p className="wo-esign-summary">{signatureState.summary}</p>
         <dl className="wo-esign-meta">
+          {co.offline_signed_at ? (
+            <div className="wo-esign-meta-row">
+              <dt>Signed offline</dt>
+              <dd>{formatEsignTimestamp(co.offline_signed_at)}</dd>
+            </div>
+          ) : null}
           {co.esign_sent_at ? (
             <div className="wo-esign-meta-row">
               <dt>{coEsignWasResent && co.esign_status === 'sent' ? 'Resent' : 'Sent'}</dt>
@@ -403,27 +493,29 @@ export function ChangeOrderDetailPage({
           ) : null}
         </dl>
         <div className="wo-esign-actions">
-          {!co.esign_submitter_id ? (
-            <button
-              type="button"
-              className="btn-primary btn-action wo-esign-actions-primary"
-              disabled={coEsignBusy || !job.customer_email?.trim()}
-              title={
-                !job.customer_email?.trim() ? 'Customer email is required to send for signature' : undefined
-              }
-              onClick={() => void handleSendForSignature()}
-            >
-              {coEsignBusy ? 'Sending…' : 'Send for signature'}
-            </button>
-          ) : co.esign_status !== 'completed' ? (
-            <button
-              type="button"
-              className="btn-primary btn-action wo-esign-actions-primary"
-              disabled={coEsignBusy}
-              onClick={() => void handleResendSignature()}
-            >
-              {coEsignBusy ? 'Sending…' : 'Resend Change Order'}
-            </button>
+          {!isOfflineMarked ? (
+            !co.esign_submitter_id ? (
+              <button
+                type="button"
+                className="btn-primary btn-action wo-esign-actions-primary"
+                disabled={coEsignBusy || !job.customer_email?.trim()}
+                title={
+                  !job.customer_email?.trim() ? 'Customer email is required to send for signature' : undefined
+                }
+                onClick={() => void handleSendForSignature()}
+              >
+                {coEsignBusy ? 'Sending…' : 'Send for signature'}
+              </button>
+            ) : co.esign_status !== 'completed' ? (
+              <button
+                type="button"
+                className="btn-primary btn-action wo-esign-actions-primary"
+                disabled={coEsignBusy}
+                onClick={() => void handleResendSignature()}
+              >
+                {coEsignBusy ? 'Sending…' : 'Resend Change Order'}
+              </button>
+            ) : null
           ) : null}
           {showCopySigningLink ? (
             <button
@@ -447,17 +539,83 @@ export function ChangeOrderDetailPage({
               {signedDocBusy ? 'Loading…' : 'Download signed PDF'}
             </button>
           ) : null}
+          {isOfflineMarked ? (
+            <button
+              type="button"
+              className="btn-secondary btn-action"
+              disabled={saveBusy}
+              onClick={() => void handleUndoOfflineMark()}
+            >
+              {saveBusy ? 'Removing…' : 'Undo offline mark'}
+            </button>
+          ) : !signatureState.isSignatureSatisfied ? (
+            <button
+              type="button"
+              className="btn-secondary btn-action"
+              disabled={saveBusy}
+              onClick={() => void handleMarkSignedOffline()}
+            >
+              {saveBusy ? 'Marking…' : 'Mark signed offline'}
+            </button>
+          ) : null}
         </div>
       </section>
 
-      <div className="work-order-detail-scroll co-detail-scroll">
-        <div className="co-detail-document-frame">
-          <div
-            className="agreement-document work-order-detail-document"
-            dangerouslySetInnerHTML={{ __html: innerHtml }}
-          />
+      <section className="co-detail-preview-card" aria-labelledby="co-preview-heading">
+        <div className="co-detail-preview-header">
+          <h2 id="co-preview-heading" className="co-detail-preview-title">
+            Preview
+          </h2>
+          <p className="co-detail-preview-copy">Tap the preview to open the full sheet.</p>
         </div>
-      </div>
+        <div
+          ref={coPreviewViewportRef}
+          className="agreement-preview-scale-viewport co-detail-mini-viewport"
+        >
+          <div
+            role="button"
+            tabIndex={0}
+            className="co-detail-mini-preview-hitbox"
+            aria-label="Open full change order preview"
+            onClick={() => setCoPreviewModalOpen(true)}
+            onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setCoPreviewModalOpen(true);
+              }
+            }}
+          >
+            <div
+              className="agreement-preview-scale-spacer"
+              style={{
+                width: coPreviewSpacerWidth,
+                height: coPreviewSpacerHeight,
+              }}
+            >
+              <div
+                ref={coPreviewSheetRef}
+                className="agreement-preview-scale-sheet"
+                style={{
+                  width: coLetterWidthPx,
+                  transform: coPreviewScale !== 1 ? `scale(${coPreviewScale})` : undefined,
+                  transformOrigin: 'top left',
+                  willChange: coPreviewScale !== 1 ? 'transform' : undefined,
+                }}
+              >
+                <div dangerouslySetInnerHTML={{ __html: innerHtml }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <InvoicePreviewModal
+        open={coPreviewModalOpen}
+        onClose={() => setCoPreviewModalOpen(false)}
+        htmlMarkup={innerHtml}
+        kicker="Change order preview"
+        ariaLabel="Change order preview"
+      />
 
       <div className="work-order-detail-footer co-detail-footer">
         <button

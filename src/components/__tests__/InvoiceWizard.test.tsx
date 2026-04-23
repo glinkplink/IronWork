@@ -126,7 +126,16 @@ function makeCO(n: number, description: string): ChangeOrder {
     time_note: '',
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
-    esign_status: 'not_sent',
+    esign_status: 'completed',
+    offline_signed_at: null,
+  };
+}
+
+function makePendingCO(n: number, description: string): ChangeOrder {
+  return {
+    ...makeCO(n, description),
+    status: 'pending_approval',
+    esign_status: 'sent',
   };
 }
 
@@ -200,20 +209,25 @@ describe('InvoiceWizard', () => {
     cleanup();
   });
 
-  it('creates a CO-scoped invoice without showing the multi-CO picker', async () => {
+  it('shows unsigned change orders as unavailable and excludes them from the invoice', async () => {
     const user = userEvent.setup();
-    renderWizard({ changeOrder: makeCO(2, 'Second') });
+    listChangeOrders.mockResolvedValueOnce([makeCO(1, 'Signed'), makePendingCO(2, 'Pending')]);
+    renderWizard();
 
     await waitFor(() => {
-      expect(screen.getByText(/CO #0002 only/i)).toBeInTheDocument();
+      expect(screen.getByText(/Change orders on this job/i)).toBeInTheDocument();
+      expect(screen.getByText(/Requires change order signature/i)).toBeInTheDocument();
+      expect(screen.getByText('CO #0001')).toBeInTheDocument();
     });
-    expect(screen.queryByText(/Change orders on this job/i)).toBeNull();
-    expect(screen.getByText('CO #0002').parentElement).toHaveTextContent('$100.00');
+    const pendingCheckbox = screen.getByRole('checkbox', { name: /CO #0002: Pending/i });
+    expect(pendingCheckbox).toBeDisabled();
 
     const summary = screen.getByRole('region', { name: /amount preview/i });
-    expect(within(summary).getByText((_, node) => node?.textContent === 'Original Total$0.00')).toBeInTheDocument();
-    expect(within(summary).getByText((_, node) => node?.textContent === 'Change Order Total$100.00')).toBeInTheDocument();
-    expect(within(summary).getByText((_, node) => node?.textContent === 'Total$100.00')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(summary).getByText((_, node) => node?.textContent === 'Original Total$100.00')).toBeInTheDocument();
+      expect(within(summary).getByText((_, node) => node?.textContent === 'Change Order Total$100.00')).toBeInTheDocument();
+      expect(within(summary).getByText((_, node) => node?.textContent === 'Total$200.00')).toBeInTheDocument();
+    });
 
     await user.click(screen.getByRole('button', { name: /confirm/i }));
     await user.click(screen.getByRole('button', { name: /continue/i }));
@@ -223,9 +237,8 @@ describe('InvoiceWizard', () => {
       expect(createInvoice).toHaveBeenCalledTimes(1);
     });
     const payload = createInvoice.mock.calls[0][0];
-    expect(payload.line_items).toHaveLength(1);
-    expect(payload.line_items[0].change_order_id).toBe('co-2');
-    expect(payload.line_items[0].source).toBe('change_order');
+    expect(payload.line_items.some((line: { change_order_id?: string }) => line.change_order_id === 'co-1')).toBe(true);
+    expect(payload.line_items.some((line: { change_order_id?: string }) => line.change_order_id === 'co-2')).toBe(false);
   });
 
   it('keeps the job invoice flow showing the change-order picker', async () => {

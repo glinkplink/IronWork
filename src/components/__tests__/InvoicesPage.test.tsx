@@ -3,13 +3,12 @@ import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ChangeOrder, Invoice, Job } from '../../types/db';
+import type { Invoice, Job } from '../../types/db';
 import type { InvoiceWithCustomerName } from '../../lib/db/invoices';
 import { InvoicesPage } from '../InvoicesPage';
 
 const listInvoicesWithCustomerName = vi.fn();
 const getJobById = vi.fn();
-const getChangeOrderById = vi.fn();
 
 vi.mock('../../lib/db/invoices', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/db/invoices')>();
@@ -22,10 +21,6 @@ vi.mock('../../lib/db/invoices', async (importOriginal) => {
 
 vi.mock('../../lib/db/jobs', () => ({
   getJobById: (...args: unknown[]) => getJobById(...args),
-}));
-
-vi.mock('../../lib/db/change-orders', () => ({
-  getChangeOrderById: (...args: unknown[]) => getChangeOrderById(...args),
 }));
 
 function baseInvoice(overrides: Partial<Invoice> = {}): Invoice {
@@ -120,26 +115,6 @@ function minimalJob(id: string): Job {
     esign_signed_document_url: null,
     esign_resent_at: null,
     offline_signed_at: null,
-  };
-}
-
-function minimalChangeOrder(id: string, jobId: string): ChangeOrder {
-  return {
-    id,
-    user_id: 'u1',
-    job_id: jobId,
-    co_number: 1,
-    description: 'Extra',
-    reason: 'r',
-    status: 'approved',
-    requires_approval: true,
-    line_items: [],
-    time_amount: 0,
-    time_unit: 'hours',
-    time_note: '',
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-01-01T00:00:00Z',
-    esign_status: 'not_sent',
   };
 }
 
@@ -356,7 +331,6 @@ describe('InvoicesPage', () => {
     listInvoicesWithCustomerName.mockResolvedValue({ data: [inv], error: null });
     const job = minimalJob('job-1');
     getJobById.mockResolvedValue(job);
-    getChangeOrderById.mockResolvedValue(null);
 
     render(
       <InvoicesPage userId="u1" onOpenInvoice={onOpenInvoice} onOpenCoInvoice={onOpenCoInvoice} />
@@ -373,10 +347,9 @@ describe('InvoicesPage', () => {
     });
     expect(onOpenInvoice).toHaveBeenCalledWith(job, inv);
     expect(onOpenCoInvoice).not.toHaveBeenCalled();
-    expect(getChangeOrderById).not.toHaveBeenCalled();
   });
 
-  it('opens change-order invoice path when exactly one unique change order id is present', async () => {
+  it('opens the normal invoice path even if a legacy CO-only invoice row is present', async () => {
     const user = userEvent.setup();
     const coId = 'co-99';
     const inv = withListFields(
@@ -409,9 +382,7 @@ describe('InvoicesPage', () => {
     );
     listInvoicesWithCustomerName.mockResolvedValue({ data: [inv], error: null });
     const job = minimalJob('job-1');
-    const co = minimalChangeOrder(coId, 'job-1');
     getJobById.mockResolvedValue(job);
-    getChangeOrderById.mockResolvedValue(co);
 
     render(
       <InvoicesPage userId="u1" onOpenInvoice={onOpenInvoice} onOpenCoInvoice={onOpenCoInvoice} />
@@ -424,11 +395,10 @@ describe('InvoicesPage', () => {
     await user.click(screen.getByRole('button', { name: /INV #0001/i }));
 
     await waitFor(() => {
-      expect(onOpenCoInvoice).toHaveBeenCalledTimes(1);
+      expect(onOpenInvoice).toHaveBeenCalledTimes(1);
     });
-    expect(onOpenCoInvoice).toHaveBeenCalledWith(job, co, inv);
-    expect(onOpenInvoice).not.toHaveBeenCalled();
-    expect(getChangeOrderById).toHaveBeenCalledWith(coId);
+    expect(onOpenInvoice).toHaveBeenCalledWith(job, inv);
+    expect(onOpenCoInvoice).not.toHaveBeenCalled();
   });
 
   it('prevents repeat open while row is busy/disabled', async () => {
@@ -535,7 +505,6 @@ describe('InvoicesPage', () => {
     });
     expect(onOpenInvoice).toHaveBeenCalledWith(job, inv);
     expect(onOpenCoInvoice).not.toHaveBeenCalled();
-    expect(getChangeOrderById).not.toHaveBeenCalled();
   });
 
   it('shows an error banner when invoice list query fails', async () => {

@@ -99,13 +99,7 @@
 }
 
 .work-orders-stat-card--paid {
-  grid-column: 1 / -1;
   order: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
 }
 
 .work-orders-stat-card--paid::before {
@@ -192,9 +186,6 @@
   font-weight: 500;
 }
 
-.work-orders-stat-card--paid .work-orders-stat-label {
-  margin-top: 0;
-}
 
 /* ─── Profile nudge ─── */
 .work-orders-profile-nudge {

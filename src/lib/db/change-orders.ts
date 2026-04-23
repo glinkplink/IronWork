@@ -91,6 +91,7 @@ function mapChangeOrderRow(data: Record<string, unknown>): ChangeOrder {
     esign_declined_at: optStringCol(data.esign_declined_at),
     esign_decline_reason: optStringCol(data.esign_decline_reason),
     esign_signed_document_url: optStringCol(data.esign_signed_document_url),
+    offline_signed_at: optStringCol(data.offline_signed_at),
   };
 }
 
@@ -174,6 +175,7 @@ export async function updateChangeOrder(
       | 'time_amount'
       | 'time_unit'
       | 'time_note'
+      | 'offline_signed_at'
     >
   >
 ): Promise<{ data: ChangeOrder | null; error: Error | null }> {

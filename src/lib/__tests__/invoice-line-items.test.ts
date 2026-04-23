@@ -113,6 +113,7 @@ const baseCo: ChangeOrder = {
   created_at: '2024-06-05T00:00:00Z',
   updated_at: '2024-06-05T00:00:00Z',
   esign_status: 'not_sent',
+  offline_signed_at: null,
 };
 
 function baseInvoice(line_items: Invoice['line_items']): Invoice {

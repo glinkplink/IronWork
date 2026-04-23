@@ -92,6 +92,7 @@ function minimalChangeOrder(): ChangeOrder {
     esign_declined_at: null,
     esign_decline_reason: null,
     esign_signed_document_url: null,
+    offline_signed_at: null,
   };
 }
 
@@ -112,7 +113,7 @@ describe('useChangeOrderFlow', () => {
 
     expect(result.current.state.coDetailCO?.id).toBe('co-1');
     expect(result.current.state.coDetailBackTarget).toBe('work-orders');
-    expect(navigateTo).toHaveBeenCalledWith('co-detail');
+    expect(navigateTo).toHaveBeenCalledWith('co-detail', { jobId: 'job-1', coId: 'co-1' });
 
     act(() => {
       result.current.actions.handleBackFromCODetail();

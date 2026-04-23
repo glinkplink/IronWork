@@ -277,4 +277,5 @@ export interface ChangeOrder {
   esign_declined_at?: string | null;
   esign_decline_reason?: string | null;
   esign_signed_document_url?: string | null;
+  offline_signed_at: string | null;
 }

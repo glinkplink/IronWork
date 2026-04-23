@@ -11,6 +11,17 @@ vi.mock('../../lib/change-order-generator', () => ({
   generateChangeOrderHtml: () => '<div>Change Order Preview</div>',
 }));
 
+vi.mock('../../hooks/useScaledPreview', () => ({
+  useScaledPreview: () => ({
+    viewportRef: { current: null },
+    sheetRef: { current: null },
+    scale: 1,
+    spacerHeight: 400,
+    spacerWidth: 816,
+    letterWidthPx: 816,
+  }),
+}));
+
 vi.mock('../../lib/esign-api', () => ({
   sendChangeOrderForSignature: vi.fn(),
   resendChangeOrderSignature: vi.fn(),
@@ -149,6 +160,7 @@ function unsentChangeOrder(): ChangeOrder {
     esign_declined_at: null,
     esign_decline_reason: null,
     esign_signed_document_url: null,
+    offline_signed_at: null,
   };
 }
 
@@ -180,6 +192,7 @@ function changeOrderWithEsign(status: ChangeOrder['esign_status']): ChangeOrder 
     esign_declined_at: null,
     esign_decline_reason: null,
     esign_signed_document_url: status === 'completed' ? 'https://example.com/signed.pdf' : null,
+    offline_signed_at: null,
   };
   return co;
 }
@@ -274,6 +287,22 @@ describe('ChangeOrderDetailPage', () => {
 
     expect(screen.queryByRole('button', { name: /copy signing link/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /download signed pdf/i })).toBeInTheDocument();
+  });
+
+  it('opens full document preview lightbox from mini preview', () => {
+    render(
+      <ChangeOrderDetailPage
+        userId="u1"
+        co={unsentChangeOrder()}
+        job={minimalJob()}
+        profile={minimalProfile()}
+        onBack={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /open full change order preview/i }));
+    expect(screen.getByRole('dialog', { name: /change order preview/i })).toBeInTheDocument();
   });
 
   it('disables Edit and Delete while send for signature is in-flight', async () => {

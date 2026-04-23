@@ -254,10 +254,46 @@ export function useAuthProfile({
     if (!stripeConnectState) return;
 
     let active = true;
+    const clearStripeConnectQuery = () => {
+      if (typeof window === 'undefined') return;
+      const u = new URL(window.location.href);
+      if (!u.searchParams.has('stripe_connect')) return;
+      u.searchParams.delete('stripe_connect');
+      const q = u.searchParams.toString();
+      window.history.replaceState({}, '', u.pathname + (q ? `?${q}` : ''));
+    };
+
     const run = async () => {
       replaceView('profile');
 
-      if (stripeConnectState === 'refresh') {
+      try {
+        if (stripeConnectState === 'refresh') {
+          try {
+            const status = await getStripeConnectStatus();
+            if (!active) return;
+            await loadProfile({ silent: true });
+            if (!active) return;
+            setStripeConnectNotice(
+              status.onboardingComplete
+                ? { tone: 'success', message: 'Stripe account connected. You can now use Stripe-backed invoice payments.' }
+                : { tone: 'info', message: 'Stripe setup is still incomplete. Continue onboarding to finish connecting your account.' }
+            );
+          } catch (error) {
+            if (!active) return;
+            await loadProfile({ silent: true });
+            if (!active) return;
+            setStripeConnectNotice({
+              tone: 'error',
+              message: error instanceof Error ? error.message : 'Could not refresh Stripe connection status.',
+            });
+          }
+          return;
+        }
+
+        if (stripeConnectState !== 'return') {
+          return;
+        }
+
         try {
           const status = await getStripeConnectStatus();
           if (!active) return;
@@ -265,8 +301,15 @@ export function useAuthProfile({
           if (!active) return;
           setStripeConnectNotice(
             status.onboardingComplete
-              ? { tone: 'success', message: 'Stripe account connected. You can now use Stripe-backed invoice payments.' }
-              : { tone: 'info', message: 'Stripe setup is still incomplete. Continue onboarding to finish connecting your account.' }
+              ? {
+                  tone: 'success',
+                  message: 'Stripe account connected. You can now use Stripe-backed invoice payments.',
+                }
+              : {
+                  tone: 'info',
+                  message:
+                    'Stripe setup has started, but onboarding is not complete yet. Continue setup to finish connecting your account.',
+                }
           );
         } catch (error) {
           if (!active) return;
@@ -274,44 +317,16 @@ export function useAuthProfile({
           if (!active) return;
           setStripeConnectNotice({
             tone: 'error',
-            message: error instanceof Error ? error.message : 'Could not refresh Stripe connection status.',
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Could not refresh Stripe connection status.',
           });
         }
-        return;
-      }
-
-      if (stripeConnectState !== 'return') {
-        return;
-      }
-
-      try {
-        const status = await getStripeConnectStatus();
-        if (!active) return;
-        await loadProfile({ silent: true });
-        if (!active) return;
-        setStripeConnectNotice(
-          status.onboardingComplete
-            ? {
-                tone: 'success',
-                message: 'Stripe account connected. You can now use Stripe-backed invoice payments.',
-              }
-            : {
-                tone: 'info',
-                message:
-                  'Stripe setup has started, but onboarding is not complete yet. Continue setup to finish connecting your account.',
-              }
-        );
-      } catch (error) {
-        if (!active) return;
-        await loadProfile({ silent: true });
-        if (!active) return;
-        setStripeConnectNotice({
-          tone: 'error',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Could not refresh Stripe connection status.',
-        });
+      } finally {
+        if (active) {
+          clearStripeConnectQuery();
+        }
       }
     };
 

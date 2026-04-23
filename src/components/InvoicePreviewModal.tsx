@@ -6,6 +6,10 @@ interface InvoicePreviewModalProps {
   onClose: () => void;
   /** Full inner markup from `generateInvoiceHtml` (includes `.agreement-document` root). */
   htmlMarkup: string;
+  /** Toolbar kicker; default keeps invoice call sites unchanged. */
+  kicker?: string;
+  /** Dialog accessible name; default keeps invoice call sites unchanged. */
+  ariaLabel?: string;
 }
 
 /** Letter width at 96dpi — must match the PDF viewport so text does not reflow. */
@@ -24,7 +28,13 @@ function tabbableElements(container: HTMLElement): HTMLElement[] {
   });
 }
 
-export function InvoicePreviewModal({ open, onClose, htmlMarkup }: InvoicePreviewModalProps) {
+export function InvoicePreviewModal({
+  open,
+  onClose,
+  htmlMarkup,
+  kicker = 'Invoice preview',
+  ariaLabel = 'Invoice preview',
+}: InvoicePreviewModalProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -125,12 +135,12 @@ export function InvoicePreviewModal({ open, onClose, htmlMarkup }: InvoicePrevie
       className="invoice-preview-modal-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Invoice preview"
+      aria-label={ariaLabel}
       onKeyDown={handleDialogKeyDown}
     >
       <div className="invoice-preview-modal-toolbar">
         <div className="invoice-preview-modal-heading">
-          <p className="invoice-preview-modal-kicker">Invoice preview</p>
+          <p className="invoice-preview-modal-kicker">{kicker}</p>
         </div>
         <button
           ref={closeButtonRef}

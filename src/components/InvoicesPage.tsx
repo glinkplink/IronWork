@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ChangeOrder, Job, Invoice, InvoiceLineItem } from '../types/db';
+import type { Job, Invoice } from '../types/db';
 import type { InvoiceWithCustomerName } from '../lib/db/invoices';
 import {
   listInvoicesWithCustomerName,
@@ -7,7 +7,6 @@ import {
   summarizeInvoiceDashboardRows,
 } from '../lib/db/invoices';
 import { getJobById } from '../lib/db/jobs';
-import { getChangeOrderById } from '../lib/db/change-orders';
 import { formatUsd } from '../lib/work-order-dashboard-display';
 import './WorkOrdersPage.css';
 import './InvoicesPage.css';
@@ -15,28 +14,7 @@ import './InvoicesPage.css';
 interface InvoicesPageProps {
   userId: string;
   onOpenInvoice: (job: Job, invoice: Invoice) => void;
-  onOpenCoInvoice: (job: Job, changeOrder: ChangeOrder, invoice: Invoice) => void;
-}
-
-/**
- * Returns the CO id when this is a CO-only invoice:
- * - exactly one unique `change_order_id`
- * - no base-scope lines (original/labor/material/manual/etc without a CO id)
- */
-function getSingleCoIdForCoOnlyInvoice(lineItems: InvoiceLineItem[]): string | null {
-  if (lineItems.length === 0) return null;
-
-  const ids = new Set(
-    lineItems.map((i) => i.change_order_id).filter((id): id is string => Boolean(id))
-  );
-  if (ids.size !== 1) return null;
-
-  const hasBaseScopeLine = lineItems.some((line) => {
-    const hasCoId = typeof line.change_order_id === 'string' && line.change_order_id.trim() !== '';
-    return !hasCoId && line.source !== 'change_order';
-  });
-
-  return hasBaseScopeLine ? null : [...ids][0];
+  onOpenCoInvoice?: () => void;
 }
 
 function formatInvoiceDate(dateStr: string): string {
@@ -127,7 +105,7 @@ function InvoiceRow({ invoice, busy, onOpen }: InvoiceRowProps) {
   );
 }
 
-export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: InvoicesPageProps) {
+export function InvoicesPage({ userId, onOpenInvoice }: InvoicesPageProps) {
   const [invoices, setInvoices] = useState<InvoiceWithCustomerName[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -169,18 +147,10 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
     if (busyId) return;
     setBusyId(invoice.id);
     try {
-      const coId = getSingleCoIdForCoOnlyInvoice(invoice.line_items);
       const job = await getJobById(invoice.job_id);
       if (!job) {
         setBusyId(null);
         return;
-      }
-      if (coId) {
-        const changeOrder = await getChangeOrderById(coId);
-        if (changeOrder) {
-          onOpenCoInvoice(job, changeOrder, invoice);
-          return;
-        }
       }
       onOpenInvoice(job, invoice);
     } catch {
@@ -213,19 +183,15 @@ export function InvoicesPage({ userId, onOpenInvoice, onOpenCoInvoice }: Invoice
         <div
           className="work-orders-stat-strip"
           role="group"
-          aria-label="Invoiced, paid, and pending invoice totals"
+          aria-label="Outstanding and paid invoice totals"
         >
           <div className="work-orders-stat-card work-orders-stat-card--blue">
             <div className="work-orders-stat-num">{formatUsd(totalsSummary.invoicedTotal)}</div>
-            <div className="work-orders-stat-label">Invoiced</div>
+            <div className="work-orders-stat-label">Outstanding</div>
           </div>
           <div className="work-orders-stat-card work-orders-stat-card--paid">
             <div className="work-orders-stat-num">{formatUsd(totalsSummary.paidTotal)}</div>
             <div className="work-orders-stat-label">Paid</div>
-          </div>
-          <div className="work-orders-stat-card work-orders-stat-card--green">
-            <div className="work-orders-stat-num">{formatUsd(totalsSummary.pendingInvoiceTotal)}</div>
-            <div className="work-orders-stat-label">Pending invoice</div>
           </div>
         </div>
       )}

@@ -119,6 +119,7 @@ function jobFixture(): Job {
 }
 
 function changeOrderFixture(overrides: Partial<ChangeOrder> = {}): ChangeOrder {
+  const { offline_signed_at = null, ...restOverrides } = overrides;
   return {
     id: 'co-1',
     user_id: 'user-1',
@@ -153,7 +154,8 @@ function changeOrderFixture(overrides: Partial<ChangeOrder> = {}): ChangeOrder {
     esign_declined_at: null,
     esign_decline_reason: null,
     esign_signed_document_url: null,
-    ...overrides,
+    offline_signed_at,
+    ...restOverrides,
   };
 }
 

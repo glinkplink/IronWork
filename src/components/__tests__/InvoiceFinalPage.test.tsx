@@ -274,7 +274,8 @@ describe('InvoiceFinalPage', () => {
 
   it('downloads the invoice PDF without navigating away', async () => {
     const user = userEvent.setup();
-    renderPage();
+    const signedJob = { ...baseJob(), esign_status: 'completed' as const };
+    renderPage(baseInvoice(), signedJob);
 
     await user.click(screen.getByRole('button', { name: /^Download Invoice$/i }));
 
@@ -459,9 +460,7 @@ describe('InvoiceFinalPage', () => {
     });
     renderPage(baseInvoice(), baseJob(), profile);
 
-    expect(
-      screen.getByText(/invoice drafts can be created before signature/i)
-    ).toBeInTheDocument();
+    expect(screen.getAllByText(/requires work order signature/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: /^Send Invoice$/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Send with payment link$/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /create payment link/i })).toBeDisabled();

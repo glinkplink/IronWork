@@ -119,7 +119,7 @@ The server loads **`.env`** then **`.env.local`** (override) via `dotenv` so Doc
 
 **Signed in with profile**
 
-- **Home**, **Work Orders**, **Edit profile** (gear). **Work order drafts** while editing a new job are **in-memory** until **Download & Save** persists the job (and upserts **clients** by normalized name). **Invoices** and **change orders** are persisted in Postgres; change orders are created from **Work Order detail**, and invoice wizards can include change orders as line items (picker defaults to all on the job).
+- **Home**, **Work Orders**, **Edit profile** (gear). **Work order drafts** while editing a new job are **in-memory** until **Download & Save** persists the job (and upserts **clients** by normalized name). **Invoices** and **change orders** are persisted in Postgres; change orders are created from **Work Order detail**, and the single work-order invoice can include signed/offline-signed change orders as line items.
 
 Session persistence is standard Supabase client behavior (refresh survives page reload).
 
@@ -132,7 +132,7 @@ Session persistence is standard Supabase client behavior (refresh survives page 
 - Email/password auth via Supabase
 - Business profile and defaults (exclusions, assumptions, warranty, payment methods, tax, WO/invoice counters, etc.) in the database
 - **Work Orders** list, detail, agreement PDF re-download
-- **Change orders:** wizard from detail, statuses, standalone and combined PDFs, optional inclusion on new invoices (`line_items.source` for stable edit behavior)
+- **Change orders:** wizard from detail, statuses, standalone and combined PDFs, offline-sign support, optional inclusion on the work-order invoice when signature-satisfied (`line_items.source` for stable edit behavior)
 - **Invoices:** wizard from a work order → PDF download; persisted rows
 - **Work Orders dashboard:** contract-value rollups use saved work-order totals (`job.price`), and partial invoice-status parse issues show a warning banner instead of disabling all invoice actions
 - Job site autocomplete (optional Geoapify key)

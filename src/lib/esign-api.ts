@@ -1,5 +1,6 @@
 import type { ChangeOrder, EsignJobStatus, Job } from '../types/db';
 import { fetchWithSupabaseAuth } from './fetch-with-supabase-auth';
+import { isChangeOrderSignatureSatisfied } from './change-order-signature';
 
 export interface EsignSendDocumentsPayload {
   name?: string;
@@ -119,14 +120,17 @@ export function mergeEsignResponseIntoJob(job: Job, r: EsignApiResponse): Job {
 
 function mergeChangeOrderStatusFromEsign(
   currentStatus: ChangeOrder['status'],
-  esignStatus: EsignApiResponse['esign_status']
+  esignStatus: EsignApiResponse['esign_status'],
+  offlineSignedAt: string | null
 ): ChangeOrder['status'] {
+  if (isChangeOrderSignatureSatisfied(esignStatus, offlineSignedAt)) {
+    return 'approved';
+  }
+
   switch (esignStatus) {
     case 'sent':
     case 'opened':
       return 'pending_approval';
-    case 'completed':
-      return 'approved';
     case 'declined':
       return 'rejected';
     default:
@@ -137,7 +141,7 @@ function mergeChangeOrderStatusFromEsign(
 export function mergeEsignResponseIntoChangeOrder(co: ChangeOrder, r: EsignApiResponse): ChangeOrder {
   return {
     ...co,
-    status: mergeChangeOrderStatusFromEsign(co.status, r.esign_status),
+    status: mergeChangeOrderStatusFromEsign(co.status, r.esign_status, co.offline_signed_at),
     esign_submission_id: r.esign_submission_id,
     esign_submitter_id: r.esign_submitter_id,
     // Only overwrite embed_src when the response carries one; GET /submissions

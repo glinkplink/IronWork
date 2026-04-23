@@ -335,6 +335,10 @@
   border-bottom: none;
 }
 
+.invoice-co-picker-row-disabled {
+  opacity: 0.78;
+}
+
 .invoice-co-picker-label {
   display: flex;
   align-items: flex-start;
@@ -350,9 +354,21 @@
   flex-shrink: 0;
 }
 
+.invoice-co-picker-label input:disabled {
+  cursor: not-allowed;
+}
+
 .invoice-co-picker-amt {
   font-variant-numeric: tabular-nums;
   color: var(--iron-300);
+}
+
+.invoice-co-picker-gate-hint {
+  flex: 1 1 100%;
+  margin: 0 0 0 1.75rem;
+  color: var(--iron-350);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .co-status-badge {

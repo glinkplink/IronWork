@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type {
   BusinessProfile,
   ChangeOrder,
-  ChangeOrderInvoiceStatus,
   Job,
 } from '../types/db';
 import { generateAgreement } from '../lib/agreement-generator';
@@ -44,13 +43,13 @@ import '../lib/change-order-document.css';
 import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { computeCOTotal, listChangeOrders } from '../lib/db/change-orders';
 import {
-  changeOrderInvoiceStatusMapFromRows,
-  getInvoiceBusinessStatus,
   getBlocksNewChangeOrdersForJob,
-  listInvoiceStatusByChangeOrder,
   listInvoiceStatusByJob,
 } from '../lib/db/invoices';
 import type { WorkOrderInvoiceStatus } from '../lib/db/invoices';
+import { getChangeOrderSignatureState } from '../lib/change-order-signature';
+import { useScaledPreview } from '../hooks/useScaledPreview';
+import { InvoicePreviewModal } from './InvoicePreviewModal';
 import './WorkOrderDetailPage.css';
 
 const ROW_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
@@ -67,15 +66,19 @@ function formatRowDate(raw: string | null | undefined): string {
   return ROW_DATE_FORMATTER.format(new Date(y, m - 1, d));
 }
 
-function renderEsignStrip(status: ChangeOrder['esign_status']) {
-  const progress = getEsignProgressModel(status, 'change_order');
-  if (status === 'not_sent') return null;
+function renderEsignStrip(status: ChangeOrder['esign_status'], offlineSignedAt: string | null) {
+  const signatureState = getChangeOrderSignatureState(status, offlineSignedAt);
+  const progress = getEsignProgressModel(
+    signatureState.isSignatureSatisfied ? 'completed' : status,
+    'change_order'
+  );
+  if (status === 'not_sent' && offlineSignedAt === null) return null;
 
   return (
     <span
       className="esign-strip"
-      title={`E-signature: ${progress.title}`}
-      aria-label={`E-signature status: ${progress.title}`}
+      title={`E-signature: ${signatureState.displayLabel}`}
+      aria-label={`E-signature status: ${signatureState.displayLabel}`}
     >
       {progress.steps.map((step) => (
         <span
@@ -84,7 +87,7 @@ function renderEsignStrip(status: ChangeOrder['esign_status']) {
           aria-hidden="true"
         />
       ))}
-      <span className="esign-strip-text">{progress.title}</span>
+      <span className="esign-strip-text">{signatureState.displayLabel}</span>
     </span>
   );
 }
@@ -100,7 +103,7 @@ interface WorkOrderDetailPageProps {
   onJobUpdated?: (job: Job) => void;
   onBack: () => void;
   onStartChangeOrder: () => void;
-  onStartChangeOrderInvoice: (co: ChangeOrder, invoiceId: string | null) => void;
+  onStartChangeOrderInvoice?: () => void;
   onOpenCODetail: (co: ChangeOrder) => void;
 }
 
@@ -115,7 +118,6 @@ export function WorkOrderDetailPage({
   onJobUpdated,
   onBack,
   onStartChangeOrder,
-  onStartChangeOrderInvoice,
   onOpenCODetail,
 }: WorkOrderDetailPageProps) {
   const documentRef = useRef<HTMLDivElement | null>(null);
@@ -142,11 +144,6 @@ export function WorkOrderDetailPage({
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([]);
   const [coLoading, setCoLoading] = useState(true);
   const [coError, setCoError] = useState('');
-  const [coInvoiceStatusLoading, setCoInvoiceStatusLoading] = useState(true);
-  const [coInvoiceStatusError, setCoInvoiceStatusError] = useState<string | null>(null);
-  const [coInvoiceStatusRows, setCoInvoiceStatusRows] = useState<ChangeOrderInvoiceStatus[] | null>(
-    null
-  );
   const [coNewCoBlockLoading, setCoNewCoBlockLoading] = useState(true);
   const [coNewCoBlockError, setCoNewCoBlockError] = useState<string | null>(null);
   const [coNewCoBlockedByInvoice, setCoNewCoBlockedByInvoice] = useState(false);
@@ -155,6 +152,7 @@ export function WorkOrderDetailPage({
   const [jobInvoiceStatus, setJobInvoiceStatus] = useState<WorkOrderInvoiceStatus | null>(null);
   const [jobInvoiceLoading, setJobInvoiceLoading] = useState(true);
   const [jobInvoiceError, setJobInvoiceError] = useState<string | null>(null);
+  const [woPreviewModalOpen, setWoPreviewModalOpen] = useState(false);
 
   useEffect(() => {
     if (!initialJob || initialJob.id !== jobId) return;
@@ -203,6 +201,23 @@ export function WorkOrderDetailPage({
   const sections = useMemo(
     () => (welderJob ? generateAgreement(welderJob, profile) : null),
     [welderJob, profile]
+  );
+
+  const {
+    viewportRef: woPreviewViewportRef,
+    sheetRef: woPreviewSheetRef,
+    scale: woPreviewScale,
+    spacerHeight: woPreviewSpacerHeight,
+    spacerWidth: woPreviewSpacerWidth,
+    letterWidthPx: woLetterWidthPx,
+  } = useScaledPreview(sections);
+
+  const woPreviewHtml = useMemo(
+    () =>
+      sections
+        ? `<div class="agreement-document work-order-detail-document">${agreementSectionsToHtml(sections)}</div>`
+        : '',
+    [sections]
   );
 
   const woLabel =
@@ -261,33 +276,6 @@ export function WorkOrderDetailPage({
     section.scrollIntoView({ block: 'start' });
     initialScrollHandledRef.current = true;
   }, [initialScrollTarget, coLoading]);
-
-  useEffect(() => {
-    if (!job) return;
-    let cancelled = false;
-    setCoInvoiceStatusLoading(true);
-    setCoInvoiceStatusError(null);
-    setCoInvoiceStatusRows(null);
-
-    void (async () => {
-      const result = await listInvoiceStatusByChangeOrder(userId, job.id);
-      if (cancelled) return;
-      setCoInvoiceStatusLoading(false);
-      if (result.error) {
-        setCoInvoiceStatusError(
-          `Could not load invoice status (${result.error.message}). Invoice actions are unavailable.`
-        );
-        setCoInvoiceStatusRows(null);
-      } else {
-        setCoInvoiceStatusError(null);
-        setCoInvoiceStatusRows(result.data);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [job, userId, changeOrderListVersion]);
 
   useEffect(() => {
     if (!job) return;
@@ -374,11 +362,6 @@ export function WorkOrderDetailPage({
       providerPhone: getPdfFooterPhone(profile, welderJob),
     };
   }, [profile, welderJob]);
-
-  const coInvoiceById = useMemo(() => {
-    if (coInvoiceStatusRows === null) return null;
-    return changeOrderInvoiceStatusMapFromRows(coInvoiceStatusRows);
-  }, [coInvoiceStatusRows]);
 
   const refreshJobRow = useCallback(async () => {
     if (!job) return null;
@@ -814,11 +797,63 @@ export function WorkOrderDetailPage({
         </div>
       </section>
 
-      <div className="work-order-detail-scroll">
-        <div ref={documentRef} className="agreement-document work-order-detail-document">
-          <AgreementDocumentSections sections={sections} />
+      <section className="wo-detail-preview-card" aria-labelledby="wo-preview-heading">
+        <div className="wo-detail-preview-header">
+          <h2 id="wo-preview-heading" className="wo-detail-preview-title">
+            Preview
+          </h2>
+          <p className="wo-detail-preview-copy">Tap the preview to open the full sheet.</p>
         </div>
-      </div>
+        <div
+          ref={woPreviewViewportRef}
+          className="agreement-preview-scale-viewport wo-detail-mini-viewport"
+        >
+          <div
+            role="button"
+            tabIndex={0}
+            className="wo-detail-mini-preview-hitbox"
+            aria-label="Open full work order preview"
+            onClick={() => setWoPreviewModalOpen(true)}
+            onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setWoPreviewModalOpen(true);
+              }
+            }}
+          >
+            <div
+              className="agreement-preview-scale-spacer"
+              style={{
+                width: woPreviewSpacerWidth,
+                height: woPreviewSpacerHeight,
+              }}
+            >
+              <div
+                ref={woPreviewSheetRef}
+                className="agreement-preview-scale-sheet"
+                style={{
+                  width: woLetterWidthPx,
+                  transform: woPreviewScale !== 1 ? `scale(${woPreviewScale})` : undefined,
+                  transformOrigin: 'top left',
+                  willChange: woPreviewScale !== 1 ? 'transform' : undefined,
+                }}
+              >
+                <div ref={documentRef} className="agreement-document work-order-detail-document">
+                  <AgreementDocumentSections sections={sections} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <InvoicePreviewModal
+        open={woPreviewModalOpen}
+        onClose={() => setWoPreviewModalOpen(false)}
+        htmlMarkup={woPreviewHtml}
+        kicker="Work order preview"
+        ariaLabel="Work order preview"
+      />
 
       <section
         ref={changeOrdersSectionRef}
@@ -836,11 +871,6 @@ export function WorkOrderDetailPage({
             Work order invoice has been finalized. New change orders cannot be added.
           </p>
         ) : null}
-        {coInvoiceStatusError ? (
-          <p className="work-orders-empty" role="alert">
-            {coInvoiceStatusError}
-          </p>
-        ) : null}
         {coError ? (
           <p className="work-orders-empty" role="alert">
             {coError}
@@ -852,7 +882,6 @@ export function WorkOrderDetailPage({
         ) : (
           <ul className="work-orders-list" style={{ listStyle: 'none', margin: '0 0 var(--space-lg)', padding: 0 }}>
             {changeOrders.map((co) => {
-              const inv = coInvoiceById?.get(co.id) ?? null;
               return (
                 <li key={co.id} className="co-list-item">
                   <div className="work-orders-row-main">
@@ -867,52 +896,8 @@ export function WorkOrderDetailPage({
                       </span>
                       <span className="work-orders-customer co-list-desc">{co.description || '—'}</span>
                       <span className="co-list-amount">${computeCOTotal(co.line_items).toFixed(2)}</span>
-                      {renderEsignStrip(co.esign_status)}
+                      {renderEsignStrip(co.esign_status, co.offline_signed_at)}
                     </button>
-                  </div>
-                  <div className="work-orders-row-actions">
-                    {coInvoiceStatusLoading ? (
-                      <button
-                        type="button"
-                        className="wo-row-create-invoice-outline work-orders-invoice-status-loading"
-                        disabled
-                        aria-busy="true"
-                      >
-                        Loading…
-                      </button>
-                    ) : coInvoiceStatusError ? (
-                      <button
-                        type="button"
-                        className="wo-row-create-invoice-outline work-orders-invoice-status-unavailable"
-                        disabled
-                      >
-                        Unavailable
-                      </button>
-                    ) : !inv ? (
-                      <button
-                        type="button"
-                        className="wo-row-create-invoice-outline"
-                        onClick={() => onStartChangeOrderInvoice(co, null)}
-                      >
-                        Invoice
-                      </button>
-                    ) : getInvoiceBusinessStatus(inv) === 'draft' ? (
-                      <button
-                        type="button"
-                        className="badge-pending"
-                        onClick={() => onStartChangeOrderInvoice(co, inv.id)}
-                      >
-                        Draft
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="badge-invoiced"
-                        onClick={() => onStartChangeOrderInvoice(co, inv.id)}
-                      >
-                        Invoiced
-                      </button>
-                    )}
                   </div>
                 </li>
               );

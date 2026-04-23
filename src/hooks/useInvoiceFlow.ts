@@ -1,12 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ChangeOrder, Job, Invoice } from '../types/db';
+import type { Job, Invoice } from '../types/db';
 import type { AppRouteParams, AppView } from './useAppNavigation';
 import { getInvoiceByJobId } from '../lib/db/invoices';
 
 export type InvoiceFlowState = {
   invoiceFlowJob: Job | null;
-  invoiceFlowChangeOrder: ChangeOrder | null;
-  invoiceFlowTarget: 'job' | 'change_order' | null;
   wizardExistingInvoice: Invoice | null;
   activeInvoice: Invoice | null;
   invoiceFinalReturnView: 'work-orders' | 'invoices';
@@ -15,8 +13,6 @@ export type InvoiceFlowState = {
 
 const initialInvoice: InvoiceFlowState = {
   invoiceFlowJob: null,
-  invoiceFlowChangeOrder: null,
-  invoiceFlowTarget: null,
   wizardExistingInvoice: null,
   activeInvoice: null,
   invoiceFinalReturnView: 'work-orders',
@@ -43,8 +39,6 @@ export function useInvoiceFlow(
           setInvoice((inv) => ({
             ...inv,
             invoiceFlowJob: jobRow,
-            invoiceFlowChangeOrder: null,
-            invoiceFlowTarget: 'job',
             wizardExistingInvoice: null,
             activeInvoice: existing,
             invoiceFinalReturnView: 'work-orders',
@@ -56,8 +50,6 @@ export function useInvoiceFlow(
         setInvoice((inv) => ({
           ...inv,
           invoiceFlowJob: jobRow,
-          invoiceFlowChangeOrder: null,
-          invoiceFlowTarget: 'job',
           wizardExistingInvoice: null,
           activeInvoice: null,
           invoiceFinalReturnView: 'work-orders',
@@ -68,45 +60,11 @@ export function useInvoiceFlow(
     [navigateTo]
   );
 
-  const handleStartChangeOrderInvoice = useCallback(
-    (jobRow: Job, changeOrder: ChangeOrder) => {
-      setInvoice((inv) => ({
-        ...inv,
-        invoiceFlowJob: jobRow,
-        invoiceFlowChangeOrder: changeOrder,
-        invoiceFlowTarget: 'change_order',
-        wizardExistingInvoice: null,
-        activeInvoice: null,
-        invoiceFinalReturnView: 'work-orders',
-      }));
-      navigateTo('invoice-wizard', { jobId: jobRow.id, coId: changeOrder.id });
-    },
-    [navigateTo]
-  );
-
   const handleOpenPendingInvoice = useCallback(
     (jobRow: Job, inv: Invoice, returnView: 'work-orders' | 'invoices' = 'work-orders') => {
       setInvoice((i) => ({
         ...i,
         invoiceFlowJob: jobRow,
-        invoiceFlowChangeOrder: null,
-        invoiceFlowTarget: 'job',
-        wizardExistingInvoice: null,
-        activeInvoice: inv,
-        invoiceFinalReturnView: returnView,
-      }));
-      navigateTo('invoice-final', { invoiceId: inv.id });
-    },
-    [navigateTo]
-  );
-
-  const handleOpenPendingChangeOrderInvoice = useCallback(
-    (jobRow: Job, changeOrder: ChangeOrder, inv: Invoice, returnView: 'work-orders' | 'invoices' = 'work-orders') => {
-      setInvoice((i) => ({
-        ...i,
-        invoiceFlowJob: jobRow,
-        invoiceFlowChangeOrder: changeOrder,
-        invoiceFlowTarget: 'change_order',
         wizardExistingInvoice: null,
         activeInvoice: inv,
         invoiceFinalReturnView: returnView,
@@ -142,8 +100,6 @@ export function useInvoiceFlow(
       setInvoice((prev) => ({
         ...prev,
         invoiceFlowJob: null,
-        invoiceFlowChangeOrder: null,
-        invoiceFlowTarget: null,
         activeInvoice: null,
         refreshKey: prev.refreshKey + 1,
       }));
@@ -157,8 +113,6 @@ export function useInvoiceFlow(
     setInvoice((i) => ({
       ...i,
       invoiceFlowJob: null,
-      invoiceFlowChangeOrder: null,
-      invoiceFlowTarget: null,
       activeInvoice: null,
       wizardExistingInvoice: null,
       invoiceFinalReturnView: 'work-orders',
@@ -175,7 +129,6 @@ export function useInvoiceFlow(
     }));
     navigateTo('invoice-wizard', {
       jobId: current.invoiceFlowJob.id,
-      coId: current.invoiceFlowChangeOrder?.id ?? undefined,
       invoiceId: current.activeInvoice.id,
     });
   }, [navigateTo]);
@@ -192,9 +145,7 @@ export function useInvoiceFlow(
     state: invoice,
     actions: {
       handleStartInvoice,
-      handleStartChangeOrderInvoice,
       handleOpenPendingInvoice,
-      handleOpenPendingChangeOrderInvoice,
       handleInvoiceWizardSuccess,
       handleInvoiceWizardCancel,
       handleInvoiceFinalBack,

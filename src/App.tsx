@@ -121,17 +121,6 @@ function renderLazyPage(page: ReactNode) {
   );
 }
 
-function deriveSingleChangeOrderId(invoice: import('./types/db').Invoice): string | undefined {
-  const ids = new Set<string>();
-  for (const line of invoice.line_items) {
-    if (typeof line.change_order_id === 'string' && line.change_order_id.trim()) {
-      ids.add(line.change_order_id);
-    }
-  }
-  if (ids.size !== 1) return undefined;
-  return Array.from(ids)[0];
-}
-
 function App() {
   const [workOrdersSuccessBanner, setWorkOrdersSuccessBanner] = useState<string | null>(null);
   const { view, routeParams, navigateTo, replaceView } = useAppNavigation();
@@ -156,7 +145,6 @@ function App() {
   const [routeInvoiceFinal, setRouteInvoiceFinal] = useState<{ invoice: import('./types/db').Invoice; job: Job } | null>(null);
   const [routeInvoiceWizard, setRouteInvoiceWizard] = useState<{
     job: Job;
-    changeOrder: ChangeOrder | null;
     existingInvoice: import('./types/db').Invoice | null;
   } | null>(null);
   const [routeChangeOrderWizard, setRouteChangeOrderWizard] = useState<{
@@ -397,9 +385,7 @@ function App() {
     void (async () => {
       const job = await getJobById(routeJobId);
       if (!active || !job) return;
-      const co = routeCoId ? await getChangeOrderById(routeCoId) : null;
-      if (!active) return;
-      if (!routeInvoiceId && !routeCoId) {
+      if (!routeInvoiceId) {
         const existingJobInvoice = await getInvoiceByJobId(job.id);
         if (!active) return;
         if (existingJobInvoice) {
@@ -413,14 +399,13 @@ function App() {
       if (!active) return;
       setRouteInvoiceWizard({
         job,
-        changeOrder: co && co.job_id === job.id ? co : null,
         existingInvoice,
       });
     })();
     return () => {
       active = false;
     };
-  }, [navigateTo, routeCoId, routeInvoiceId, routeJobId, view]);
+  }, [navigateTo, routeInvoiceId, routeJobId, view]);
 
   useEffect(() => {
     if (view !== 'change-order-wizard' || !routeJobId) {
@@ -533,13 +518,9 @@ function App() {
   const changeOrderWizardJob = changeOrder.changeOrderFlowJob ?? routeChangeOrderWizard?.job ?? null;
   const changeOrderWizardExisting = changeOrder.wizardExistingCO ?? routeChangeOrderWizard?.existingCO ?? null;
   const invoiceWizardJob = invoice.invoiceFlowJob ?? routeInvoiceWizard?.job ?? null;
-  const invoiceWizardCO = invoice.invoiceFlowChangeOrder ?? routeInvoiceWizard?.changeOrder ?? null;
   const invoiceWizardExisting = invoice.wizardExistingInvoice ?? routeInvoiceWizard?.existingInvoice ?? null;
   const invoiceFinalJob = invoice.invoiceFlowJob ?? routeInvoiceFinal?.job ?? null;
   const invoiceFinalInvoice = invoice.activeInvoice ?? routeInvoiceFinal?.invoice ?? null;
-  const invoiceFinalCoId =
-    invoice.invoiceFlowChangeOrder?.id ??
-    (invoiceFinalInvoice ? deriveSingleChangeOrderId(invoiceFinalInvoice) : undefined);
 
   const homePageEl = (
     <HomePage
@@ -628,18 +609,6 @@ function App() {
           }}
           onBack={handleBackFromWorkOrderDetail}
           onStartChangeOrder={changeOrderFlow.handleStartChangeOrderFromDetail}
-          onStartChangeOrderInvoice={(co: ChangeOrder, invoiceId: string | null) => {
-            const activeJob = workOrderDetailJob;
-            if (!activeJob) return;
-            if (!invoiceId) {
-              invoiceFlow.handleStartChangeOrderInvoice(activeJob, co);
-              return;
-            }
-            void getInvoice(invoiceId).then((inv) => {
-              if (!inv) return;
-              invoiceFlow.handleOpenPendingChangeOrderInvoice(activeJob, co, inv);
-            });
-          }}
           onOpenCODetail={changeOrderFlow.handleOpenCODetail}
         />
       );
@@ -675,10 +644,9 @@ function App() {
     if (view === 'invoice-wizard' && user && profile && invoiceWizardJob) {
       return renderLazyPage(
         <InvoiceWizard
-          key={`${invoiceWizardJob.id}-${invoiceWizardCO?.id ?? 'job'}-${invoiceWizardExisting?.id ?? 'new'}`}
+          key={`${invoiceWizardJob.id}-${invoiceWizardExisting?.id ?? 'new'}`}
           userId={user.id}
           job={invoiceWizardJob}
-          changeOrder={invoiceWizardCO}
           profile={profile}
           existingInvoice={invoiceWizardExisting}
           onCancel={invoiceFlow.handleInvoiceWizardCancel}
@@ -701,7 +669,6 @@ function App() {
             navigateTo('invoice-wizard', {
               jobId: invoiceFinalJob.id,
               invoiceId: invoiceFinalInvoice.id,
-              coId: invoiceFinalCoId,
             });
           }}
           onInvoiceUpdated={invoiceFlow.handleInvoiceUpdated}
@@ -719,9 +686,6 @@ function App() {
           userId={user.id}
           onOpenInvoice={(job, inv) =>
             invoiceFlow.handleOpenPendingInvoice(job, inv, 'invoices')
-          }
-          onOpenCoInvoice={(job, co, inv) =>
-            invoiceFlow.handleOpenPendingChangeOrderInvoice(job, co, inv, 'invoices')
           }
         />
       );
