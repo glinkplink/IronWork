@@ -353,6 +353,13 @@
   text-align: center;
 }
 
+.invoice-final-gate-link {
+  display: inline;
+  font-size: inherit;
+  line-height: inherit;
+  align-self: auto;
+}
+
 .invoice-final-actions {
   display: flex;
   flex-direction: column;

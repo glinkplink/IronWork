@@ -689,6 +689,9 @@ function App() {
             });
           }}
           onInvoiceUpdated={invoiceFlow.handleInvoiceUpdated}
+          onOpenChangeOrdersSection={() =>
+            handleOpenWorkOrderDetail(invoiceFinalJob.id, 'change-orders')
+          }
           onOpenStripeSetup={() => {
             profileScrollToStripeRef.current = true;
             navigateTo('profile');

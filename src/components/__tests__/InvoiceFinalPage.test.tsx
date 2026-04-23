@@ -177,6 +177,7 @@ describe('InvoiceFinalPage', () => {
   const onEditInvoice = vi.fn();
   const onInvoiceUpdated = vi.fn();
   const onOpenStripeSetup = vi.fn();
+  const onOpenChangeOrdersSection = vi.fn();
 
   function renderPage(
     invoice = baseInvoice(),
@@ -191,6 +192,7 @@ describe('InvoiceFinalPage', () => {
         onBack={onBack}
         onEditInvoice={onEditInvoice}
         onInvoiceUpdated={onInvoiceUpdated}
+        onOpenChangeOrdersSection={onOpenChangeOrdersSection}
         onOpenStripeSetup={onOpenStripeSetup}
       />
     );
@@ -389,6 +391,7 @@ describe('InvoiceFinalPage', () => {
         onBack={onBack}
         onEditInvoice={onEditInvoice}
         onInvoiceUpdated={onInvoiceUpdated}
+        onOpenChangeOrdersSection={onOpenChangeOrdersSection}
         onOpenStripeSetup={onOpenStripeSetup}
       />
     );

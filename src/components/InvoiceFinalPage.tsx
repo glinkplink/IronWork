@@ -24,6 +24,8 @@ interface InvoiceFinalPageProps {
   onBack: () => void;
   onEditInvoice: () => void;
   onInvoiceUpdated: (invoice: Invoice) => void;
+  /** Navigate to the WO detail page, scrolled to the Change Orders section. */
+  onOpenChangeOrdersSection: () => void;
   /** Navigate to Edit Profile (Stripe Connect lives there). */
   onOpenStripeSetup: () => void;
 }
@@ -56,6 +58,7 @@ export function InvoiceFinalPage({
   onBack,
   onEditInvoice,
   onInvoiceUpdated,
+  onOpenChangeOrdersSection,
   onOpenStripeSetup,
 }: InvoiceFinalPageProps) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -466,7 +469,13 @@ export function InvoiceFinalPage({
                 <p className="invoice-final-payment-primary-hint invoice-final-gate-hint">
                   {hasPendingCOs ? (
                     <>
-                      Resolve {pendingCOCount} pending change order{pendingCOCount === 1 ? '' : 's'}
+                      <button
+                        type="button"
+                        className="btn-text invoice-final-gate-link"
+                        onClick={onOpenChangeOrdersSection}
+                      >
+                        Resolve {pendingCOCount} pending change order{pendingCOCount === 1 ? '' : 's'}
+                      </button>
                       <br />(sign, mark signed offline, or delete).
                     </>
                   ) : (
@@ -683,7 +692,13 @@ export function InvoiceFinalPage({
             <p className="invoice-final-gate-hint invoice-final-gate-hint--actions">
               {hasPendingCOs ? (
                 <>
-                  Resolve {pendingCOCount} pending change order{pendingCOCount === 1 ? '' : 's'}
+                  <button
+                    type="button"
+                    className="btn-text invoice-final-gate-link"
+                    onClick={onOpenChangeOrdersSection}
+                  >
+                    Resolve {pendingCOCount} pending change order{pendingCOCount === 1 ? '' : 's'}
+                  </button>
                   <br />(sign, mark signed offline, or delete).
                 </>
               ) : (
