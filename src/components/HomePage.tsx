@@ -661,15 +661,15 @@ export function HomePage({
         </section>
 
         <footer className="home-landing-footer">
-          <p className="home-landing-tagline">Lock the scope. Own the change order. Get paid in full.</p>
+          <p className="home-landing-tagline">Send the invoice. Cash the check. Move on.</p>
           <nav className="home-landing-footer-nav" aria-label="Legal and contact">
-            <a className="home-landing-footer-link" href="mailto:hello@ironwork.app">
+            <a className="home-landing-footer-link" href="/contact.html">
               Contact
             </a>
-            <a className="home-landing-footer-link" href="#">
+            <a className="home-landing-footer-link" href="/terms.html">
               Terms
             </a>
-            <a className="home-landing-footer-link" href="#">
+            <a className="home-landing-footer-link" href="/privacy.html">
               Privacy
             </a>
           </nav>

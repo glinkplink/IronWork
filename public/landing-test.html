@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IronWork — landing copy test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --iron-900: #0d1014;
+    --iron-800: #141820;
+    --iron-750: #1a1f28;
+    --iron-700: #222832;
+    --iron-600: #2d343e;
+    --iron-500: #414a57;
+    --iron-400: #7d8794;
+    --iron-300: #a4acb7;
+    --iron-200: #cbd1d8;
+    --iron-100: #e3e7ec;
+    --iron-50:  #f4f6f9;
+    --spark:    #ff8c1a;
+    --spark-dim:#d1720e;
+    --green:    #4ade80;
+    --red:      #e05252;
+    --font-app: 'Outfit', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --font-head:'Chakra Petch', 'Outfit', sans-serif;
+    --maxw: 62rem;
+    --space-xs: 0.4rem;
+    --space-sm: 0.75rem;
+    --space-md: 1.25rem;
+    --space-lg: 2rem;
+    --space-xl: 3rem;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-app);
+    background:
+      radial-gradient(ellipse 75% 55% at 50% 0%, rgba(255, 140, 0, 0.08), transparent 58%),
+      var(--iron-900);
+    color: var(--iron-100);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .wrap {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: clamp(1rem, 4vh, 2.5rem) 1.25rem 3rem;
+  }
+
+  /* Top ribbon */
+  .ribbon {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(13, 16, 20, 0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--iron-700);
+    padding: 0.6rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+  }
+  .ribbon-brand {
+    font-family: var(--font-head);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--iron-50);
+  }
+  .ribbon-brand span { color: var(--spark); }
+  .ribbon-right { color: var(--iron-300); font-size: 0.78rem; }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.1rem;
+    padding: clamp(1.5rem, 6vh, 3.5rem) 0 clamp(1rem, 3vh, 2rem);
+  }
+  .hero h1 {
+    font-family: var(--font-head);
+    font-size: clamp(1.9rem, 5.5vw, 2.9rem);
+    margin: 0;
+    color: var(--iron-50);
+    line-height: 1.1;
+    max-width: 22ch;
+  }
+  .hero-sub {
+    color: var(--iron-200);
+    font-size: clamp(1rem, 1.8vw, 1.1rem);
+    margin: 0;
+    max-width: 38ch;
+  }
+  .hero-timing {
+    color: var(--iron-100);
+    font-weight: 600;
+    font-size: 0.98rem;
+    margin: 0;
+  }
+  .btn {
+    display: inline-block;
+    font-family: var(--font-app);
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 0.95rem 1.5rem;
+    border-radius: 0.55rem;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.08s ease, background 0.15s ease;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: var(--spark);
+    color: #1a0e00;
+    box-shadow: 0 6px 20px -6px rgba(255, 140, 26, 0.45);
+  }
+  .btn-primary:hover { background: #ffa04a; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--iron-100);
+    border: 1px solid var(--iron-600);
+  }
+  .btn-ghost:hover { border-color: var(--iron-400); }
+  .hero-trust {
+    color: var(--iron-400);
+    font-size: 0.82rem;
+    margin: 0;
+  }
+
+  /* Stats strip */
+  .stats {
+    margin: clamp(1rem, 3vh, 2rem) 0 clamp(1.5rem, 4vh, 3rem);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.9rem;
+  }
+  @media (max-width: 640px) {
+    .stats { grid-template-columns: 1fr; }
+  }
+  .stat {
+    background: var(--iron-800);
+    border: 1px solid var(--iron-700);
+    border-radius: 0.8rem;
+    padding: 1.1rem 1rem;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: var(--font-head);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--spark);
+    line-height: 1;
+  }
+  .stat-label {
+    color: var(--iron-200);
+    font-size: 0.92rem;
+    margin-top: 0.5rem;
+  }
+  .stat-source {
+    color: var(--iron-400);
+    font-size: 0.72rem;
+    margin-top: 0.4rem;
+    font-style: italic;
+  }
+
+  /* Section heading */
+  .section {
+    padding: clamp(1.5rem, 5vh, 3rem) 0;
+  }
+  .section-heading {
+    font-family: var(--font-head);
+    font-size: clamp(1.3rem, 3vw, 1.6rem);
+    text-align: center;
+    margin: 0 0 0.5rem;
+    color: var(--iron-50);
+  }
+  .section-sub {
+    text-align: center;
+    color: var(--iron-300);
+    max-width: 40ch;
+    margin: 0 auto 1.75rem;
+    font-size: 0.98rem;
+  }
+  .eyebrow {
+    display: block;
+    text-align: center;
+    font-family: var(--font-head);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spark);
+    margin-bottom: 0.6rem;
+  }
+
+  /* Journey rows */
+  .journey-rows { display: flex; flex-direction: column; gap: 1rem; }
+  .journey-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0.9rem;
+    align-items: stretch;
+  }
+  @media (max-width: 680px) {
+    .journey-row {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    .journey-step { order: -1; justify-self: start; }
+  }
+  .journey-card {
+    background: var(--iron-800);
+    border: 1px solid var(--iron-700);
+    border-radius: 0.7rem;
+    padding: 0.95rem 1rem;
+  }
+  .journey-card.problem { border-left: 3px solid var(--red); }
+  .journey-card.solution { border-left: 3px solid var(--green); }
+  .card-eyebrow {
+    font-family: var(--font-head);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .card-eyebrow.problem { color: var(--red); }
+  .card-eyebrow.solution { color: var(--green); }
+  .journey-card p { margin: 0.35rem 0 0; font-size: 0.95rem; color: var(--iron-100); }
+  .journey-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    min-width: 3.5rem;
+  }
+  .step-circle {
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    background: var(--iron-700);
+    border: 1px solid var(--iron-500);
+    color: var(--iron-50);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-head);
+    font-weight: 700;
+  }
+  .step-label {
+    font-family: var(--font-head);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--iron-300);
+  }
+
+  /* "What you get" placeholders */
+  .docs-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  @media (max-width: 640px) { .docs-grid { grid-template-columns: 1fr; } }
+  .doc-card {
+    background: #f4f1e8;
+    color: #222;
+    border-radius: 0.5rem;
+    padding: 1.1rem;
+    font-family: 'Barlow', Georgia, serif;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    min-height: 14rem;
+    box-shadow: 0 10px 30px -12px rgba(0,0,0,0.6);
+    position: relative;
+    overflow: hidden;
+  }
+  .doc-card h4 {
+    font-family: var(--font-head);
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem;
+    color: #1a1a1a;
+  }
+  .doc-card .sec-title {
+    font-weight: 700;
+    font-size: 0.75rem;
+    margin-top: 0.55rem;
+    color: #8a5a2e;
+  }
+  .doc-card .row { display: flex; justify-content: space-between; border-bottom: 1px dotted #b8ae93; padding: 0.18rem 0; }
+  .doc-hint {
+    margin-top: 0.6rem;
+    color: var(--iron-400);
+    font-size: 0.78rem;
+    text-align: center;
+  }
+
+  /* Steps (More than a quote) */
+  .steps-list {
+    counter-reset: stepnum;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .steps-list li {
+    background: var(--iron-800);
+    border: 1px solid var(--iron-700);
+    border-radius: 0.7rem;
+    padding: 1rem 1.1rem;
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    gap: 0.8rem;
+    align-items: start;
+  }
+  .step-num {
+    background: var(--spark);
+    color: #1a0e00;
+    font-family: var(--font-head);
+    font-weight: 700;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step-title { font-weight: 700; color: var(--iron-50); display: block; margin-bottom: 0.2rem; }
+  .step-detail { color: var(--iron-300); font-size: 0.93rem; }
+
+  /* FAQ */
+  .faq details {
+    background: var(--iron-800);
+    border: 1px solid var(--iron-700);
+    border-radius: 0.6rem;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.6rem;
+  }
+  .faq summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--iron-50);
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after {
+    content: '+';
+    color: var(--spark);
+    font-size: 1.3rem;
+    font-weight: 400;
+    transition: transform 0.15s ease;
+  }
+  .faq details[open] summary::after { content: '–'; }
+  .faq p { color: var(--iron-200); margin: 0.7rem 0 0; font-size: 0.95rem; }
+
+  /* Lead magnet */
+  .magnet {
+    background: linear-gradient(180deg, var(--iron-800), var(--iron-750));
+    border: 1px solid var(--iron-700);
+    border-radius: 0.9rem;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  .magnet h2 { font-family: var(--font-head); margin: 0 0 0.35rem; color: var(--iron-50); font-size: 1.25rem; }
+  .magnet p { color: var(--iron-300); margin: 0 0 1rem; font-size: 0.95rem; }
+  .magnet-form { display: flex; gap: 0.5rem; max-width: 28rem; margin: 0 auto; flex-wrap: wrap; justify-content: center; }
+  .magnet-form input {
+    flex: 1 1 15rem;
+    background: var(--iron-900);
+    border: 1px solid var(--iron-600);
+    color: var(--iron-50);
+    padding: 0.75rem 0.9rem;
+    border-radius: 0.5rem;
+    font-family: var(--font-app);
+    font-size: 0.95rem;
+  }
+  .magnet-form input:focus { outline: 2px solid var(--spark); outline-offset: 2px; }
+  .magnet-form button { flex: 0 0 auto; }
+
+  /* Closer */
+  .closer {
+    text-align: center;
+    padding: clamp(2rem, 6vh, 3.5rem) 0 1.5rem;
+    border-top: 1px solid var(--iron-700);
+    margin-top: 2rem;
+  }
+  .closer h2 {
+    font-family: var(--font-head);
+    font-size: clamp(1.3rem, 3vw, 1.6rem);
+    margin: 0 0 0.75rem;
+    color: var(--iron-50);
+    max-width: 26ch;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.2;
+  }
+  .closer-line {
+    color: var(--iron-300);
+    margin: 0 0 1.4rem;
+    font-size: 1rem;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--iron-400);
+    font-size: 0.82rem;
+    padding-top: 1.5rem;
+  }
+  footer .tag {
+    font-family: var(--font-head);
+    color: var(--iron-200);
+    margin: 0 0 0.5rem;
+    letter-spacing: 0.03em;
+  }
+
+  /* Annotation markers (review-only) */
+  .note-tag {
+    display: inline-block;
+    background: rgba(255,140,26,0.12);
+    color: var(--spark);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.3rem;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<div class="ribbon">
+  <div class="ribbon-brand">IRON<span>WORK</span></div>
+  <div class="ribbon-right">landing copy test · 2026-04-23</div>
+</div>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <h1>Pros don't work on a promise. Your job, your terms.</h1>
+    <p class="hero-sub">
+      Ironclad scope. Signed price. Paid on time.
+    </p>
+    <p class="hero-timing">Ready in 2 minutes.</p>
+    <button class="btn btn-primary" type="button">Create my first work order</button>
+    <p class="hero-trust">Free to try. No credit card. No install.</p>
+  </section>
+
+  <!-- STATS STRIP (NEW) -->
+  <section class="stats" aria-label="Why this exists">
+    <div class="stat">
+      <div class="stat-num">82%</div>
+      <div class="stat-label">of contractors wait over 30 days to get paid</div>
+      <div class="stat-source">Construction Payments Report, 2025</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">60%</div>
+      <div class="stat-label">of projects go over budget — scope changes are the top cause</div>
+      <div class="stat-source">Constrafor / PMI</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">1 in 2</div>
+      <div class="stat-label">independent contractors weren't paid on time last year</div>
+      <div class="stat-source">Freelance Statistics 2025</div>
+    </div>
+  </section>
+
+  <!-- JOURNEY (kept) -->
+  <section class="section">
+    <span class="eyebrow">The Journey</span>
+    <h2 class="section-heading">From messy jobsite to paid in full.</h2>
+    <p class="section-sub">Three steps. Same day. No more chasing.</p>
+
+    <div class="journey-rows">
+      <div class="journey-row">
+        <div class="journey-card problem">
+          <span class="card-eyebrow problem">On the Job</span>
+          <p>Clients add to the scope mid-job and expect it free.</p>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle">1</div>
+          <span class="step-label">Scope</span>
+        </div>
+        <div class="journey-card solution">
+          <span class="card-eyebrow solution">IronWork</span>
+          <p>Signed change order required before any extra work begins.</p>
+        </div>
+      </div>
+
+      <div class="journey-row">
+        <div class="journey-card problem">
+          <span class="card-eyebrow problem">After the Job</span>
+          <p>Client disputes what was supposed to be done.</p>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle">2</div>
+          <span class="step-label">Protect</span>
+        </div>
+        <div class="journey-card solution">
+          <span class="card-eyebrow solution">IronWork</span>
+          <p>Scope and exclusions locked in writing before you start.</p>
+        </div>
+      </div>
+
+      <div class="journey-row">
+        <div class="journey-card problem">
+          <span class="card-eyebrow problem">Chasing Payment</span>
+          <p>Invoice sits unpaid for weeks and you have no leverage.</p>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle">3</div>
+          <span class="step-label">Paid</span>
+        </div>
+        <div class="journey-card solution">
+          <span class="card-eyebrow solution">IronWork</span>
+          <p>Late fees and work-suspension rights written into every agreement.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT YOU GET (new heading) -->
+  <section class="section">
+    <h2 class="section-heading">Client approves. Your money's protected. No more bullshit.</h2>
+    <p class="section-sub">
+      Not a price in an email. Exclusions, enforceable late fees, and work-suspension rights baked into every agreement.
+      <span style="display: block; margin-top: 0.7rem; color: var(--spark); font-weight: 600;">Do the work, get paid on time — the way it should be.</span>
+    </p>
+
+    <div class="docs-grid">
+      <div>
+        <div class="doc-card">
+          <h4>Work Order Agreement</h4>
+          <div class="sec-title">1. Parties & Project</div>
+          <div class="row"><span>Service Provider</span><span>Mike's Custom Fabrications</span></div>
+          <div class="row"><span>Customer</span><span>John Smith</span></div>
+          <div class="row"><span>Job Site</span><span>123 Main St, Laurel, MD</span></div>
+          <div class="sec-title">3. Scope of Work</div>
+          <div>TIG weld repair on stainless 304 flange. Clean and re-pass with ER308L rod.</div>
+          <div class="sec-title">6. Pricing & Payment</div>
+          <div class="row"><span>Fixed Price</span><span>$2,500.00</span></div>
+          <div class="row"><span>Deposit</span><span>$250.00</span></div>
+          <div class="sec-title">8. Workmanship Warranty</div>
+          <div>30 days from completion. Covers weld defects. Does not cover misuse or corrosion.</div>
+        </div>
+        <p class="doc-hint">Work Order PDF — numbered sections, e-signed</p>
+      </div>
+      <div>
+        <div class="doc-card">
+          <h4>INVOICE</h4>
+          <div class="row"><span>Invoice date</span><span>April 21, 2026</span></div>
+          <div class="row"><span>Due date</span><span>May 5, 2026</span></div>
+          <div class="sec-title">Line items</div>
+          <div class="row"><span>TIG weld repair, 304 flange</span><span>$2,500.00</span></div>
+          <div class="sec-title">Totals</div>
+          <div class="row"><span>Subtotal</span><span>$2,500.00</span></div>
+          <div class="row"><span>Tax (6%)</span><span>$150.00</span></div>
+          <div class="row"><strong>Total</strong><strong>$2,650.00</strong></div>
+          <div class="sec-title">Payment</div>
+          <div>1.5%/month late fee after due date. Pay by card or ACH.</div>
+        </div>
+        <p class="doc-hint">Invoice PDF — Stripe payment link baked in</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- MORE THAN A QUOTE (kept) -->
+  <section class="section">
+    <h2 class="section-heading">Quotes don't get you paid.</h2>
+    <p class="section-sub">Other apps send a price. IronWork sends protection.</p>
+
+    <ol class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div>
+          <span class="step-title">Build a real agreement in 2 minutes.</span>
+          <span class="step-detail">Scope of work, exclusions, customer obligations, and payment terms — legal language that holds up when a client pushes back. Not just a price quote.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div>
+          <span class="step-title">Client signs before you touch a tool.</span>
+          <span class="step-detail">E-sign in seconds. Any scope change mid-job triggers a new change order — new signature required. No handshake agreements.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div>
+          <span class="step-title">Invoice the day you finish.</span>
+          <span class="step-detail">Pro PDF sent immediately with a Stripe payment link. Late-fee terms and work-suspension rights are already in the contract — no extras needed.</span>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- FAQ (NEW) -->
+  <section class="section faq">
+    <h2 class="section-heading">Questions you're about to ask.<span class="note-tag">new</span></h2>
+    <p class="section-sub">Here's the short version.</p>
+
+    <details>
+      <summary>Will this hold up in my state?</summary>
+      <p>Every agreement has the same clauses contractor attorneys use: scope, exclusions, customer obligations, warranty, limitation of liability, change orders, and dispute resolution. Nothing state-specific is enforced — you can edit anything before sending. If your state requires specific contractor-license language, you add it once to your profile defaults and it prints on every job.</p>
+    </details>
+    <details>
+      <summary>What if my client refuses to sign?</summary>
+      <p>Then they're not your client — you just found out before starting the work, not after. You can also mark the job as <em>offline signed</em> (paper signature on-site) and the system still tracks it. Either way, you have a dated document they saw and the work starts on your terms.</p>
+    </details>
+    <details>
+      <summary>How much does it cost?</summary>
+      <p>Free to try — create and download real work orders and invoices, no credit card. Paid plans kick in when you start sending for e-signature and Stripe payment links in volume. No per-job fees on the work order itself.</p>
+    </details>
+    <details>
+      <summary>Do I need a lawyer to customize it?</summary>
+      <p>No. Your exclusions, warranty terms, payment methods, and tax rules are saved to your business profile once and pre-fill every new agreement. Change a word on a specific job — the original template is untouched.</p>
+    </details>
+    <details>
+      <summary>What about change orders mid-job?</summary>
+      <p>Exactly what the app is built for. Generate a standalone change order with new scope, new price, new deposit — client e-signs it, and it prints on the final invoice and combined agreement PDF. No more "we talked about it" arguments.</p>
+    </details>
+    <details>
+      <summary>Does it work on my phone?</summary>
+      <p>Yes — mobile-first. Fill out the job from the truck, preview the PDF, send for signature. Installable on iOS and Android home screens if you want it feel like a native app.</p>
+    </details>
+  </section>
+
+  <!-- LEAD MAGNET (reframed email capture) -->
+  <section class="section">
+    <div class="magnet">
+      <h2>The contractor scope-creep checklist <span class="note-tag">reframed</span></h2>
+      <p>Five clauses that save you from the three most common client disputes. Free. One email a month. No sales pitch.</p>
+      <form class="magnet-form" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Thanks — check your email.';">
+        <input type="email" name="email" placeholder="you@example.com" required autocomplete="email" />
+        <button type="submit" class="btn btn-ghost">Send me the checklist</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- CLOSER (distinct CTA, no duplicate copy) -->
+  <section class="closer">
+    <h2>Built for contractors who are tired of getting burned.</h2>
+    <p class="closer-line">Your next job deserves a signed agreement, not a verbal yes.</p>
+    <button class="btn btn-primary" type="button">Start — it's free</button>
+  </section>
+
+  <footer>
+    <p class="tag">Send the invoice. Cash the check. Move on.</p>
+    <p>Contact · Terms · Privacy</p>
+  </footer>
+</div>
+
+</body>
+</html>
