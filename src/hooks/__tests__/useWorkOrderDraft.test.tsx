@@ -56,6 +56,7 @@ function baseProfile(over: Partial<BusinessProfile> = {}): BusinessProfile {
 describe('useWorkOrderDraft', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.scrollTo = vi.fn();
     getSession.mockResolvedValue({
       data: { session: { user: { id: 'u1' } } },
     });
@@ -177,6 +178,19 @@ describe('useWorkOrderDraft', () => {
 
     expect(onNewDraft).toHaveBeenCalledTimes(1);
     expect(navigateTo).toHaveBeenCalledWith('form');
+  });
+
+  it('scrolls to the top when creating a new draft', () => {
+    const navigateTo = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkOrderDraft(null, null, navigateTo, vi.fn())
+    );
+
+    act(() => {
+      result.current.actions.createNewAgreement();
+    });
+
+    expect(window.scrollTo).toHaveBeenCalledWith(0, 0);
   });
 
   it('does not reset draft when userId goes from null to signed-in', () => {

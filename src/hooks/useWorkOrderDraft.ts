@@ -64,6 +64,11 @@ function buildNewAgreementDraft(currentProfile: BusinessProfile | null): WelderJ
   };
 }
 
+function scrollWindowToTop() {
+  if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
+  window.scrollTo(0, 0);
+}
+
 export function useWorkOrderDraft(
   profile: BusinessProfile | null,
   userId: string | null,
@@ -123,6 +128,7 @@ export function useWorkOrderDraft(
         woIsOpen: true,
       }));
       navigateTo('form');
+      scrollWindowToTop();
     },
     [navigateTo, onNewDraft]
   );

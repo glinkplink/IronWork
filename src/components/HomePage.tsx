@@ -483,16 +483,34 @@ export function HomePage({
       <div className="home-page home-page--guest">
         <section className="home-hero">
           <h1 className="home-hero-lead">
-            Stop working on a handshake. Your job, your terms.
+            Pros don't work on a promise. Your job, your terms.
           </h1>
           <div className="home-hero-sub-block">
-            <p className="home-hero-sub">Binding work orders, signed change orders, and pro invoices for independent contractors.</p>
+            <p className="home-hero-sub">Ironclad scope. Signed price. Paid on time.</p>
             <p className="home-hero-sub home-hero-sub--timing">Ready in 2 minutes.</p>
           </div>
           <button type="button" className="btn-primary btn-large home-hero-cta" onClick={onCreateAgreement}>
-            Try it free
+            Create my first work order
           </button>
-          <p className="home-hero-trust">Free to try. No credit card required.</p>
+          <p className="home-hero-trust">Free to try. No credit card. No install.</p>
+        </section>
+
+        <section className="home-proof-stats" aria-label="Why this exists">
+          <div className="home-proof-stat">
+            <div className="home-proof-stat-num">82%</div>
+            <div className="home-proof-stat-label">of contractors wait over 30 days to get paid</div>
+            <div className="home-proof-stat-source">Construction Payments Report, 2025</div>
+          </div>
+          <div className="home-proof-stat">
+            <div className="home-proof-stat-num">60%</div>
+            <div className="home-proof-stat-label">of projects go over budget — scope changes are the top cause</div>
+            <div className="home-proof-stat-source">Constrafor / PMI</div>
+          </div>
+          <div className="home-proof-stat">
+            <div className="home-proof-stat-num">1 in 2</div>
+            <div className="home-proof-stat-label">independent contractors weren't paid on time last year</div>
+            <div className="home-proof-stat-source">Freelance Statistics 2025</div>
+          </div>
         </section>
 
         <section className="home-journey" aria-labelledby="home-journey-heading">
@@ -567,7 +585,13 @@ export function HomePage({
         </section>
 
         <section className="home-shots" aria-labelledby="home-shots-heading">
-          <h2 id="home-shots-heading" className="home-section-heading">What you get</h2>
+          <h2 id="home-shots-heading" className="home-section-heading home-shots-heading">
+            Client approves. Your money's protected. No more bullshit.
+          </h2>
+          <p className="home-shots-sub">
+            Not a price in an email. Scope exclusions, enforceable late fees, and work-suspension rights baked into every agreement.
+          </p>
+          <p className="home-shots-promise">Do the work, get paid on time — the way it should be.</p>
           <div className="home-shots-grid">
             <div className="home-shot-tile">
               <DocThumbnail
@@ -575,7 +599,7 @@ export function HomePage({
                 ariaLabel="Open full work order preview"
                 onClick={() => setLandingPreview('work-order')}
               />
-              <p className="home-shot-hint">Work Order PDF — tap to read full document</p>
+              <p className="home-shot-hint">Work Order PDF — numbered sections, e-signed</p>
             </div>
             <div className="home-shot-tile">
               <DocThumbnail
@@ -583,13 +607,13 @@ export function HomePage({
                 ariaLabel="Open full invoice preview"
                 onClick={() => setLandingPreview('invoice')}
               />
-              <p className="home-shot-hint">Invoice PDF — tap to read full document</p>
+              <p className="home-shot-hint">Invoice PDF — Stripe payment link baked in</p>
             </div>
           </div>
         </section>
 
         <section className="home-steps" aria-labelledby="home-steps-heading">
-          <h2 id="home-steps-heading" className="home-section-heading">More than a quote.</h2>
+          <h2 id="home-steps-heading" className="home-section-heading">Quotes don't get you paid.</h2>
           <p className="home-steps-sub">Other apps send a price. IronWork sends protection.</p>
           <ol className="home-steps-list">
             <li>
@@ -610,16 +634,64 @@ export function HomePage({
               <span className="home-step-num">3</span>
               <div className="home-step-body">
                 <span className="home-step-title">Invoice the day you finish.</span>
-                <span className="home-step-detail">Pro PDF sent immediately. Late-fee terms and work-suspension rights are already in the contract — no extras needed.</span>
+                <span className="home-step-detail">Pro PDF sent immediately with a Stripe payment link. Late-fee terms and work-suspension rights are already in the contract — no extras needed.</span>
               </div>
             </li>
           </ol>
         </section>
 
-        <section className="home-updates" aria-labelledby="home-updates-heading">
-          <h2 id="home-updates-heading" className="home-section-heading">
-            Not ready? Get updates
+        <section className="home-faq" aria-labelledby="home-faq-heading">
+          <h2 id="home-faq-heading" className="home-section-heading home-faq-heading">
+            Questions you're about to ask.
           </h2>
+
+          <div className="home-faq-list">
+            <details className="home-faq-item">
+              <summary>Will this hold up in my state?</summary>
+              <p>
+                Every agreement has the same clauses contractor attorneys use: scope, exclusions, customer obligations, warranty, limitation of liability, change orders, and dispute resolution. Nothing state-specific is enforced — you can edit anything before sending. If your state requires specific contractor-license language, you add it once to your profile defaults and it prints on every job.
+              </p>
+            </details>
+            <details className="home-faq-item">
+              <summary>What if my client refuses to sign?</summary>
+              <p>
+                Then they're not your client — you just found out before starting the work, not after. You can also mark the job as <em>offline signed</em> (paper signature on-site) and the system still tracks it. Either way, you have a dated document they saw and the work starts on your terms.
+              </p>
+            </details>
+            <details className="home-faq-item">
+              <summary>How much does it cost?</summary>
+              <p>
+                Free to try — create and download real work orders and invoices, no credit card. Paid plans kick in when you start sending for e-signature and Stripe payment links in volume. No per-job fees on the work order itself.
+              </p>
+            </details>
+            <details className="home-faq-item">
+              <summary>Do I need a lawyer to customize it?</summary>
+              <p>
+                No. Your exclusions, warranty terms, payment methods, and tax rules are saved to your business profile once and pre-fill every new agreement. Change a word on a specific job — the original template is untouched.
+              </p>
+            </details>
+            <details className="home-faq-item">
+              <summary>What about change orders mid-job?</summary>
+              <p>
+                Exactly what the app is built for. Generate a standalone change order with new scope, new price, new deposit — client e-signs it, and it prints on the final invoice and combined agreement PDF. No more "we talked about it" arguments.
+              </p>
+            </details>
+            <details className="home-faq-item">
+              <summary>Does it work on my phone?</summary>
+              <p>
+                Yes — mobile-first. Fill out the job from the truck, preview the PDF, send for signature. Installable on iOS and Android home screens if you want it to feel like a native app.
+              </p>
+            </details>
+          </div>
+        </section>
+
+        <section className="home-updates" aria-labelledby="home-updates-heading">
+          <h2 id="home-updates-heading" className="home-section-heading home-updates-heading">
+            The contractor scope-creep checklist
+          </h2>
+          <p className="home-updates-copy">
+            Five clauses that save you from the three most common client disputes. Free. One email a month. No sales pitch.
+          </p>
           <form className="home-updates-form" onSubmit={handleUpdatesSubmit}>
             <label className="home-updates-label" htmlFor="landing-updates-email">
               Email
@@ -637,7 +709,7 @@ export function HomePage({
                 disabled={updatesSubmitting}
               />
               <button type="submit" className="btn-secondary home-updates-submit" disabled={updatesSubmitting}>
-                {updatesSubmitting ? 'Sending…' : 'Get updates'}
+                {updatesSubmitting ? 'Sending…' : 'Send me the checklist'}
               </button>
             </div>
             {updatesFeedback ? (
@@ -655,8 +727,9 @@ export function HomePage({
 
         <section className="home-cta-footer">
           <h2 className="home-section-heading">Built for contractors who are tired of getting burned.</h2>
+          <p className="home-cta-footer-copy">Your next job deserves a signed agreement, not a handshake.</p>
           <button type="button" className="btn-primary btn-large home-hero-cta" onClick={onCreateAgreement}>
-            Try it now
+            Start — it's free
           </button>
         </section>
 

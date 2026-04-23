@@ -110,10 +110,18 @@ describe('HomePage', () => {
     render(<HomePage {...guestProps()} />);
 
     const heroHeading = screen.getByRole('heading', { level: 1 });
-    expect(heroHeading).toHaveTextContent(/Stop working on a handshake/i);
+    expect(heroHeading).toHaveTextContent(/Pros don't work on a promise/i);
     expect(heroHeading).toHaveTextContent(/your terms/i);
-    expect(screen.getByRole('button', { name: 'Try it free' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try it now' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create my first work order' })).toBeInTheDocument();
+    expect(screen.getByText(/82%/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Client approves/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Questions you're about to ask/i })).toBeInTheDocument();
+    expect(screen.getByText(/Will this hold up in my state/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send me the checklist' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "Start — it's free" })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute('href', '/contact.html');
+    expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms.html');
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy.html');
     expect(screen.queryByText(/Cover your ass/i)).not.toBeInTheDocument();
   });
 
@@ -137,7 +145,7 @@ describe('HomePage', () => {
     expect(screen.queryByText('Customer Alpha')).not.toBeInTheDocument();
     expect(screen.queryByText(/You have \d+ work order/)).not.toBeInTheDocument();
     const heroHeading = screen.getByRole('heading', { level: 1 });
-    expect(heroHeading).toHaveTextContent(/Stop working on a handshake/i);
+    expect(heroHeading).toHaveTextContent(/Pros don't work on a promise/i);
   });
 
   it('shows loading then dashboard when RPCs succeed', async () => {
