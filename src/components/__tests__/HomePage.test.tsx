@@ -305,7 +305,7 @@ describe('HomePage', () => {
     expect(onOpenWorkOrderDetail).toHaveBeenCalledWith('job-1');
   });
 
-  it('recent row shows invoice draft chip like work orders list', async () => {
+  it('recent row suppresses the invoice-draft chip (dashboard surfaces complete vs in-progress only)', async () => {
     const jobDraft: WorkOrderDashboardJob = {
       ...listJob,
       latestInvoice: {
@@ -328,28 +328,57 @@ describe('HomePage', () => {
     render(<HomePage {...signedInProps()} />);
 
     await waitFor(() => {
-      const draftChip = screen.getByText('Draft');
-      expect(draftChip).toHaveClass('iw-status-chip', 'iw-status-chip--draft');
+      expect(screen.getByText('Customer Alpha')).toBeInTheDocument();
     });
+    expect(screen.queryByText('Draft')).toBeNull();
+    expect(screen.queryByText('Invoice draft')).toBeNull();
+  });
+
+  it('paid invoice tints the dashboard card (100%-done visual anchor)', async () => {
+    const jobPaid: WorkOrderDashboardJob = {
+      ...listJob,
+      latestInvoice: {
+        id: 'inv-paid',
+        job_id: 'job-1',
+        issued_at: '2025-06-02T00:00:00Z',
+        invoice_number: 1,
+        created_at: '2025-06-02T00:00:00Z',
+        payment_status: 'paid',
+      },
+    };
+    listWorkOrdersDashboardPage.mockResolvedValue({
+      data: [jobPaid],
+      error: null,
+      hasMore: false,
+      nextCursor: null,
+    });
+    getWorkOrdersDashboardSummary.mockResolvedValue({ data: summaryOk, error: null });
+
+    render(<HomePage {...signedInProps()} />);
+
+    const card = await screen.findByRole('button', { name: /Open work order WO #0001/i });
+    expect(card).toHaveClass('home-dash-card--paid');
+    // Chip inside the card reads "Paid"
+    expect(within(card.parentElement as HTMLElement).getByText('Paid')).toBeInTheDocument();
   });
 
   it('invoice chip calls onOpenInvoiceFromDashboard without opening WO', async () => {
     const user = userEvent.setup();
     const onOpenWorkOrderDetail = vi.fn();
     const onOpenInvoiceFromDashboard = vi.fn();
-    const jobDraft: WorkOrderDashboardJob = {
+    const jobPaid: WorkOrderDashboardJob = {
       ...listJob,
       latestInvoice: {
-        id: 'inv-draft',
+        id: 'inv-paid',
         job_id: 'job-1',
-        issued_at: null,
+        issued_at: '2025-06-02T00:00:00Z',
         invoice_number: 1,
         created_at: '2025-06-02T00:00:00Z',
-        payment_status: 'unpaid',
+        payment_status: 'paid',
       },
     };
     listWorkOrdersDashboardPage.mockResolvedValue({
-      data: [jobDraft],
+      data: [jobPaid],
       error: null,
       hasMore: false,
       nextCursor: null,
@@ -364,14 +393,11 @@ describe('HomePage', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Draft')).toBeInTheDocument();
-    });
-
+    await screen.findByRole('button', { name: /Open invoice for WO #0001/i });
     await user.click(screen.getByRole('button', { name: /Open invoice for WO #0001/i }));
 
     expect(onOpenInvoiceFromDashboard).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'job-1', latestInvoice: expect.objectContaining({ id: 'inv-draft' }) })
+      expect.objectContaining({ id: 'job-1', latestInvoice: expect.objectContaining({ id: 'inv-paid' }) })
     );
     expect(onOpenWorkOrderDetail).not.toHaveBeenCalled();
   });

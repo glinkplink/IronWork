@@ -42,11 +42,7 @@ import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-i
 import '../lib/change-order-document.css';
 import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { computeCOTotal, listChangeOrders } from '../lib/db/change-orders';
-import {
-  getBlocksNewChangeOrdersForJob,
-  listInvoiceStatusByJob,
-} from '../lib/db/invoices';
-import type { WorkOrderInvoiceStatus } from '../lib/db/invoices';
+import { getBlocksNewChangeOrdersForJob } from '../lib/db/invoices';
 import { getChangeOrderSignatureState } from '../lib/change-order-signature';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
@@ -148,10 +144,6 @@ export function WorkOrderDetailPage({
   const [coNewCoBlockError, setCoNewCoBlockError] = useState<string | null>(null);
   const [coNewCoBlockedByInvoice, setCoNewCoBlockedByInvoice] = useState(false);
 
-  // Job-level invoice status
-  const [jobInvoiceStatus, setJobInvoiceStatus] = useState<WorkOrderInvoiceStatus | null>(null);
-  const [jobInvoiceLoading, setJobInvoiceLoading] = useState(true);
-  const [jobInvoiceError, setJobInvoiceError] = useState<string | null>(null);
   const [woPreviewModalOpen, setWoPreviewModalOpen] = useState(false);
 
   useEffect(() => {
@@ -310,32 +302,6 @@ export function WorkOrderDetailPage({
       cancelled = true;
     };
   }, [job, userId, changeOrderListVersion]);
-
-  // Load job-level invoice status
-  useEffect(() => {
-    if (!job) return;
-    let cancelled = false;
-    setJobInvoiceLoading(true);
-    setJobInvoiceError(null);
-    setJobInvoiceStatus(null);
-
-    void (async () => {
-      const result = await listInvoiceStatusByJob(userId);
-      if (cancelled) return;
-      setJobInvoiceLoading(false);
-      if (result.error) {
-        setJobInvoiceError(`Could not load invoice status (${result.error.message}).`);
-      } else if (result.data) {
-        // Find invoice for this job
-        const jobInv = result.data.find(inv => inv.job_id === job.id);
-        setJobInvoiceStatus(jobInv || null);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [job, userId]);
 
   const createChangeOrderDisabled =
     downloading || coNewCoBlockLoading || coNewCoBlockError !== null || coNewCoBlockedByInvoice;
@@ -629,28 +595,6 @@ export function WorkOrderDetailPage({
         <h1 className="invoice-final-heading">{customerTitle}</h1>
         <p className="invoice-final-heading-sub">{woLabel}</p>
       </hgroup>
-
-      {/* Job-level invoice status */}
-      {jobInvoiceStatus ? (
-        <div className="wo-invoice-status wo-detail-invoice-strip">
-          <span className="wo-invoice-number">
-            Invoice #{String(jobInvoiceStatus.invoice_number).padStart(4, '0')}
-          </span>
-          {jobInvoiceStatus.payment_status === 'paid' ? (
-            <span className="iw-status-chip iw-status-chip--paid">Paid</span>
-          ) : jobInvoiceStatus.payment_status === 'offline' ? (
-            <span className="iw-status-chip iw-status-chip--offline">Paid offline</span>
-          ) : jobInvoiceStatus.issued_at ? (
-            <span className="iw-status-chip iw-status-chip--outstanding">Invoiced</span>
-          ) : (
-            <span className="iw-status-chip iw-status-chip--draft">Draft</span>
-          )}
-        </div>
-      ) : jobInvoiceLoading ? (
-        <div className="wo-invoice-status wo-invoice-status-loading">Loading invoice...</div>
-      ) : jobInvoiceError ? (
-        <div className="wo-invoice-status wo-invoice-status-error">{jobInvoiceError}</div>
-      ) : null}
 
       {pdfError ? (
         <div className="error-banner" role="alert">

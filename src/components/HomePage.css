@@ -1076,6 +1076,7 @@
 }
 
 .home-dash-card {
+  position: relative;
   width: 100%;
   text-align: left;
   background: var(--iron-750);
@@ -1088,6 +1089,27 @@
   transition:
     border-color 0.15s ease,
     transform 0.12s ease;
+}
+
+/* Tint + left accent stripe for WOs whose invoice is fully paid (Stripe or offline).
+   Makes "100% done" jobs scannable at a glance. */
+.home-dash-card--paid {
+  background:
+    linear-gradient(180deg, rgba(46, 153, 104, 0.1), rgba(46, 153, 104, 0.04));
+  border-color: rgba(46, 153, 104, 0.35);
+}
+
+.home-dash-card--paid::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
+  border-top-left-radius: var(--shell-radius-sm);
+  border-bottom-left-radius: var(--shell-radius-sm);
+  background: var(--iw-status-paid-border);
+  pointer-events: none;
 }
 
 .home-dash-card:active {

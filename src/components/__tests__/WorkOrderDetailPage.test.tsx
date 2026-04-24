@@ -27,7 +27,6 @@ const mockFns = vi.hoisted(() => {
   const resendWorkOrderSignature = vi.fn();
   const pollWorkOrderEsignStatus = vi.fn();
   const coBlockState = { blocks: false, error: null as Error | null };
-  const jobInvoiceState = { data: null as { job_id: string; payment_status: 'unpaid' | 'paid' | 'offline'; invoice_number: number; issued_at: string | null }[] | null, error: null as Error | null };
   const getBlocksNewChangeOrdersForJob: ReturnType<typeof vi.fn<(userId: string, jobId: string) => Promise<{ blocks: boolean; error: Error | null }>>> = vi.fn(async () => ({
     blocks: coBlockState.blocks,
     error: coBlockState.error,
@@ -35,12 +34,6 @@ const mockFns = vi.hoisted(() => {
   return {
     listChangeOrders,
     listInvoiceStatusByChangeOrder,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    listInvoiceStatusByJob: vi.fn(async (_userId: string) => ({
-      data: jobInvoiceState.data,
-      error: jobInvoiceState.error,
-      warning: null,
-    })),
     getJobById,
     updateJob,
     sendWorkOrderForSignature,
@@ -50,10 +43,6 @@ const mockFns = vi.hoisted(() => {
     setCoBlockResult(next: { blocks: boolean; error: Error | null }) {
       coBlockState.blocks = next.blocks;
       coBlockState.error = next.error;
-    },
-    setJobInvoiceResult(next: { data: { job_id: string; payment_status: 'unpaid' | 'paid' | 'offline'; invoice_number: number; issued_at: string | null }[] | null; error: Error | null }) {
-      jobInvoiceState.data = next.data;
-      jobInvoiceState.error = next.error;
     },
   };
 });
@@ -71,7 +60,6 @@ vi.mock('../../lib/db/invoices', async (importOriginal) => {
   return {
     ...actual,
     listInvoiceStatusByChangeOrder: (jobId: string) => mockFns.listInvoiceStatusByChangeOrder(jobId),
-    listInvoiceStatusByJob: (userId: string) => mockFns.listInvoiceStatusByJob(userId),
     getBlocksNewChangeOrdersForJob: (userId: string, jobId: string) => mockFns.getBlocksNewChangeOrdersForJob(userId, jobId),
   };
 });
@@ -318,13 +306,9 @@ describe('WorkOrderDetailPage', () => {
     };
     mockFns.pollWorkOrderEsignStatus.mockResolvedValue(defaultPoll);
     mockFns.setCoBlockResult({ blocks: false, error: null });
-    mockFns.setJobInvoiceResult({ data: null, error: null });
   });
 
-  it('shows change-order rows without standalone invoice controls and job-level invoice status when present', async () => {
-    // Set up job invoice status to null (no invoice yet)
-    mockFns.setJobInvoiceResult({ data: null, error: null });
-
+  it('shows change-order rows without standalone invoice controls', async () => {
     render(
       <WorkOrderDetailPage
         userId="u1"
@@ -341,7 +325,7 @@ describe('WorkOrderDetailPage', () => {
     await screen.findByText('CO #0001');
     expect(screen.queryByRole('button', { name: /^Invoice$/i })).toBeNull();
 
-    // No invoice number shown when no job invoice exists
+    // WO detail page no longer surfaces invoice status — that lives on the Invoices page.
     expect(screen.queryByText(/^Invoice #/i)).toBeNull();
 
     const coList = document.querySelector('ul.work-orders-list');
@@ -371,44 +355,7 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByRole('dialog', { name: /work order preview/i })).toBeInTheDocument();
   });
 
-  it('shows paid badge when job invoice has payment_status=paid', async () => {
-    // Set up a paid invoice for this job
-    mockFns.setJobInvoiceResult({
-      data: [
-        {
-          job_id: 'job-1',
-          payment_status: 'paid',
-          invoice_number: 1,
-          issued_at: '2024-01-15T00:00:00Z',
-        },
-      ],
-      error: null,
-    });
-
-    render(
-      <WorkOrderDetailPage
-        userId="u1"
-        jobId="job-1"
-        job={minimalJob()}
-        profile={minimalProfile()}
-        onBack={() => {}}
-        onStartChangeOrder={() => {}}
-        onStartChangeOrderInvoice={() => {}}
-        onOpenCODetail={() => {}}
-      />
-    );
-
-    // Wait for loading to complete
-    await waitFor(() => {
-      expect(screen.queryByText('Loading invoice...')).toBeNull();
-    });
-
-    // Paid badge should be visible
-    expect(screen.getByText('Paid')).toBeTruthy();
-    expect(screen.getByText('Invoice #0001')).toBeTruthy();
-  });
-
-  it('renders change-order rows with date, amount, description, and shared e-sign strip order', async () => {
+it('renders change-order rows with date, amount, description, and shared e-sign strip order', async () => {
     mockFns.listChangeOrders.mockResolvedValue([
       {
         ...makeCO(1, 'Opened change order'),

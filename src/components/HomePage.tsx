@@ -367,7 +367,6 @@ function DocThumbnail({ htmlMarkup, onClick, ariaLabel }: { htmlMarkup: string; 
 const HOME_RECENT_INVOICE_CHIP_LABELS = new Set([
   'Paid',
   'Paid offline',
-  'Invoice draft',
   'Invoiced',
 ]);
 
@@ -873,6 +872,7 @@ export function HomePage({
                     HOME_RECENT_INVOICE_CHIP_LABELS.has(statusLabel)
                 );
 
+                const isPaidCard = statusLabel === 'Paid' || statusLabel === 'Paid offline';
                 let statusNode: ReactNode = null;
                 if (statusLabel === 'Paid offline') {
                   statusNode = wrapHomeRecentInvoiceChip(
@@ -888,13 +888,6 @@ export function HomePage({
                     openInvoice,
                     onOpenInvoiceFromDashboard
                   );
-                } else if (statusLabel === 'Invoice draft') {
-                  statusNode = wrapHomeRecentInvoiceChip(
-                    job,
-                    <span className="iw-status-chip iw-status-chip--draft">Draft</span>,
-                    openInvoice,
-                    onOpenInvoiceFromDashboard
-                  );
                 } else if (statusLabel === 'Invoiced') {
                   statusNode = wrapHomeRecentInvoiceChip(
                     job,
@@ -902,7 +895,10 @@ export function HomePage({
                     openInvoice,
                     onOpenInvoiceFromDashboard
                   );
-                } else if (statusLabel) {
+                } else if (statusLabel && statusLabel !== 'Invoice draft') {
+                  // Non-invoice statuses (e.g. WO-level states) fall back to plain text.
+                  // "Invoice draft" is intentionally suppressed on the dashboard: users
+                  // scan here for completed vs in-progress jobs, not pre-issue invoice state.
                   statusNode = <span className="home-dash-card-status">{statusLabel}</span>;
                 }
 
@@ -911,7 +907,7 @@ export function HomePage({
                     <div
                       role="button"
                       tabIndex={0}
-                      className="home-dash-card"
+                      className={`home-dash-card${isPaidCard ? ' home-dash-card--paid' : ''}`}
                       aria-label={`Open work order ${formatWorkOrderDashboardWoLabel(job)}`}
                       onClick={() => onOpenWorkOrderDetail(job.id)}
                       onKeyDown={(e) => {

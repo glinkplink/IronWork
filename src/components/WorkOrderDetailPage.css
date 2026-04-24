@@ -32,40 +32,6 @@
   color: var(--iron-300);
 }
 
-.wo-invoice-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  margin: 0 0 var(--space-lg);
-  padding: var(--space-sm) var(--space-md);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--shell-radius-md);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
-}
-
-.wo-invoice-status-loading,
-.wo-invoice-status-error {
-  font-size: 0.875rem;
-  color: var(--iron-300);
-}
-
-.wo-invoice-status-error {
-  color: #ff9d8e;
-}
-
-.wo-invoice-number {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--iron-100);
-  letter-spacing: 0.02em;
-}
-
-.wo-detail-invoice-strip {
-  border-bottom: none;
-}
-
 .wo-esign-card {
   margin: 0 0 var(--space-lg);
   padding: clamp(1rem, 2.5vw, 1.35rem);
