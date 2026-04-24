@@ -519,7 +519,7 @@ export function HomePage({
           <button type="button" className="btn-primary btn-large home-hero-cta" onClick={onCreateAgreement}>
             Create my first work order
           </button>
-          <p className="home-hero-trust">Free to try. No credit card. No install.</p>
+          <p className="home-hero-trust">Free while we&apos;re in beta. No credit card, no commitment.</p>
         </section>
 
         <section className="home-proof-stats" aria-label="Why this exists">
