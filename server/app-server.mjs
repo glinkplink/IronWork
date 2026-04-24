@@ -176,21 +176,31 @@ async function handlePdfRequest(res, body) {
       typeof filename === 'string' ? filename : 'work-order.pdf'
     );
 
+    // Puppeteer v24 returns a Uint8Array from page.pdf(). Coerce to Buffer so Node
+    // serializes it deterministically and omit Content-Length so Node picks the
+    // right framing (avoids header/body length mismatches on some stream paths).
+    const pdfBuffer = Buffer.isBuffer(pdf) ? pdf : Buffer.from(pdf);
+
     res.writeHead(200, {
       ...COMMON_HEADERS,
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${safeName}"`,
-      'Content-Length': pdf.length,
     });
-    res.end(pdf);
+    res.end(pdfBuffer);
     return true;
   } catch (error) {
     log.error('PDF generation failed', log.errCtx(error));
-    sendText(res, 500, 'Could not generate PDF.');
+    if (!res.headersSent) {
+      sendText(res, 500, 'Could not generate PDF.');
+    }
     return true;
   } finally {
     if (page) {
-      await page.close();
+      try {
+        await page.close();
+      } catch (e) {
+        log.error('pdf page.close threw', log.errCtx(e));
+      }
     }
   }
 }

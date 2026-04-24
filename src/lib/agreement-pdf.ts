@@ -51,6 +51,17 @@ export function buildPdfHtml(previewMarkup: string): string {
         background: #ffffff;
       }
 
+      /* App.css paints a full-viewport grain texture via body::before. With
+         printBackground:true under screen media, Chrome rasterizes it into
+         every PDF page — a large per-page SVG texture that inflated output
+         to ~5 MB/page. Kill it for PDF rendering. */
+      body::before,
+      body::after {
+        display: none !important;
+        content: none !important;
+        background: none !important;
+      }
+
       body {
         font-family: 'Barlow', 'DIN 2014', 'Bahnschrift', 'D-DIN', system-ui, sans-serif;
         letter-spacing: normal;
