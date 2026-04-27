@@ -18,8 +18,21 @@
   margin-bottom: var(--space-lg);
 }
 
-.job-form .form-row {
-  align-items: flex-start;
+.job-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 3rem;
+  padding: 0 1rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Fix for mobile browsers stretching select elements */
+@media (max-width: 768px) {
+  .job-form select {
+    height: 3rem !important;
+    min-height: 3rem !important;
+  }
 }
 
 .job-form .help-text,
