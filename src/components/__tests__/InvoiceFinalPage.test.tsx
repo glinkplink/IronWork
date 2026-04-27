@@ -318,12 +318,14 @@ describe('InvoiceFinalPage', () => {
 
   it('updates active invoice after marking paid offline', async () => {
     const user = userEvent.setup();
+    const issued = baseInvoice({ id: 'inv-1', issued_at: '2025-01-05T10:00:00Z' });
     const updated = baseInvoice({
       id: 'inv-1',
       issued_at: '2025-01-05T10:00:00Z',
       payment_status: 'offline',
       paid_at: '2025-01-10T12:00:00Z',
     });
+    getInvoice.mockResolvedValue(issued);
     fetchWithSupabaseAuthMock.mockResolvedValueOnce(
       new Response(JSON.stringify({ invoice: updated }), {
         status: 200,
@@ -331,9 +333,9 @@ describe('InvoiceFinalPage', () => {
       })
     );
 
-    renderPage(baseInvoice({ id: 'inv-1', issued_at: '2025-01-05T10:00:00Z' }));
+    renderPage(issued);
 
-    await user.click(screen.getByRole('button', { name: /mark as paid \(offline\)/i }));
+    await user.click(screen.getAllByRole('button', { name: /mark as paid \(offline\)/i })[0]);
 
     await waitFor(() => {
       expect(fetchWithSupabaseAuthMock).toHaveBeenCalledWith(
@@ -346,12 +348,19 @@ describe('InvoiceFinalPage', () => {
 
   it('allows undo only for offline-paid invoices in the UI', async () => {
     const user = userEvent.setup();
+    const offlinePaid = baseInvoice({
+      id: 'inv-1',
+      issued_at: '2025-01-05T10:00:00Z',
+      payment_status: 'offline',
+      paid_at: '2025-01-10T12:00:00Z',
+    });
     const updated = baseInvoice({
       id: 'inv-1',
       issued_at: '2025-01-05T10:00:00Z',
       payment_status: 'unpaid',
       paid_at: null,
     });
+    getInvoice.mockResolvedValue(offlinePaid);
     fetchWithSupabaseAuthMock.mockResolvedValueOnce(
       new Response(JSON.stringify({ invoice: updated }), {
         status: 200,
@@ -359,14 +368,7 @@ describe('InvoiceFinalPage', () => {
       })
     );
 
-    const { rerender } = renderPage(
-      baseInvoice({
-        id: 'inv-1',
-        issued_at: '2025-01-05T10:00:00Z',
-        payment_status: 'offline',
-        paid_at: '2025-01-10T12:00:00Z',
-      })
-    );
+    const { rerender } = renderPage(offlinePaid);
 
     await user.click(screen.getByRole('button', { name: /undo offline paid/i }));
 
@@ -375,7 +377,7 @@ describe('InvoiceFinalPage', () => {
         '/api/invoices/inv-1/unmark-paid-offline',
         { method: 'POST' }
       );
-      expect(onInvoiceUpdated).toHaveBeenCalledWith(updated);
+      expect(onInvoiceUpdated).toHaveBeenLastCalledWith(updated);
     });
 
     rerender(
