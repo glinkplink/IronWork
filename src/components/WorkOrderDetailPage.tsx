@@ -8,7 +8,6 @@ import { generateAgreement } from '../lib/agreement-generator';
 import { jobRowToWelderJob } from '../lib/job-to-welder-job';
 import {
   downloadAgreementPdfBlob,
-  fetchAgreementPdfBlob,
   fetchHtmlPdfBlob,
   getPdfFilename,
   getPdfFooterBusinessName,
@@ -40,7 +39,6 @@ import { agreementSectionsToHtml } from '../lib/agreement-sections-html';
 import { buildCombinedWorkOrderAndChangeOrdersHtml } from '../lib/change-order-generator';
 import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-image';
 import '../lib/change-order-document.css';
-import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { computeCOTotal, listChangeOrders } from '../lib/db/change-orders';
 import { getBlocksNewChangeOrdersForJob } from '../lib/db/invoices';
 import { getChangeOrderSignatureState } from '../lib/change-order-signature';
@@ -116,7 +114,6 @@ export function WorkOrderDetailPage({
   onStartChangeOrder,
   onOpenCODetail,
 }: WorkOrderDetailPageProps) {
-  const documentRef = useRef<HTMLDivElement | null>(null);
   const changeOrdersSectionRef = useRef<HTMLElement | null>(null);
   const copySigningLinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialScrollHandledRef = useRef(false);
@@ -308,13 +305,20 @@ export function WorkOrderDetailPage({
 
   const handleDownloadPdf = async () => {
     setPdfError('');
-    if (!welderJob || !documentRef.current) {
+    if (!welderJob || !woPreviewHtml) {
       setPdfError('Document is not ready. Try again.');
       return;
     }
     setDownloading(true);
     try {
-      const blob = await fetchAgreementPdfBlob(welderJob, profile, documentRef.current);
+      const blob = await fetchHtmlPdfBlob({
+        filename: getPdfFilename(welderJob.wo_number, welderJob.customer_name),
+        innerMarkup: woPreviewHtml,
+        headerLeft: getWorkOrderHeaderLabel(welderJob),
+        headerRight: '',
+        providerName: footerMeta.providerName,
+        providerPhone: footerMeta.providerPhone,
+      });
       downloadAgreementPdfBlob(blob, welderJob);
     } catch (e) {
       setPdfError(e instanceof Error ? e.message : 'PDF download failed.');
@@ -794,9 +798,7 @@ export function WorkOrderDetailPage({
                   willChange: woPreviewScale !== 1 ? 'transform' : undefined,
                 }}
               >
-                <div ref={documentRef} className="agreement-document work-order-detail-document">
-                  <AgreementDocumentSections sections={sections} />
-                </div>
+                <div dangerouslySetInnerHTML={{ __html: woPreviewHtml }} />
               </div>
             </div>
           </div>

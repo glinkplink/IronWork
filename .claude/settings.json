@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/billy/Documents/MVPs/scope-lock diff HEAD src/components/WorkOrdersPage.tsx)",
+      "Bash(git -C /home/billy/Documents/MVPs/scope-lock stash list)",
+      "Bash(git -C /home/billy/Documents/MVPs/scope-lock show HEAD:src/components/WorkOrdersPage.tsx)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
