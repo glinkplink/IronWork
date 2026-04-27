@@ -686,6 +686,23 @@ export function InvoiceFinalPage({
           >
             {downloading ? 'Downloading…' : 'Download Invoice'}
           </button>
+          
+          {!isPaid && (
+            <div className="invoice-final-offline-payment-trigger">
+              {markPaidError ? (
+                <p className="invoice-final-payment-feedback">{markPaidError}</p>
+              ) : null}
+              <button
+                type="button"
+                className="btn-secondary invoice-final-mark-paid-btn"
+                disabled={markingPaid}
+                onClick={() => void handleMarkPaidOffline()}
+              >
+                {markingPaid ? 'Saving...' : 'Mark as paid (offline)'}
+              </button>
+            </div>
+          )}
+
           {!canIssueInvoice && (
             <p className="invoice-final-gate-hint invoice-final-gate-hint--actions">
               {hasPendingCOs ? (

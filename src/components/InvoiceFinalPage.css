@@ -328,8 +328,28 @@
 .invoice-final-actions {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-md);
   margin-top: var(--space-lg);
+}
+
+.invoice-final-download-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.invoice-final-offline-payment-trigger {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.invoice-final-payment-feedback {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #ffb1c0;
 }
 
 .invoice-final-download-slot {
