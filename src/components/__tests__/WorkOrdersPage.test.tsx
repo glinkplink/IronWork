@@ -170,6 +170,7 @@ function renderPage(profile: BusinessProfile | null = null) {
       onCreateWorkOrder={onCreateWorkOrder}
       onCompleteProfileClick={() => {}}
       onOpenWorkOrderDetail={onOpenWorkOrderDetail}
+      onStartInvoice={() => {}}
     />
   );
   return {
@@ -466,6 +467,7 @@ describe('WorkOrdersPage', () => {
         onCreateWorkOrder={() => {}}
         onCompleteProfileClick={() => {}}
         onOpenWorkOrderDetail={() => {}}
+        onStartInvoice={() => {}}
       />
     );
 
@@ -696,6 +698,7 @@ describe('WorkOrdersPage', () => {
         onCreateWorkOrder={() => {}}
         onCompleteProfileClick={onCompleteProfileClick}
         onOpenWorkOrderDetail={() => {}}
+        onStartInvoice={() => {}}
       />
     );
 
@@ -721,6 +724,7 @@ describe('WorkOrdersPage', () => {
         onCreateWorkOrder={() => {}}
         onCompleteProfileClick={() => {}}
         onOpenWorkOrderDetail={() => {}}
+        onStartInvoice={() => {}}
       />
     );
 
@@ -739,6 +743,7 @@ describe('WorkOrdersPage', () => {
         onCreateWorkOrder={() => {}}
         onCompleteProfileClick={() => {}}
         onOpenWorkOrderDetail={() => {}}
+        onStartInvoice={() => {}}
       />
     );
 
@@ -758,6 +763,7 @@ describe('WorkOrdersPage', () => {
         onCreateWorkOrder={() => {}}
         onCompleteProfileClick={() => {}}
         onOpenWorkOrderDetail={() => {}}
+        onStartInvoice={() => {}}
       />
     );
 
