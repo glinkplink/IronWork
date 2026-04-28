@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import type {
   BusinessProfile,
   ChangeOrder,
+  Client,
   Job,
 } from '../types/db';
 import { generateAgreement } from '../lib/agreement-generator';
@@ -32,6 +33,7 @@ import {
   downloadSignedDocumentFile,
 } from '../lib/esign-api';
 import { getJobById, updateJob } from '../lib/db/jobs';
+import { getClientById } from '../lib/db/clients';
 import { formatEsignTimestamp } from '../lib/esign-live';
 import { getEsignProgressModel } from '../lib/esign-progress';
 import { getWorkOrderSignatureState } from '../lib/work-order-signature';
@@ -44,6 +46,7 @@ import { getBlocksNewChangeOrdersForJob } from '../lib/db/invoices';
 import { getChangeOrderSignatureState } from '../lib/change-order-signature';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { StaleContactBanner } from './StaleContactBanner';
 import './WorkOrderDetailPage.css';
 
 const ROW_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
@@ -96,6 +99,7 @@ interface WorkOrderDetailPageProps {
   onJobLoaded?: (job: Job) => void;
   onJobUpdated?: (job: Job) => void;
   onBack: () => void;
+  onEditClient?: () => void;
   onStartChangeOrder: () => void;
   onStartChangeOrderInvoice?: () => void;
   onOpenCODetail: (co: ChangeOrder) => void;
@@ -111,6 +115,7 @@ export function WorkOrderDetailPage({
   onJobLoaded,
   onJobUpdated,
   onBack,
+  onEditClient = () => {},
   onStartChangeOrder,
   onOpenCODetail,
 }: WorkOrderDetailPageProps) {
@@ -134,6 +139,7 @@ export function WorkOrderDetailPage({
   const [hydratedJob, setHydratedJob] = useState<Job | null>(initialJob);
   const [jobLoading, setJobLoading] = useState(() => initialJob === null);
   const [jobLoadError, setJobLoadError] = useState('');
+  const [linkedClient, setLinkedClient] = useState<Client | null>(null);
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([]);
   const [coLoading, setCoLoading] = useState(true);
   const [coError, setCoError] = useState('');
@@ -182,6 +188,30 @@ export function WorkOrderDetailPage({
   }, [initialJob, jobId, onJobLoaded]);
 
   const job = hydratedJob ?? (initialJob && initialJob.id === jobId ? initialJob : null);
+
+  useEffect(() => {
+    const clientId = job?.client_id;
+    if (!clientId) {
+      setLinkedClient(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const c = await getClientById(clientId);
+      if (!cancelled) setLinkedClient(c);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [job?.client_id]);
+
+  const handleJobBackfilled = useCallback(
+    (updated: Job) => {
+      setHydratedJob(updated);
+      onJobUpdatedRef.current?.(updated);
+    },
+    []
+  );
 
   const welderJob = useMemo(
     () => (job ? jobRowToWelderJob(job, profile) : null),
@@ -614,6 +644,15 @@ export function WorkOrderDetailPage({
         <div className="error-banner" role="alert">
           {saveError}
         </div>
+      ) : null}
+
+      {job ? (
+        <StaleContactBanner
+          job={job}
+          client={linkedClient}
+          onJobBackfilled={handleJobBackfilled}
+          onEditClient={onEditClient}
+        />
       ) : null}
 
       <section className="wo-esign-card" aria-labelledby="wo-esign-heading">

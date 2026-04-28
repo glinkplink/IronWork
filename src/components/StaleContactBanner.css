@@ -1,0 +1,40 @@
+.stale-contact-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-md);
+  padding: clamp(0.85rem, 2vw, 1.1rem);
+  border: 1px solid rgba(255, 140, 0, 0.35);
+  border-radius: var(--shell-radius-lg);
+  background: rgba(255, 140, 0, 0.08);
+  color: var(--iron-100);
+}
+
+.stale-contact-banner-text {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.stale-contact-banner-error {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #ffb1c0;
+}
+
+.stale-contact-banner-action {
+  align-self: stretch;
+  width: min(100%, 20rem);
+}
+
+.stale-contact-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.stale-contact-banner--empty {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}

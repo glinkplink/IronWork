@@ -137,6 +137,14 @@ export function useInvoiceFlow(
     setInvoice((i) => ({ ...i, activeInvoice: inv }));
   }, []);
 
+  const handleJobUpdated = useCallback((updatedJob: Job) => {
+    setInvoice((i) =>
+      i.invoiceFlowJob && i.invoiceFlowJob.id === updatedJob.id
+        ? { ...i, invoiceFlowJob: updatedJob }
+        : i
+    );
+  }, []);
+
   const resetInvoiceFlow = useCallback(() => {
     setInvoice(initialInvoice);
   }, []);
@@ -151,6 +159,7 @@ export function useInvoiceFlow(
       handleInvoiceFinalBack,
       handleEditInvoice,
       handleInvoiceUpdated,
+      handleJobUpdated,
       resetInvoiceFlow,
     },
   };

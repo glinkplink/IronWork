@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import type { Job, BusinessProfile, Invoice } from '../types/db';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import type { Job, BusinessProfile, Client, Invoice } from '../types/db';
+import { getClientById } from '../lib/db/clients';
 import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { getInvoice, getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
 import { fetchWithSupabaseAuth } from '../lib/fetch-with-supabase-auth';
@@ -10,6 +11,7 @@ import { listChangeOrders } from '../lib/db/change-orders';
 import { computeSignedCOLines } from '../lib/invoice-line-items';
 import { isChangeOrderSignatureSatisfied } from '../lib/change-order-signature';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { StaleContactBanner } from './StaleContactBanner';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import {
   downloadPdfBlobToFile,
@@ -25,6 +27,8 @@ interface InvoiceFinalPageProps {
   onBack: () => void;
   onEditInvoice: () => void;
   onInvoiceUpdated: (invoice: Invoice) => void;
+  onJobUpdated?: (job: Job) => void;
+  onEditClient?: () => void;
   /** Navigate to the WO detail page, scrolled to the Change Orders section. */
   onOpenChangeOrdersSection: () => void;
   /** Navigate to Edit Profile (Stripe Connect lives there). */
@@ -59,6 +63,8 @@ export function InvoiceFinalPage({
   onBack,
   onEditInvoice,
   onInvoiceUpdated,
+  onJobUpdated,
+  onEditClient = () => {},
   onOpenChangeOrdersSection,
   onOpenStripeSetup,
 }: InvoiceFinalPageProps) {
@@ -79,6 +85,7 @@ export function InvoiceFinalPage({
   const [markPaidError, setMarkPaidError] = useState('');
   const [paymentLinkCopied, setPaymentLinkCopied] = useState(false);
   const [pendingCOCount, setPendingCOCount] = useState(0);
+  const [linkedClient, setLinkedClient] = useState<Client | null>(null);
 
   const documentRef = useRef<HTMLDivElement | null>(null);
   const paymentLinkCopiedTimeoutRef = useRef<number | null>(null);
@@ -86,6 +93,30 @@ export function InvoiceFinalPage({
   useEffect(() => {
     onInvoiceUpdatedRef.current = onInvoiceUpdated;
   }, [onInvoiceUpdated]);
+  const onJobUpdatedRef = useRef(onJobUpdated);
+  useEffect(() => {
+    onJobUpdatedRef.current = onJobUpdated;
+  }, [onJobUpdated]);
+
+  useEffect(() => {
+    const clientId = job.client_id;
+    if (!clientId) {
+      setLinkedClient(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const c = await getClientById(clientId);
+      if (!cancelled) setLinkedClient(c);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [job.client_id]);
+
+  const handleJobBackfilled = useCallback((updated: Job) => {
+    onJobUpdatedRef.current?.(updated);
+  }, []);
 
   const previewHtml = generateInvoiceHtml(invoiceProp, job, profile);
   const businessStatus = getInvoiceBusinessStatus(invoiceProp);
@@ -423,6 +454,13 @@ export function InvoiceFinalPage({
           {downloadError}
         </div>
       ) : null}
+
+      <StaleContactBanner
+        job={job}
+        client={linkedClient}
+        onJobBackfilled={handleJobBackfilled}
+        onEditClient={onEditClient}
+      />
 
       <section className="invoice-final-payment-card" aria-labelledby="invoice-payment-heading">
         <h2 id="invoice-payment-heading" className="wo-esign-heading">Send Invoice</h2>

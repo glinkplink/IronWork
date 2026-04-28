@@ -1,0 +1,93 @@
+import { useState } from 'react';
+import type { Client, Job } from '../types/db';
+import { backfillJobFromClient } from '../lib/job-backfill-from-client';
+import './StaleContactBanner.css';
+
+interface StaleContactBannerProps {
+  job: Job;
+  client: Client | null;
+  onJobBackfilled: (job: Job) => void;
+  onEditClient: () => void;
+}
+
+/**
+ * Detects stale customer contact info on a job (job has empty email/phone, client has populated value)
+ * and offers a one-click backfill. When neither side has a value, prompts the user to edit either record.
+ */
+export function StaleContactBanner({
+  job,
+  client,
+  onJobBackfilled,
+  onEditClient,
+}: StaleContactBannerProps) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const jobEmail = job.customer_email?.trim() || '';
+  const jobPhone = job.customer_phone?.trim() || '';
+  const clientEmail = client?.email?.trim() || '';
+  const clientPhone = client?.phone?.trim() || '';
+
+  const emailMissingFromJob = !jobEmail;
+  const phoneMissingFromJob = !jobPhone;
+  const clientHasNewerEmail = emailMissingFromJob && Boolean(clientEmail);
+  const clientHasNewerPhone = phoneMissingFromJob && Boolean(clientPhone);
+
+  // Banner only shows when there is something to act on
+  const hasBackfill = clientHasNewerEmail || clientHasNewerPhone;
+  const hasNothingOnFile = emailMissingFromJob && !clientEmail;
+
+  if (!hasBackfill && !hasNothingOnFile) return null;
+
+  const handleBackfill = async () => {
+    setBusy(true);
+    setError('');
+    const result = await backfillJobFromClient(job.id);
+    setBusy(false);
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+    if (result.data) {
+      onJobBackfilled(result.data);
+    }
+  };
+
+  if (hasBackfill) {
+    const fields: string[] = [];
+    if (clientHasNewerEmail) fields.push(`email (${clientEmail})`);
+    if (clientHasNewerPhone) fields.push(`phone (${clientPhone})`);
+    return (
+      <div className="stale-contact-banner" role="status">
+        <p className="stale-contact-banner-text">
+          This work order is missing customer {fields.join(' and ')}. Use saved client info?
+        </p>
+        {error ? <p className="stale-contact-banner-error">{error}</p> : null}
+        <button
+          type="button"
+          className="btn-primary btn-action stale-contact-banner-action"
+          disabled={busy}
+          onClick={() => void handleBackfill()}
+        >
+          {busy ? 'Updating…' : 'Use saved client info'}
+        </button>
+      </div>
+    );
+  }
+
+  // hasNothingOnFile — neither job nor client has an email
+  return (
+    <div className="stale-contact-banner stale-contact-banner--empty" role="status">
+      <p className="stale-contact-banner-text">
+        No customer email on file. Add one to the client record so this work order or invoice can be sent.
+      </p>
+      <button
+        type="button"
+        className="btn-secondary btn-action stale-contact-banner-action"
+        onClick={onEditClient}
+      >
+        Edit client
+      </button>
+    </div>
+  );
+}

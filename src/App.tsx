@@ -609,6 +609,7 @@ function App() {
             setWorkOrderDetailJob(job);
           }}
           onBack={handleBackFromWorkOrderDetail}
+          onEditClient={() => navigateTo('clients')}
           onStartChangeOrder={changeOrderFlow.handleStartChangeOrderFromDetail}
           onOpenCODetail={changeOrderFlow.handleOpenCODetail}
         />
@@ -675,6 +676,8 @@ function App() {
             });
           }}
           onInvoiceUpdated={invoiceFlow.handleInvoiceUpdated}
+          onJobUpdated={invoiceFlow.handleJobUpdated}
+          onEditClient={() => navigateTo('clients')}
           onOpenChangeOrdersSection={() =>
             handleOpenWorkOrderDetail(invoiceFinalJob.id, 'change-orders')
           }

@@ -9,6 +9,7 @@ import puppeteer from 'puppeteer-core';
 import { tryHandleEsignRoute } from './esign-routes.mjs';
 import { tryHandleStripeRoute } from './stripe-routes.mjs';
 import { tryHandleInvoiceRoute } from './invoice-routes.mjs';
+import { tryHandleJobsRoute } from './jobs-routes.mjs';
 import { checkRateLimit, getClientIp } from './lib/rate-limit.mjs';
 import { log } from './lib/logger.mjs';
 import { initSentry, captureException, Sentry } from './lib/sentry.mjs';
@@ -313,6 +314,13 @@ async function createAppServer() {
       sendText,
     });
     if (handledInvoice) return;
+
+    const handledJobs = await tryHandleJobsRoute(req, res, {
+      readJsonBody: readJsonBodyDefault,
+      sendJson,
+      sendText,
+    });
+    if (handledJobs) return;
 
     const handledStripe = await tryHandleStripeRoute(req, res, {
       readJsonBody: readJsonBodyDefault,

@@ -141,6 +141,20 @@ export const listClientItems = async (userId: string): Promise<ListClientItemsRe
   return { data, error: null };
 };
 
+export const getClientById = async (id: string): Promise<Client | null> => {
+  const { data, error } = await supabase
+    .from('clients')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error loading client by id:', error);
+    return null;
+  }
+  return data ?? null;
+};
+
 export const upsertClient = async (client: Partial<Client> & { user_id: string }) => {
   const { data, error } = await supabase
     .from('clients')
