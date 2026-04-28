@@ -202,6 +202,7 @@ export function InvoiceFinalPage({
   const isPaidOffline = invoiceProp.payment_status === 'offline';
   const isPaidStripe = invoiceProp.payment_status === 'paid';
   const isPaid = isPaidStripe || isPaidOffline;
+  const showEditInvoiceButton = !isPaid && !isReadOnly;
   const invoiceStatusChip = (() => {
     if (isPaidOffline) {
       return { label: 'Paid offline', className: ' iw-status-chip--offline' };
@@ -766,7 +767,7 @@ export function InvoiceFinalPage({
         </div>
       </section>
 
-      <div className="invoice-final-actions">
+      <div className={`invoice-final-actions${showEditInvoiceButton ? '' : ' invoice-final-actions--single'}`}>
         <div className="invoice-final-download-slot">
           <button
             type="button"
@@ -778,7 +779,7 @@ export function InvoiceFinalPage({
             {downloading ? 'Downloading…' : 'Download Invoice'}
           </button>
         </div>
-        {!isPaid && !isReadOnly ? (
+        {showEditInvoiceButton ? (
           <button
             type="button"
             className="btn-primary btn-large invoice-final-download-btn"

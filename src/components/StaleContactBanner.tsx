@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Client, Job } from '../types/db';
-import { backfillJobFromClient } from '../lib/job-backfill-from-client';
+import { updateJob } from '../lib/db/jobs';
 import './StaleContactBanner.css';
 
 interface StaleContactBannerProps {
@@ -40,16 +40,21 @@ export function StaleContactBanner({
   if (!hasBackfill && !hasNothingOnFile) return null;
 
   const handleBackfill = async () => {
+    const patch: Partial<Job> = {};
+    if (clientHasNewerEmail) patch.customer_email = clientEmail;
+    if (clientHasNewerPhone) patch.customer_phone = clientPhone;
+    if (Object.keys(patch).length === 0) return;
+
     setBusy(true);
     setError('');
-    const result = await backfillJobFromClient(job.id);
+    const { data, error: updateError } = await updateJob(job.id, patch);
     setBusy(false);
-    if (result.error) {
-      setError(result.error.message);
+    if (updateError) {
+      setError(updateError.message || 'Could not update work order from client.');
       return;
     }
-    if (result.data) {
-      onJobBackfilled(result.data);
+    if (data) {
+      onJobBackfilled(data);
     }
   };
 

@@ -7,9 +7,9 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Client, Job } from '../../types/db';
 
-const backfillMock = vi.hoisted(() => vi.fn());
-vi.mock('../../lib/job-backfill-from-client', () => ({
-  backfillJobFromClient: backfillMock,
+const updateJobMock = vi.hoisted(() => vi.fn());
+vi.mock('../../lib/db/jobs', () => ({
+  updateJob: updateJobMock,
 }));
 
 import { StaleContactBanner } from '../StaleContactBanner';
@@ -96,7 +96,7 @@ function makeClient(overrides: Partial<Client> = {}): Client {
 
 describe('StaleContactBanner', () => {
   beforeEach(() => {
-    backfillMock.mockReset();
+    updateJobMock.mockReset();
   });
   afterEach(() => cleanup());
 
@@ -156,10 +156,10 @@ describe('StaleContactBanner', () => {
     expect(screen.getByText(/phone \(555-1234\)/i)).toBeInTheDocument();
   });
 
-  it('calls backfill API and notifies parent on click', async () => {
+  it('updates missing job contact fields and notifies parent on click', async () => {
     const user = userEvent.setup();
     const updatedJob = makeJob({ customer_email: 'jane@example.com', customer_phone: '555-1234' });
-    backfillMock.mockResolvedValue({ data: updatedJob, updated: true, error: null });
+    updateJobMock.mockResolvedValue({ data: updatedJob, error: null });
     const onJobBackfilled = vi.fn();
     render(
       <StaleContactBanner
@@ -171,7 +171,10 @@ describe('StaleContactBanner', () => {
     );
     await user.click(screen.getByRole('button', { name: /use saved client info/i }));
     await waitFor(() => {
-      expect(backfillMock).toHaveBeenCalledWith('job-1');
+      expect(updateJobMock).toHaveBeenCalledWith('job-1', {
+        customer_email: 'jane@example.com',
+        customer_phone: '555-1234',
+      });
       expect(onJobBackfilled).toHaveBeenCalledWith(updatedJob);
     });
   });
@@ -194,7 +197,7 @@ describe('StaleContactBanner', () => {
 
   it('shows error message when backfill fails', async () => {
     const user = userEvent.setup();
-    backfillMock.mockResolvedValue({ data: null, updated: false, error: new Error('Server unavailable') });
+    updateJobMock.mockResolvedValue({ data: null, error: new Error('Update unavailable') });
     render(
       <StaleContactBanner
         job={makeJob({ customer_email: null })}
@@ -205,7 +208,7 @@ describe('StaleContactBanner', () => {
     );
     await user.click(screen.getByRole('button', { name: /use saved client info/i }));
     await waitFor(() => {
-      expect(screen.getByText(/server unavailable/i)).toBeInTheDocument();
+      expect(screen.getByText(/update unavailable/i)).toBeInTheDocument();
     });
   });
 });

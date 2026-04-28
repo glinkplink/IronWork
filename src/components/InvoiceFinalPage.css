@@ -321,6 +321,10 @@
   box-sizing: border-box;
 }
 
+.invoice-final-actions--single .invoice-final-download-slot {
+  flex-basis: auto;
+}
+
 .invoice-final-notes-panel .form-group {
   margin-bottom: 16px;
 }

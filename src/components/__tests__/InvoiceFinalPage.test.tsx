@@ -295,6 +295,16 @@ describe('InvoiceFinalPage', () => {
     expect(screen.getByRole('button', { name: /^Download Invoice$/i })).toBeInTheDocument();
   });
 
+  it('hides edit button for paid invoice and uses single-action layout', () => {
+    renderPage(baseInvoice({ payment_status: 'paid', paid_at: '2025-01-10T12:00:00Z' }));
+
+    expect(screen.queryByRole('button', { name: /edit invoice/i })).not.toBeInTheDocument();
+    const downloadButton = screen.getByRole('button', { name: /^Download Invoice$/i });
+    expect(downloadButton.closest('.invoice-final-actions')).toHaveClass(
+      'invoice-final-actions--single'
+    );
+  });
+
   it('refetches invoice on mount and passes the row to onInvoiceUpdated', async () => {
     const fresh = baseInvoice({
       id: 'inv-1',
