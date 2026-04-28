@@ -7,6 +7,7 @@ import { getWorkOrderSignatureState } from '../lib/work-order-signature';
 import {
   formatWorkOrderDashboardJobType,
   formatUsd,
+  formatUsdContract,
   formatWorkOrderDashboardRowDate,
   formatWorkOrderDashboardWoLabel,
   isWorkOrderDashboardJobComplete,
@@ -179,11 +180,17 @@ const WorkOrderRow = memo(function WorkOrderRow({ job, onOpenDetail, onStartInvo
   const jobMetaLabel = formatWorkOrderDashboardRowDate(job);
   const statusChip = getWorkOrderRowStatusChip(job);
   const isPaidRow = isWorkOrderDashboardJobComplete(job);
+  const signatureState = getWorkOrderSignatureState(job.esign_status, job.offline_signed_at);
+  const hasInvoice = job.latestInvoice != null;
+  const isSignatureSatisfied = signatureState.isSignatureSatisfied;
 
   const handleRowClick = (e: MouseEvent<HTMLLIElement>) => {
     if ((e.target as HTMLElement).closest('button')) return;
     onOpenDetail(job);
   };
+
+  const showCreateInvoiceButton = !hasInvoice;
+  const isButtonDisabled = !isSignatureSatisfied && showCreateInvoiceButton;
 
   return (
     <li
@@ -196,26 +203,39 @@ const WorkOrderRow = memo(function WorkOrderRow({ job, onOpenDetail, onStartInvo
             <span className="work-orders-wo">{woLabel}</span>
             <span className="work-orders-customer">{job.customer_name}</span>
             <span className="work-orders-job-type">{formatWorkOrderDashboardJobType(job)}</span>
-            <span className="work-orders-row-amount">{formatUsd(job.price)}</span>
+            <span className="work-orders-row-amount">{formatUsdContract(job.price)}</span>
           </div>
           <div className="work-orders-row-right">
             <div className="work-orders-row-status-slot">
               {statusChip ? <span className={statusChip.className}>{statusChip.label}</span> : null}
             </div>
-            <span className="work-orders-wo-date">{jobMetaLabel}</span>
           </div>
         </div>
         <div className="work-orders-row-footer">
-          <button
-            type="button"
-            className="work-orders-create-invoice-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStartInvoice(job);
-            }}
-          >
-            Create Invoice
-          </button>
+          {showCreateInvoiceButton ? (
+            <>
+              <button
+                type="button"
+                className="work-orders-create-invoice-btn"
+                disabled={isButtonDisabled}
+                onClick={(e) => {
+                  if (!isButtonDisabled) {
+                    e.stopPropagation();
+                    onStartInvoice(job);
+                  }
+                }}
+                title={isButtonDisabled ? 'Work order must be e-signed or marked signed offline' : ''}
+              >
+                Create Invoice
+              </button>
+              {isButtonDisabled ? (
+                <p className="work-orders-create-invoice-hint">
+                  Work order must be signed (e-signature or marked signed offline) before invoice can be generated.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+          <span className="work-orders-wo-date">{jobMetaLabel}</span>
         </div>
       </div>
     </li>

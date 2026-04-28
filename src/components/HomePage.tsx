@@ -11,6 +11,7 @@ import { splitFullNameForForm } from '../lib/owner-name';
 import {
   formatWorkOrderDashboardJobType,
   formatUsd,
+  formatUsdContract,
   formatWorkOrderDashboardRowDate,
   formatWorkOrderDashboardWoLabel,
   isWorkOrderDashboardJobComplete,
@@ -882,7 +883,7 @@ export function HomePage({
                           <span className="home-dash-card-title">
                             {formatWorkOrderDashboardJobType(job)}
                           </span>
-                          <span className="home-dash-card-amount">{formatUsd(job.price)}</span>
+                          <span className="home-dash-card-amount">{formatUsdContract(job.price)}</span>
                         </div>
                         <div className="home-dash-card-right">
                           <div className="home-dash-card-status-slot">

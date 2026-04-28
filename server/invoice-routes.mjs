@@ -572,7 +572,7 @@ async function handleMarkPaidOffline(req, res, { sendJson }) {
 
   const { data: invoice, error: invoiceErr } = await supabase
     .from('invoices')
-    .select('id, user_id, payment_status, issued_at')
+    .select('id, user_id, payment_status')
     .eq('id', invoiceId)
     .eq('user_id', userId)
     .maybeSingle();
@@ -584,10 +584,6 @@ async function handleMarkPaidOffline(req, res, { sendJson }) {
   }
   if (!invoice) {
     sendJson(res, 404, { error: 'Invoice not found' });
-    return true;
-  }
-  if (!invoice.issued_at) {
-    sendJson(res, 409, { error: 'Cannot mark a draft invoice as paid. Send the invoice first.' });
     return true;
   }
   if (invoice.payment_status === 'paid' || invoice.payment_status === 'offline') {

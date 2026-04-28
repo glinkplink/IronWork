@@ -10,16 +10,29 @@ const USD_FORMATTER = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
+const USD_CONTRACT_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const ROW_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
   month: 'short',
   day: 'numeric',
 });
 
-/** Same semantics as the former Work Orders list `formatUsd`. */
+/** Same semantics as the former Work Orders list `formatUsd` (0 fraction digits — used for stat cards). */
 export function formatUsd(amount: number | null | undefined): string {
   if (typeof amount !== 'number' || !Number.isFinite(amount)) return '—';
   return USD_FORMATTER.format(amount);
+}
+
+/** Format work-order contract price with 2 decimal places so list/home match invoice wizard precision. */
+export function formatUsdContract(amount: number | null | undefined): string {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return '—';
+  return USD_CONTRACT_FORMATTER.format(amount);
 }
 
 /** Agreement date if set, else calendar date from `created_at`; same rules as Work Orders list. */

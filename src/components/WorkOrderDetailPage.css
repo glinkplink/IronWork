@@ -163,6 +163,7 @@
   gap: var(--space-sm);
   align-items: center;
   justify-content: center;
+  margin-bottom: var(--space-md);
 }
 
 .wo-esign-actions .btn-action {

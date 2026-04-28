@@ -129,7 +129,7 @@ function mockSupabase(options: {
   return { supabase, update, single };
 }
 
-describe('tryHandleInvoiceRoute offline paid undo', () => {
+describe('tryHandleInvoiceRoute offline paid mark/unmark', () => {
   const prevEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
@@ -143,6 +143,24 @@ describe('tryHandleInvoiceRoute offline paid undo', () => {
   afterEach(() => {
     process.env.SUPABASE_URL = prevEnv.SUPABASE_URL;
     process.env.SUPABASE_SERVICE_ROLE_KEY = prevEnv.SUPABASE_SERVICE_ROLE_KEY;
+  });
+
+  it('allows marking draft invoice as paid offline (issued_at not required)', async () => {
+    const { update } = mockSupabase({ invoice: { id: INVOICE_UUID, user_id: USER_UUID, payment_status: 'unpaid' } });
+    const res = captureRes();
+
+    await tryHandleInvoiceRoute(
+      {
+        method: 'POST',
+        url: `/api/invoices/${INVOICE_UUID}/mark-paid-offline`,
+        headers: { authorization: 'Bearer token' },
+      },
+      res,
+      helpers()
+    );
+
+    expect(res.status).toBe(200);
+    expect(update).toHaveBeenCalledWith({ payment_status: 'offline', paid_at: expect.any(String) });
   });
 
   it('returns 401 without authorization', async () => {

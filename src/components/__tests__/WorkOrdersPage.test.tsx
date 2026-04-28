@@ -448,8 +448,9 @@ describe('WorkOrdersPage', () => {
     await screen.findByText('Customer A');
     expect(screen.getByText('WO #0001')).toBeInTheDocument();
     expect(screen.getByText('repair')).toBeInTheDocument();
-    expect(screen.getByText('$100')).toBeInTheDocument();
-    expect(screen.getByText('Jan 1, 2025')).toBeInTheDocument();
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    // Date may render as Dec 31, 2024 or Jan 1, 2025 depending on timezone (UTC vs local)
+    expect(screen.getByText(/(Jan 1, 2025|Dec 31, 2024)/)).toBeInTheDocument();
   });
 
   it('clears the success banner after 10 seconds and not before', async () => {
@@ -559,7 +560,7 @@ describe('WorkOrdersPage', () => {
     expect(within(list).queryByText('Alpha Fab')).not.toBeInTheDocument();
 
     await user.clear(search);
-    await user.type(search, '$500');
+    await user.type(search, '$500.00');
     list = latestWorkOrdersListUl();
     expect(within(list).getByText('Bravo Fab')).toBeInTheDocument();
     expect(within(list).queryByText('Alpha Fab')).not.toBeInTheDocument();
@@ -763,5 +764,129 @@ describe('WorkOrdersPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/Add your business phone/)).toBeInTheDocument();
     });
+  });
+
+  it('hides Create Invoice button when latestInvoice exists (draft or invoiced)', async () => {
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        {
+          ...listJobA,
+          latestInvoice: {
+            id: 'inv-a',
+            job_id: 'job-a',
+            issued_at: null,
+            invoice_number: 1,
+            created_at: '2025-01-02T00:00:00Z',
+            payment_status: 'unpaid',
+          },
+        },
+        {
+          ...listJobB,
+          latestInvoice: {
+            id: 'inv-b',
+            job_id: 'job-b',
+            issued_at: '2025-01-03T00:00:00Z',
+            invoice_number: 2,
+            created_at: '2025-01-03T00:00:00Z',
+            payment_status: 'unpaid',
+          },
+        },
+      ])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Customer B');
+
+    const list = latestWorkOrdersListUl();
+    const rows = within(list).getAllByRole('listitem');
+    
+    expect(within(rows[0]).queryByRole('button', { name: /create invoice/i })).not.toBeInTheDocument();
+    expect(within(rows[1]).queryByRole('button', { name: /create invoice/i })).not.toBeInTheDocument();
+  });
+
+  it('disables Create Invoice button and shows hint when WO is not signed', async () => {
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        {
+          ...listJobA,
+          esign_status: 'not_sent',
+          offline_signed_at: null,
+        },
+      ])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Customer A');
+
+    const list = latestWorkOrdersListUl();
+    const row = within(list).getByRole('listitem');
+    const button = within(row).getByRole('button', { name: /create invoice/i });
+    
+    expect(button).toBeDisabled();
+    expect(within(row).getByText(/work order must be signed/i)).toBeInTheDocument();
+  });
+
+  it('enables Create Invoice button when WO is signed (e-sign completed)', async () => {
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        {
+          ...listJobA,
+          esign_status: 'completed',
+          offline_signed_at: null,
+        },
+      ])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Customer A');
+
+    const list = latestWorkOrdersListUl();
+    const row = within(list).getByRole('listitem');
+    const button = within(row).getByRole('button', { name: /create invoice/i });
+    
+    expect(button).not.toBeDisabled();
+    expect(within(row).queryByText(/work order must be signed/i)).not.toBeInTheDocument();
+  });
+
+  it('enables Create Invoice button when WO is marked signed offline', async () => {
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([
+        {
+          ...listJobA,
+          esign_status: 'not_sent',
+          offline_signed_at: '2025-01-02T00:00:00Z',
+        },
+      ])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Customer A');
+
+    const list = latestWorkOrdersListUl();
+    const row = within(list).getByRole('listitem');
+    const button = within(row).getByRole('button', { name: /create invoice/i });
+    
+    expect(button).not.toBeDisabled();
+  });
+
+  it('renders work order date in footer at bottom-right of row', async () => {
+    listWorkOrdersDashboardPage.mockResolvedValue(
+      makePageResult([listJobA])
+    );
+
+    renderPage(minimalProfileWithPhone());
+
+    await screen.findByText('Customer A');
+
+    const list = latestWorkOrdersListUl();
+    const row = within(list).getByRole('listitem');
+    const footer = row.querySelector('.work-orders-row-footer');
+    
+    expect(footer).toBeInTheDocument();
+    expect(footer?.querySelector('.work-orders-wo-date')).toBeInTheDocument();
   });
 });

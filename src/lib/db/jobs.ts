@@ -460,6 +460,12 @@ function normalizeClientNameKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/** Round to cents using integer math to avoid floating-point drift (e.g. 499.99999999994 → 500.00). */
+function roundToCents(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
 export const saveWorkOrder = async (
   userId: string,
   job: WelderJob,
@@ -545,7 +551,7 @@ export const saveWorkOrder = async (
     removal_or_disassembly_included: job.removal_or_disassembly_included,
     hidden_damage_possible: job.hidden_damage_possible,
     price_type: job.price_type,
-    price: job.price,
+    price: roundToCents(Number(job.price) || 0),
     target_completion_date: job.target_completion_date || null,
     target_start: job.target_start || null,
     exclusions: Array.isArray(job.exclusions) ? job.exclusions : [],
@@ -554,7 +560,10 @@ export const saveWorkOrder = async (
     agreement_date: job.agreement_date || null,
     contractor_phone: job.contractor_phone || null,
     contractor_email: job.contractor_email || null,
-    deposit_amount: job.deposit_amount,
+    deposit_amount:
+      typeof job.deposit_amount === 'number'
+        ? roundToCents(job.deposit_amount)
+        : 0,
     payment_terms_days: job.payment_terms_days,
     late_fee_rate: job.late_fee_rate,
     negotiation_period: job.negotiation_period,
