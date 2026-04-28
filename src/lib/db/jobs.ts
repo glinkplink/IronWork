@@ -10,6 +10,7 @@ import type {
   WorkOrderInvoiceStatus,
 } from '../../types/db';
 import type { WelderJob } from '../../types';
+import { parseCurrency, roundCurrency } from '../currency';
 
 const WORK_ORDER_LIST_SELECT = `
   id,
@@ -53,11 +54,7 @@ function mapWorkOrderListChangeOrderRow(
 }
 
 function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
-  const priceRaw = row.price;
-  const price =
-    typeof priceRaw === 'number' && Number.isFinite(priceRaw)
-      ? priceRaw
-      : Number(priceRaw) || 0;
+  const price = parseCurrency(row.price);
   const ocRaw = row.other_classification;
   const other_classification =
     ocRaw != null && String(ocRaw).trim() !== '' ? String(ocRaw).trim() : null;
@@ -135,11 +132,7 @@ function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderIn
 }
 
 function mapWorkOrderDashboardRow(row: Record<string, unknown>): WorkOrderDashboardJob {
-  const priceRaw = row.price;
-  const price =
-    typeof priceRaw === 'number' && Number.isFinite(priceRaw)
-      ? priceRaw
-      : Number(priceRaw) || 0;
+  const price = parseCurrency(row.price);
   const ocRaw = row.other_classification;
   const other_classification =
     ocRaw != null && String(ocRaw).trim() !== '' ? String(ocRaw).trim() : null;
@@ -233,18 +226,9 @@ function mapWorkOrdersDashboardSummaryRow(row: Record<string, unknown>): WorkOrd
       typeof completedJobCountRaw === 'number' && Number.isFinite(completedJobCountRaw)
         ? completedJobCountRaw
         : Number(completedJobCountRaw) || 0,
-    invoicedContractTotal:
-      typeof invoicedContractTotalRaw === 'number' && Number.isFinite(invoicedContractTotalRaw)
-        ? invoicedContractTotalRaw
-        : Number(invoicedContractTotalRaw) || 0,
-    pendingContractTotal:
-      typeof pendingContractTotalRaw === 'number' && Number.isFinite(pendingContractTotalRaw)
-        ? pendingContractTotalRaw
-        : Number(pendingContractTotalRaw) || 0,
-    paidContractTotal:
-      typeof paidContractTotalRaw === 'number' && Number.isFinite(paidContractTotalRaw)
-        ? paidContractTotalRaw
-        : Number(paidContractTotalRaw) || 0,
+    invoicedContractTotal: parseCurrency(invoicedContractTotalRaw),
+    pendingContractTotal: parseCurrency(pendingContractTotalRaw),
+    paidContractTotal: parseCurrency(paidContractTotalRaw),
   };
 }
 
@@ -476,12 +460,6 @@ function normalizeClientNameKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
-/** Round to cents using integer math to avoid floating-point drift (e.g. 499.99999999994 → 500.00). */
-function roundToCents(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-
 export const saveWorkOrder = async (
   userId: string,
   job: WelderJob,
@@ -567,7 +545,7 @@ export const saveWorkOrder = async (
     removal_or_disassembly_included: job.removal_or_disassembly_included,
     hidden_damage_possible: job.hidden_damage_possible,
     price_type: job.price_type,
-    price: roundToCents(Number(job.price) || 0),
+    price: roundCurrency(Number(job.price) || 0),
     target_completion_date: job.target_completion_date || null,
     target_start: job.target_start || null,
     exclusions: Array.isArray(job.exclusions) ? job.exclusions : [],
@@ -578,7 +556,7 @@ export const saveWorkOrder = async (
     contractor_email: job.contractor_email || null,
     deposit_amount:
       typeof job.deposit_amount === 'number'
-        ? roundToCents(job.deposit_amount)
+        ? roundCurrency(job.deposit_amount)
         : 0,
     payment_terms_days: job.payment_terms_days,
     late_fee_rate: job.late_fee_rate,

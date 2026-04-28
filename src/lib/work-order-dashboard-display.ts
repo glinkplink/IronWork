@@ -1,4 +1,5 @@
 import type { WorkOrderDashboardJob } from '../types/db';
+import { roundCurrency } from './currency';
 import { getInvoiceBusinessStatus } from './db/invoices';
 import { getEsignProgressModel } from './esign-progress';
 import { getWorkOrderSignatureState } from './work-order-signature';
@@ -27,13 +28,13 @@ const ROW_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
 /** Same semantics as the former Work Orders list `formatUsd` (0 fraction digits — used for stat cards). */
 export function formatUsd(amount: number | null | undefined): string {
   if (typeof amount !== 'number' || !Number.isFinite(amount)) return '—';
-  return USD_FORMATTER.format(amount);
+  return USD_FORMATTER.format(roundCurrency(amount));
 }
 
 /** Format work-order contract price with 2 decimal places so list/home match invoice wizard precision. */
 export function formatUsdContract(amount: number | null | undefined): string {
   if (typeof amount !== 'number' || !Number.isFinite(amount)) return '—';
-  return USD_CONTRACT_FORMATTER.format(amount);
+  return USD_CONTRACT_FORMATTER.format(roundCurrency(amount));
 }
 
 /** Agreement date if set, else calendar date from `created_at`; same rules as Work Orders list. */

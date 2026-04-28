@@ -2,6 +2,7 @@ import type { Job } from '../types/db';
 import type { BusinessProfile } from '../types/db';
 import type { JobType, MaterialsProvider, WelderJob } from '../types';
 import { DEFAULT_LATE_FEE_RATE, DEFAULT_PAYMENT_TERMS_DAYS } from './payment-terms';
+import { parseCurrency } from './currency';
 import { splitFullNameForForm } from './owner-name';
 
 const JOB_TYPES: readonly JobType[] = [
@@ -56,8 +57,8 @@ export function jobRowToWelderJob(job: Job, profile: BusinessProfile | null): We
     target_start: job.target_start ?? '',
     target_completion_date: job.target_completion_date ?? '',
     price_type: job.price_type,
-    price: Number(job.price) || 0,
-    deposit_amount: job.deposit_amount ?? 0,
+    price: parseCurrency(job.price),
+    deposit_amount: parseCurrency(job.deposit_amount ?? 0),
     payment_terms_days:
       job.payment_terms_days ?? profile?.default_payment_terms_days ?? DEFAULT_PAYMENT_TERMS_DAYS,
     late_fee_rate: job.late_fee_rate ?? profile?.default_late_fee_rate ?? DEFAULT_LATE_FEE_RATE,

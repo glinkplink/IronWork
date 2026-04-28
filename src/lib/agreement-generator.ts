@@ -1,5 +1,6 @@
 import type { WelderJob, AgreementSection, SectionContentBlock, SignatureBlockData } from '../types';
 import type { BusinessProfile } from '../types/db';
+import { roundCurrency } from './currency';
 import { jobLocationSingleLine } from './job-site-address';
 
 const SERVICE_PROVIDER = 'the Service Provider';
@@ -17,7 +18,7 @@ function formatDate(iso: string): string {
 }
 
 function formatPrice(n: number): string {
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return '$' + roundCurrency(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function capitalizeFirst(str: string): string {
@@ -70,7 +71,7 @@ export function generateAgreement(job: WelderJob, profile: BusinessProfile | nul
     job.price_type === 'estimate' ? 'Estimate' :
     'Time & Materials';
 
-  const balanceDue = Math.max(0, job.price - job.deposit_amount);
+  const balanceDue = roundCurrency(Math.max(0, job.price - job.deposit_amount));
 
   // 1. Parties & Project Information — two-column party grid + full-width date/address
   drafts.push({
