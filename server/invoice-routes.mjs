@@ -260,9 +260,9 @@ export async function tryHandleInvoiceRoute(req, res, helpers) {
     }
   }
 
-  // POST /api/invoices/:invoiceId/mark-issued
-  if (req.method === 'POST' && /^\/api\/invoices\/[^/]+\/mark-issued$/.test(pathOnly)) {
-    return await handleMarkIssued(req, res, { sendJson });
+  // POST /api/invoices/:invoiceId/mark-downloaded
+  if (req.method === 'POST' && /^\/api\/invoices\/[^/]+\/mark-downloaded$/.test(pathOnly)) {
+    return await handleMarkDownloaded(req, res, { sendJson });
   }
 
   // POST /api/invoices/:invoiceId/mark-paid-offline
@@ -554,7 +554,7 @@ async function handleInvoiceSend(req, res, { readJsonBody, sendJson }) {
   return true;
 }
 
-async function handleMarkIssued(req, res, { sendJson }) {
+async function handleMarkDownloaded(req, res, { sendJson }) {
   const token = getBearerToken(req);
   if (!token) {
     sendJson(res, 401, { error: 'Missing authorization' });
@@ -569,7 +569,7 @@ async function handleMarkIssued(req, res, { sendJson }) {
   }
   const userId = userData.user.id;
 
-  const invoiceId = invoiceIdFromPath(req, 'mark-issued');
+  const invoiceId = invoiceIdFromPath(req, 'mark-downloaded');
   if (!invoiceId) {
     sendJson(res, 400, { error: 'Invalid invoice ID' });
     return true;
@@ -577,13 +577,13 @@ async function handleMarkIssued(req, res, { sendJson }) {
 
   const { data: invoice, error: invoiceErr } = await supabase
     .from('invoices')
-    .select('id, user_id, issued_at, job_id')
+    .select('id, user_id, downloaded_at, job_id')
     .eq('id', invoiceId)
     .eq('user_id', userId)
     .maybeSingle();
 
   if (invoiceErr) {
-    log.error('mark-issued load error', log.errCtx(invoiceErr));
+    log.error('mark-downloaded load error', log.errCtx(invoiceErr));
     sendJson(res, 500, { error: 'Could not load invoice.' });
     return true;
   }
@@ -592,8 +592,7 @@ async function handleMarkIssued(req, res, { sendJson }) {
     return true;
   }
 
-  // Idempotent: already issued → return fresh row
-  if (invoice.issued_at) {
+  if (invoice.downloaded_at) {
     const { data: fresh } = await supabase
       .from('invoices')
       .select('*')
@@ -604,7 +603,6 @@ async function handleMarkIssued(req, res, { sendJson }) {
     return true;
   }
 
-  // Enforce same first-issuance gates as send (signature + CO check)
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
     .select('esign_status, offline_signed_at')
@@ -613,7 +611,7 @@ async function handleMarkIssued(req, res, { sendJson }) {
     .maybeSingle();
 
   if (jobErr) {
-    log.error('mark-issued job load error', log.errCtx(jobErr));
+    log.error('mark-downloaded job load error', log.errCtx(jobErr));
     sendJson(res, 500, { error: 'Could not load work order.' });
     return true;
   }
@@ -625,7 +623,7 @@ async function handleMarkIssued(req, res, { sendJson }) {
   if (!workOrderSignatureSatisfied(job)) {
     sendJson(res, 409, {
       error:
-        'Cannot issue invoice: the work order must be signed via DocuSeal or marked as signed offline first.',
+        'Cannot mark invoice downloaded: the work order must be signed via DocuSeal or marked as signed offline first.',
     });
     return true;
   }
@@ -634,32 +632,32 @@ async function handleMarkIssued(req, res, { sendJson }) {
   try {
     pendingCOCount = await countPendingChangeOrders(supabase, invoice.job_id, userId);
   } catch (err) {
-    log.error('mark-issued pending-CO check failed', log.errCtx(err));
+    log.error('mark-downloaded pending-CO check failed', log.errCtx(err));
     sendJson(res, 500, { error: 'Could not verify change order status.' });
     return true;
   }
   if (pendingCOCount > 0) {
     sendJson(res, 409, {
-      error: `Cannot issue invoice: ${pendingCOCount} change order${pendingCOCount === 1 ? ' is' : 's are'} still pending. Sign, mark signed offline, or delete them first.`,
+      error: `Cannot mark invoice downloaded: ${pendingCOCount} change order${pendingCOCount === 1 ? ' is' : 's are'} still pending. Sign, mark signed offline, or delete them first.`,
     });
     return true;
   }
 
   const { data: updated, error: updateErr } = await supabase
     .from('invoices')
-    .update({ issued_at: new Date().toISOString() })
+    .update({ downloaded_at: new Date().toISOString() })
     .eq('id', invoiceId)
     .eq('user_id', userId)
     .select()
     .single();
 
   if (updateErr) {
-    log.error('mark-issued update error', log.errCtx(updateErr));
+    log.error('mark-downloaded update error', log.errCtx(updateErr));
     sendJson(res, 500, { error: 'Could not update invoice.' });
     return true;
   }
 
-  log.info('marked invoice issued (download)', { invoiceId, userId });
+  log.info('marked invoice downloaded', { invoiceId, userId });
   sendJson(res, 200, { invoice: updated });
   return true;
 }

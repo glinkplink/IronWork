@@ -333,6 +333,13 @@ describe('WorkOrdersPage', () => {
       makePageResult([
         {
           ...listJobA,
+          id: 'job-downloaded',
+          customer_name: 'Customer Downloaded',
+          esign_status: 'not_sent',
+          last_downloaded_at: '2025-01-01T13:00:00Z',
+        },
+        {
+          ...listJobA,
           id: 'job-sent',
           customer_name: 'Customer Sent',
           esign_status: 'sent',
@@ -364,6 +371,14 @@ describe('WorkOrdersPage', () => {
     );
 
     renderPage(minimalProfileWithPhone());
+
+    const downloadedRow = (await screen.findByText('Customer Downloaded')).closest(
+      'li'
+    ) as HTMLElement;
+    expect(within(downloadedRow).getByText('Downloaded')).toHaveClass(
+      'iw-status-chip',
+      'iw-status-chip--draft'
+    );
 
     const sentRow = (await screen.findByText('Customer Sent')).closest('li') as HTMLElement;
     expect(within(sentRow).getByText('Sent')).toHaveClass('iw-status-chip', 'iw-status-chip--draft');

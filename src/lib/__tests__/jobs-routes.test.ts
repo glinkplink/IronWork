@@ -65,6 +65,20 @@ type ClientRow = {
   phone: string | null;
 };
 
+function fullJobRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: JOB_UUID,
+    user_id: USER_UUID,
+    client_id: null,
+    customer_email: null,
+    customer_phone: null,
+    last_downloaded_at: null,
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
 function mockSupabase(opts: {
   job: JobRow | null;
   client: ClientRow | null;
@@ -256,6 +270,125 @@ describe('tryHandleJobsRoute backfill-from-client', () => {
       helpers()
     );
     expect(res.status).toBe(200);
+    expect(JSON.parse(res.body).updated).toBe(false);
+  });
+});
+
+describe('tryHandleJobsRoute mark-downloaded', () => {
+  const prevEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    prevEnv.SUPABASE_URL = process.env.SUPABASE_URL;
+    prevEnv.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    createClientMock.mockReset();
+    process.env.SUPABASE_URL = 'http://localhost:54321';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role';
+  });
+
+  afterEach(() => {
+    process.env.SUPABASE_URL = prevEnv.SUPABASE_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = prevEnv.SUPABASE_SERVICE_ROLE_KEY;
+  });
+
+  function mockDownloadSupabase(opts: {
+    job: Record<string, unknown> | null;
+    updated?: Record<string, unknown>;
+  }) {
+    const update = vi.fn();
+    const updateSingle = vi.fn(async () => ({
+      data: opts.updated ?? fullJobRow({ last_downloaded_at: '2025-01-02T00:00:00Z' }),
+      error: null,
+    }));
+    update.mockReturnValue({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          select: vi.fn(() => ({ single: updateSingle })),
+        })),
+      })),
+    });
+
+    const jobMaybeSingle = vi.fn(async () => ({ data: opts.job, error: null }));
+    const freshMaybeSingle = vi.fn(async () => ({ data: opts.job, error: null }));
+    const jobLoadEqUser = vi.fn(() => ({ maybeSingle: jobMaybeSingle }));
+    const freshLoadEqUser = vi.fn(() => ({ maybeSingle: freshMaybeSingle }));
+    const jobLoadEqId = vi.fn(() => ({ eq: jobLoadEqUser }));
+    const freshLoadEqId = vi.fn(() => ({ eq: freshLoadEqUser }));
+    const select = vi
+      .fn()
+      .mockReturnValueOnce({ eq: jobLoadEqId })
+      .mockReturnValue({ eq: freshLoadEqId });
+    const from = vi.fn(() => ({ select, update }));
+
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })) },
+      from,
+    };
+    createClientMock.mockReturnValue(supabase);
+    return { update };
+  }
+
+  it('returns 401 without authorization', async () => {
+    const res = captureRes();
+    await tryHandleJobsRoute(
+      {
+        method: 'POST',
+        url: `/api/jobs/${JOB_UUID}/mark-downloaded`,
+        headers: {},
+      },
+      res,
+      helpers()
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 404 when job is not found', async () => {
+    mockDownloadSupabase({ job: null });
+    const res = captureRes();
+    await tryHandleJobsRoute(
+      {
+        method: 'POST',
+        url: `/api/jobs/${JOB_UUID}/mark-downloaded`,
+        headers: { authorization: 'Bearer token' },
+      },
+      res,
+      helpers()
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('marks a work order as downloaded', async () => {
+    const { update } = mockDownloadSupabase({ job: fullJobRow() });
+    const res = captureRes();
+    await tryHandleJobsRoute(
+      {
+        method: 'POST',
+        url: `/api/jobs/${JOB_UUID}/mark-downloaded`,
+        headers: { authorization: 'Bearer token' },
+      },
+      res,
+      helpers()
+    );
+    expect(res.status).toBe(200);
+    expect(update).toHaveBeenCalledWith({ last_downloaded_at: expect.any(String) });
+    expect(JSON.parse(res.body).updated).toBe(true);
+  });
+
+  it('returns 200 idempotently when work order is already downloaded', async () => {
+    const { update } = mockDownloadSupabase({
+      job: fullJobRow({ last_downloaded_at: '2025-01-02T00:00:00Z' }),
+    });
+    const res = captureRes();
+    await tryHandleJobsRoute(
+      {
+        method: 'POST',
+        url: `/api/jobs/${JOB_UUID}/mark-downloaded`,
+        headers: { authorization: 'Bearer token' },
+      },
+      res,
+      helpers()
+    );
+    expect(res.status).toBe(200);
+    expect(update).not.toHaveBeenCalled();
     expect(JSON.parse(res.body).updated).toBe(false);
   });
 });

@@ -43,6 +43,7 @@ import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-i
 import '../lib/change-order-document.css';
 import { computeCOTotal, listChangeOrders } from '../lib/db/change-orders';
 import { getBlocksNewChangeOrdersForJob } from '../lib/db/invoices';
+import { markJobDownloaded } from '../lib/job-mark-downloaded';
 import { getChangeOrderSignatureState } from '../lib/change-order-signature';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
@@ -246,13 +247,20 @@ export function WorkOrderDetailPage({
     () => getWorkOrderSignatureState(job?.esign_status ?? null, job?.offline_signed_at ?? null),
     [job?.esign_status, job?.offline_signed_at]
   );
-  const woPreviewSignatureBadgeClass = useMemo(() => {
+  const woPreviewSignatureChip = useMemo(() => {
     const d = signatureState.displayLabel;
-    if (d === 'Signed') return ' iw-status-chip--paid';
-    if (d === 'Signed offline') return ' iw-status-chip--offline';
-    if (d === 'Declined' || d === 'Expired') return ' iw-status-chip--negative';
-    return ' iw-status-chip--outstanding';
-  }, [signatureState.displayLabel]);
+    if (d === 'Not sent') {
+      return job?.last_downloaded_at
+        ? { label: 'Downloaded', className: ' iw-status-chip--draft' }
+        : null;
+    }
+    if (d === 'Signed') return { label: d, className: ' iw-status-chip--paid' };
+    if (d === 'Signed offline') return { label: d, className: ' iw-status-chip--offline' };
+    if (d === 'Declined' || d === 'Expired') {
+      return { label: d, className: ' iw-status-chip--negative' };
+    }
+    return { label: d, className: ' iw-status-chip--draft' };
+  }, [job?.last_downloaded_at, signatureState.displayLabel]);
   const esignWasResent = Boolean(job?.esign_resent_at);
   const esignProgress = useMemo(
     () =>
@@ -335,7 +343,7 @@ export function WorkOrderDetailPage({
 
   const handleDownloadPdf = async () => {
     setPdfError('');
-    if (!welderJob || !woPreviewHtml) {
+    if (!job || !welderJob || !woPreviewHtml) {
       setPdfError('Document is not ready. Try again.');
       return;
     }
@@ -350,6 +358,13 @@ export function WorkOrderDetailPage({
         providerPhone: footerMeta.providerPhone,
       });
       downloadAgreementPdfBlob(blob, welderJob);
+      const { data, error } = await markJobDownloaded(job.id);
+      if (error) {
+        setPdfError(`PDF downloaded, but could not update status: ${error.message}.`);
+      } else if (data) {
+        setHydratedJob(data);
+        onJobUpdatedRef.current?.(data);
+      }
     } catch (e) {
       setPdfError(e instanceof Error ? e.message : 'PDF download failed.');
     } finally {
@@ -583,6 +598,13 @@ export function WorkOrderDetailPage({
         providerPhone: footerMeta.providerPhone,
       });
       downloadPdfBlobToFile(blob, getPdfFilename(welderJob.wo_number, job.customer_name));
+      const { data, error } = await markJobDownloaded(job.id);
+      if (error) {
+        setPdfError(`PDF downloaded, but could not update status: ${error.message}.`);
+      } else if (data) {
+        setHydratedJob(data);
+        onJobUpdatedRef.current?.(data);
+      }
     } catch (e) {
       setPdfError(e instanceof Error ? e.message : 'PDF download failed.');
     } finally {
@@ -799,9 +821,11 @@ export function WorkOrderDetailPage({
             </h2>
             <p className="wo-detail-preview-copy">Tap the preview to open the full sheet.</p>
           </div>
-          <span className={`iw-status-chip${woPreviewSignatureBadgeClass}`}>
-            {signatureState.displayLabel}
-          </span>
+          {woPreviewSignatureChip ? (
+            <span className={`iw-status-chip${woPreviewSignatureChip.className}`}>
+              {woPreviewSignatureChip.label}
+            </span>
+          ) : null}
         </div>
         <div
           ref={woPreviewViewportRef}

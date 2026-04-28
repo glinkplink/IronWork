@@ -266,13 +266,24 @@ describe('InvoicesPage', () => {
     expect(within(screen.getByRole('list')).getAllByText(/^Paid$/i)).toHaveLength(2);
   });
 
-  it('renders draft, invoiced, and paid status pills using the canonical iw-status-chip', async () => {
+  it('renders draft, downloaded, invoiced, and paid status pills using the canonical iw-status-chip', async () => {
     listInvoicesWithCustomerName.mockResolvedValue({
       data: [
       withListFields(
         baseInvoice({ id: 'inv-draft', invoice_number: 1, issued_at: null, payment_status: 'unpaid' }),
         'Draft Customer',
         1
+      ),
+      withListFields(
+        baseInvoice({
+          id: 'inv-downloaded',
+          invoice_number: 5,
+          issued_at: null,
+          downloaded_at: '2025-01-18T00:00:00Z',
+          payment_status: 'unpaid',
+        }),
+        'Downloaded Customer',
+        5
       ),
       withListFields(
         baseInvoice({
@@ -305,6 +316,10 @@ describe('InvoicesPage', () => {
     const list = await screen.findByRole('list');
 
     expect(within(list).getByText('Draft')).toHaveClass('iw-status-chip', 'iw-status-chip--draft');
+    expect(within(list).getByText('Downloaded')).toHaveClass(
+      'iw-status-chip',
+      'iw-status-chip--draft'
+    );
     expect(within(list).getByText('Pending')).toHaveClass(
       'iw-status-chip',
       'iw-status-chip--outstanding'

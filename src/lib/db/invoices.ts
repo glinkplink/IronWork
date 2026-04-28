@@ -29,6 +29,7 @@ type BaseInvoiceStatusRow = {
   id: string;
   job_id: string;
   issued_at: string | null;
+  downloaded_at?: string | null;
   invoice_number: number;
   created_at: string;
   payment_status: 'unpaid' | 'paid' | 'offline';
@@ -90,6 +91,7 @@ export function mapInvoiceRow(data: Record<string, unknown>): Invoice {
     due_date: data.due_date as string,
     status: data.status as Invoice['status'],
     issued_at: (data.issued_at as string | null) ?? null,
+    downloaded_at: (data.downloaded_at as string | null) ?? null,
     line_items,
     stripe_payment_link_id: (data.stripe_payment_link_id as string | null) ?? null,
     stripe_payment_url: (data.stripe_payment_url as string | null) ?? null,
@@ -162,6 +164,7 @@ export const updateInvoice = async (
     due_date: invoice.due_date,
     status: invoice.status,
     issued_at: invoice.issued_at,
+    downloaded_at: invoice.downloaded_at,
     line_items: invoice.line_items,
     subtotal: invoice.subtotal,
     tax_rate: invoice.tax_rate,
@@ -230,6 +233,8 @@ function mapBaseInvoiceStatusRow(row: Record<string, unknown>): BaseInvoiceStatu
   const created_at = row.created_at;
   if (typeof created_at !== 'string') return null;
   const issued_at = typeof row.issued_at === 'string' && row.issued_at.trim() ? row.issued_at : null;
+  const downloaded_at =
+    typeof row.downloaded_at === 'string' && row.downloaded_at.trim() ? row.downloaded_at : null;
   const paymentStatusRaw = row.payment_status;
   const payment_status: 'unpaid' | 'paid' | 'offline' =
     paymentStatusRaw === 'paid' || paymentStatusRaw === 'offline' ? paymentStatusRaw : 'unpaid';
@@ -237,6 +242,7 @@ function mapBaseInvoiceStatusRow(row: Record<string, unknown>): BaseInvoiceStatu
     id,
     job_id,
     issued_at,
+    ...(downloaded_at ? { downloaded_at } : {}),
     invoice_number,
     created_at,
     payment_status,
@@ -356,7 +362,7 @@ export const listInvoiceStatusByJob = async (
 ): Promise<ListInvoiceStatusByJobResult> => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, job_id, issued_at, invoice_number, created_at, line_items, payment_status')
+    .select('id, job_id, issued_at, downloaded_at, invoice_number, created_at, line_items, payment_status')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -390,7 +396,7 @@ export const listInvoiceStatusByChangeOrder = async (
 ): Promise<ListInvoiceStatusByChangeOrderResult> => {
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, job_id, issued_at, invoice_number, created_at, line_items')
+    .select('id, job_id, issued_at, downloaded_at, invoice_number, created_at, line_items')
     .eq('user_id', userId)
     .eq('job_id', jobId)
     .order('created_at', { ascending: false });

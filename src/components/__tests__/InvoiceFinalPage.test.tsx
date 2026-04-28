@@ -444,7 +444,7 @@ describe('InvoiceFinalPage', () => {
     });
   });
 
-  it('renders the Sent → Opened → Paid timeline and paid summary in the Send Invoice block', () => {
+  it('renders the Sent → Paid timeline and paid summary in the Send Invoice block', () => {
     renderPage(
       baseInvoice({
         issued_at: '2025-01-05T10:00:00Z',
@@ -459,6 +459,55 @@ describe('InvoiceFinalPage', () => {
     expect(within(paymentBlock).getAllByText('Paid').length).toBeGreaterThanOrEqual(1);
     expect(within(paymentBlock).getByText('Payment recorded offline.')).toBeInTheDocument();
     expect(within(paymentBlock).queryByText(/iw-status-chip--paid/)).not.toBeInTheDocument();
+  });
+
+  it('renders invoice detail status chips for downloaded, sent, Stripe, and paid states', () => {
+    const cases = [
+      {
+        invoice: baseInvoice({ downloaded_at: '2025-01-02T00:00:00Z' }),
+        label: 'Downloaded',
+        className: 'iw-status-chip--draft',
+      },
+      {
+        invoice: baseInvoice({ issued_at: '2025-01-05T10:00:00Z' }),
+        label: 'Sent',
+        className: 'iw-status-chip--outstanding',
+      },
+      {
+        invoice: baseInvoice({
+          issued_at: '2025-01-05T10:00:00Z',
+          stripe_payment_link_id: 'plink_123',
+        }),
+        label: 'Sent via Stripe',
+        className: 'iw-status-chip--outstanding',
+      },
+      {
+        invoice: baseInvoice({
+          issued_at: '2025-01-05T10:00:00Z',
+          payment_status: 'paid',
+        }),
+        label: 'Paid via Stripe',
+        className: 'iw-status-chip--paid',
+      },
+      {
+        invoice: baseInvoice({
+          issued_at: '2025-01-05T10:00:00Z',
+          payment_status: 'offline',
+        }),
+        label: 'Paid offline',
+        className: 'iw-status-chip--offline',
+      },
+    ];
+
+    for (const testCase of cases) {
+      const { unmount } = renderPage(testCase.invoice);
+      const preview = screen.getByRole('region', { name: /^Preview$/i });
+      expect(within(preview).getByText(testCase.label)).toHaveClass(
+        'iw-status-chip',
+        testCase.className
+      );
+      unmount();
+    }
   });
 
   it('disables send and payment-link actions before the work order is signed', () => {

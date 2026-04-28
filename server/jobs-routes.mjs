@@ -35,7 +35,75 @@ export async function tryHandleJobsRoute(req, res, helpers) {
     return await handleBackfillFromClient(req, res, { sendJson });
   }
 
+  // POST /api/jobs/:jobId/mark-downloaded
+  if (req.method === 'POST' && /^\/api\/jobs\/[^/]+\/mark-downloaded$/.test(pathOnly)) {
+    return await handleMarkDownloaded(req, res, { sendJson });
+  }
+
   return false;
+}
+
+async function handleMarkDownloaded(req, res, { sendJson }) {
+  const auth = await verifyBearerUser(req);
+  if (!auth.ok) {
+    sendJson(res, auth.status, { error: auth.error });
+    return true;
+  }
+  const { userId } = auth;
+
+  const jobId = jobIdFromPath(req, 'mark-downloaded');
+  if (!jobId) {
+    sendJson(res, 400, { error: 'Invalid job ID' });
+    return true;
+  }
+
+  const supabase = getServiceSupabase();
+
+  const { data: job, error: jobErr } = await supabase
+    .from('jobs')
+    .select('id, user_id, last_downloaded_at')
+    .eq('id', jobId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (jobErr) {
+    log.error('mark-downloaded job load error', log.errCtx(jobErr));
+    sendJson(res, 500, { error: 'Could not load work order.' });
+    return true;
+  }
+  if (!job) {
+    sendJson(res, 404, { error: 'Work order not found' });
+    return true;
+  }
+
+  if (job.last_downloaded_at) {
+    const { data: fresh } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', jobId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    sendJson(res, 200, { job: fresh || job, updated: false });
+    return true;
+  }
+
+  const { data: updated, error: updateErr } = await supabase
+    .from('jobs')
+    .update({ last_downloaded_at: new Date().toISOString() })
+    .eq('id', jobId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (updateErr) {
+    log.error('mark-downloaded job update error', log.errCtx(updateErr));
+    sendJson(res, 500, { error: 'Could not update work order.' });
+    return true;
+  }
+
+  log.info('marked job downloaded', { jobId, userId });
+  sendJson(res, 200, { job: updated, updated: true });
+  return true;
 }
 
 async function handleBackfillFromClient(req, res, { sendJson }) {

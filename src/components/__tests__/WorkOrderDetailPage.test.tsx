@@ -240,6 +240,21 @@ async function flushAsync() {
   });
 }
 
+function renderDetail(job: Job = minimalJob()) {
+  return render(
+    <WorkOrderDetailPage
+      userId="u1"
+      jobId={job.id}
+      job={job}
+      profile={minimalProfile()}
+      onBack={() => {}}
+      onStartChangeOrder={() => {}}
+      onStartChangeOrderInvoice={() => {}}
+      onOpenCODetail={() => {}}
+    />
+  );
+}
+
 describe('WorkOrderDetailPage', () => {
   afterEach(() => {
     cleanup();
@@ -306,6 +321,41 @@ describe('WorkOrderDetailPage', () => {
     };
     mockFns.pollWorkOrderEsignStatus.mockResolvedValue(defaultPoll);
     mockFns.setCoBlockResult({ blocks: false, error: null });
+  });
+
+  it('renders work-order detail status chips for downloaded and signature states', async () => {
+    mockFns.pollWorkOrderEsignStatus.mockRejectedValue(new Error('status refresh skipped'));
+    renderDetail(minimalJob());
+    await screen.findByRole('heading', { name: /^Preview$/i });
+    expect(screen.queryByText('Downloaded')).not.toBeInTheDocument();
+    cleanup();
+
+    const cases = [
+      {
+        job: { ...minimalJob(), last_downloaded_at: '2025-01-01T12:00:00Z' },
+        label: 'Downloaded',
+        className: 'iw-status-chip--draft',
+      },
+      { job: jobWithEsign('sent'), label: 'Sent', className: 'iw-status-chip--draft' },
+      { job: jobWithEsign('opened'), label: 'Opened', className: 'iw-status-chip--draft' },
+      { job: jobWithEsign('completed'), label: 'Signed', className: 'iw-status-chip--paid' },
+      {
+        job: { ...minimalJob(), offline_signed_at: '2025-01-01T12:00:00Z' },
+        label: 'Signed offline',
+        className: 'iw-status-chip--offline',
+      },
+    ];
+
+    for (const testCase of cases) {
+      mockFns.getJobById.mockResolvedValue(testCase.job);
+      renderDetail(testCase.job);
+      const preview = await screen.findByRole('region', { name: /^Preview$/i });
+      expect(within(preview).getByText(testCase.label)).toHaveClass(
+        'iw-status-chip',
+        testCase.className
+      );
+      cleanup();
+    }
   });
 
   it('shows change-order rows without standalone invoice controls', async () => {

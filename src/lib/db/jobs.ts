@@ -21,6 +21,7 @@ const WORK_ORDER_LIST_SELECT = `
   created_at,
   price,
   esign_status,
+  last_downloaded_at,
   offline_signed_at,
   change_orders (
     id,
@@ -83,6 +84,11 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
     typeof offlineSignedAtRaw === 'string' && offlineSignedAtRaw.trim()
       ? offlineSignedAtRaw.trim()
       : null;
+  const lastDownloadedAtRaw = row.last_downloaded_at;
+  const last_downloaded_at =
+    typeof lastDownloadedAtRaw === 'string' && lastDownloadedAtRaw.trim()
+      ? lastDownloadedAtRaw.trim()
+      : null;
 
   return {
     id: String(row.id),
@@ -94,6 +100,7 @@ function mapWorkOrderListRow(row: Record<string, unknown>): WorkOrderListJob {
     created_at: String(row.created_at ?? ''),
     price,
     esign_status,
+    last_downloaded_at,
     offline_signed_at,
     changeOrders,
   };
@@ -104,6 +111,8 @@ function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderIn
   const job_id = row.job_id;
   const issued_at =
     typeof row.issued_at === 'string' && row.issued_at.trim() ? row.issued_at : null;
+  const downloaded_at =
+    typeof row.downloaded_at === 'string' && row.downloaded_at.trim() ? row.downloaded_at : null;
   const created_at = row.created_at;
   const invoice_number = row.invoice_number;
   const payment_status = (row.payment_status as WorkOrderInvoiceStatus['payment_status']) ?? 'unpaid';
@@ -118,6 +127,7 @@ function mapWorkOrderInvoiceStatusRow(row: Record<string, unknown>): WorkOrderIn
     id,
     job_id,
     issued_at,
+    ...(downloaded_at ? { downloaded_at } : {}),
     invoice_number: parsedInvoiceNumber,
     created_at,
     payment_status,
@@ -167,6 +177,11 @@ function mapWorkOrderDashboardRow(row: Record<string, unknown>): WorkOrderDashbo
     typeof offlineSignedAtRaw === 'string' && offlineSignedAtRaw.trim()
       ? offlineSignedAtRaw.trim()
       : null;
+  const lastDownloadedAtRaw = row.last_downloaded_at;
+  const last_downloaded_at =
+    typeof lastDownloadedAtRaw === 'string' && lastDownloadedAtRaw.trim()
+      ? lastDownloadedAtRaw.trim()
+      : null;
 
   return {
     id: String(row.id),
@@ -178,6 +193,7 @@ function mapWorkOrderDashboardRow(row: Record<string, unknown>): WorkOrderDashbo
     created_at: String(row.created_at ?? ''),
     price,
     esign_status,
+    last_downloaded_at,
     offline_signed_at,
     changeOrderCount,
     changeOrderPreview: fullChangeOrders.slice(0, 2),

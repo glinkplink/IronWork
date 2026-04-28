@@ -67,6 +67,10 @@ function getWorkOrderRowStatusChip(
     return { className: 'iw-status-chip iw-status-chip--outstanding', label: 'Opened' };
   }
 
+  if (job.esign_status === 'not_sent' && job.last_downloaded_at) {
+    return { className: 'iw-status-chip iw-status-chip--draft', label: 'Downloaded' };
+  }
+
   if (job.esign_status === 'declined') {
     return { className: 'iw-status-chip iw-status-chip--negative', label: 'Declined' };
   }

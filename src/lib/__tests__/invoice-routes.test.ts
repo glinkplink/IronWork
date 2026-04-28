@@ -72,6 +72,7 @@ function fullUpdatedInvoice() {
     due_date: '2025-01-15',
     status: 'draft',
     issued_at: '2025-01-02T00:00:00Z',
+    downloaded_at: '2025-01-02T00:00:00Z',
     line_items: [],
     subtotal: 100,
     tax_rate: 0,
@@ -253,7 +254,7 @@ describe('tryHandleInvoiceRoute offline paid mark/unmark', () => {
   });
 });
 
-describe('tryHandleInvoiceRoute mark-issued', () => {
+describe('tryHandleInvoiceRoute mark-downloaded', () => {
   const prevEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
@@ -269,7 +270,7 @@ describe('tryHandleInvoiceRoute mark-issued', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = prevEnv.SUPABASE_SERVICE_ROLE_KEY;
   });
 
-  it('marks a draft invoice as issued and returns updated row', async () => {
+  it('marks a draft invoice as downloaded and returns updated row', async () => {
     const updated = fullUpdatedInvoice();
     const single = vi.fn(async () => ({ data: updated, error: null }));
     const selectSingle = vi.fn(() => ({ single }));
@@ -278,7 +279,7 @@ describe('tryHandleInvoiceRoute mark-issued', () => {
     const update = vi.fn(() => ({ eq: updateEqId }));
 
     const invoiceMaybeSingle = vi.fn(async () => ({
-      data: { id: INVOICE_UUID, user_id: USER_UUID, issued_at: null, job_id: 'job-1' },
+      data: { id: INVOICE_UUID, user_id: USER_UUID, downloaded_at: null, job_id: 'job-1' },
       error: null,
     }));
     const invoiceLoadEqUser = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
@@ -312,7 +313,7 @@ describe('tryHandleInvoiceRoute mark-issued', () => {
     await tryHandleInvoiceRoute(
       {
         method: 'POST',
-        url: `/api/invoices/${INVOICE_UUID}/mark-issued`,
+        url: `/api/invoices/${INVOICE_UUID}/mark-downloaded`,
         headers: { authorization: 'Bearer token' },
       },
       res,
@@ -320,12 +321,12 @@ describe('tryHandleInvoiceRoute mark-issued', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(update).toHaveBeenCalledWith({ issued_at: expect.any(String) });
+    expect(update).toHaveBeenCalledWith({ downloaded_at: expect.any(String) });
   });
 
   it('returns 409 when work order is not signed', async () => {
     const invoiceMaybeSingle = vi.fn(async () => ({
-      data: { id: INVOICE_UUID, user_id: USER_UUID, issued_at: null, job_id: 'job-1' },
+      data: { id: INVOICE_UUID, user_id: USER_UUID, downloaded_at: null, job_id: 'job-1' },
       error: null,
     }));
     const invoiceLoadEqUser = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
@@ -354,7 +355,7 @@ describe('tryHandleInvoiceRoute mark-issued', () => {
     await tryHandleInvoiceRoute(
       {
         method: 'POST',
-        url: `/api/invoices/${INVOICE_UUID}/mark-issued`,
+        url: `/api/invoices/${INVOICE_UUID}/mark-downloaded`,
         headers: { authorization: 'Bearer token' },
       },
       res,
@@ -365,16 +366,66 @@ describe('tryHandleInvoiceRoute mark-issued', () => {
     expect(JSON.parse(res.body).error).toMatch(/signed/i);
   });
 
-  it('returns 200 idempotently when invoice is already issued', async () => {
+  it('returns 409 when change orders are still pending', async () => {
     const invoiceMaybeSingle = vi.fn(async () => ({
-      data: { id: INVOICE_UUID, user_id: USER_UUID, issued_at: '2025-01-01T00:00:00Z', job_id: 'job-1' },
+      data: { id: INVOICE_UUID, user_id: USER_UUID, downloaded_at: null, job_id: 'job-1' },
+      error: null,
+    }));
+    const invoiceLoadEqUser = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceLoadEqId = vi.fn(() => ({ eq: invoiceLoadEqUser }));
+
+    const jobMaybeSingle = vi.fn(async () => ({
+      data: { esign_status: 'completed', offline_signed_at: null },
+      error: null,
+    }));
+    const jobLoadEqUser = vi.fn(() => ({ maybeSingle: jobMaybeSingle }));
+    const jobLoadEqId = vi.fn(() => ({ eq: jobLoadEqUser }));
+
+    const from = vi.fn((table: string) => {
+      if (table === 'invoices') return { select: vi.fn(() => ({ eq: invoiceLoadEqId })) };
+      if (table === 'jobs') return { select: vi.fn(() => ({ eq: jobLoadEqId })) };
+      if (table === 'change_orders') {
+        const coEqUser = vi.fn(async () => ({
+          data: [{ esign_status: 'sent', offline_signed_at: null }],
+          error: null,
+        }));
+        const coEqJob = vi.fn(() => ({ eq: coEqUser }));
+        return { select: vi.fn(() => ({ eq: coEqJob })) };
+      }
+      return { select: vi.fn(() => ({ eq: invoiceLoadEqId })) };
+    });
+
+    const supabase = {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: USER_UUID } }, error: null })) },
+      from,
+    };
+    createClientMock.mockReturnValue(supabase);
+    const res = captureRes();
+
+    await tryHandleInvoiceRoute(
+      {
+        method: 'POST',
+        url: `/api/invoices/${INVOICE_UUID}/mark-downloaded`,
+        headers: { authorization: 'Bearer token' },
+      },
+      res,
+      helpers()
+    );
+
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body).error).toMatch(/change order/i);
+  });
+
+  it('returns 200 idempotently when invoice is already downloaded', async () => {
+    const invoiceMaybeSingle = vi.fn(async () => ({
+      data: { id: INVOICE_UUID, user_id: USER_UUID, downloaded_at: '2025-01-01T00:00:00Z', job_id: 'job-1' },
       error: null,
     }));
     const invoiceLoadEqUser = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
     const invoiceLoadEqId = vi.fn(() => ({ eq: invoiceLoadEqUser }));
 
     const freshMaybeSingle = vi.fn(async () => ({
-      data: { ...fullUpdatedInvoice(), issued_at: '2025-01-01T00:00:00Z' },
+      data: { ...fullUpdatedInvoice(), downloaded_at: '2025-01-01T00:00:00Z' },
       error: null,
     }));
     const freshLoadEqUser = vi.fn(() => ({ maybeSingle: freshMaybeSingle }));
@@ -401,7 +452,7 @@ describe('tryHandleInvoiceRoute mark-issued', () => {
     await tryHandleInvoiceRoute(
       {
         method: 'POST',
-        url: `/api/invoices/${INVOICE_UUID}/mark-issued`,
+        url: `/api/invoices/${INVOICE_UUID}/mark-downloaded`,
         headers: { authorization: 'Bearer token' },
       },
       res,
@@ -417,7 +468,7 @@ describe('tryHandleInvoiceRoute mark-issued', () => {
     await tryHandleInvoiceRoute(
       {
         method: 'POST',
-        url: `/api/invoices/${INVOICE_UUID}/mark-issued`,
+        url: `/api/invoices/${INVOICE_UUID}/mark-downloaded`,
         headers: {},
       },
       res,

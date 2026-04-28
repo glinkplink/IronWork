@@ -5,7 +5,7 @@ import { generateInvoiceHtml } from '../lib/invoice-generator';
 import { getInvoice, getInvoiceBusinessStatus, updateInvoice } from '../lib/db/invoices';
 import { fetchWithSupabaseAuth } from '../lib/fetch-with-supabase-auth';
 import { sendInvoice } from '../lib/invoice-send';
-import { markInvoiceIssued } from '../lib/invoice-mark-issued';
+import { markInvoiceDownloaded } from '../lib/invoice-mark-downloaded';
 import { getWorkOrderSignatureState } from '../lib/work-order-signature';
 import { listChangeOrders } from '../lib/db/change-orders';
 import { computeSignedCOLines } from '../lib/invoice-line-items';
@@ -202,20 +202,25 @@ export function InvoiceFinalPage({
   const isPaidOffline = invoiceProp.payment_status === 'offline';
   const isPaidStripe = invoiceProp.payment_status === 'paid';
   const isPaid = isPaidStripe || isPaidOffline;
-  const invoiceStatusLabel = isPaidOffline
-    ? 'Paid offline'
-    : isPaidStripe
-      ? 'Paid'
-      : isReadOnly
-        ? 'Pending'
-        : 'Draft';
-  const invoiceStatusClass = isPaidOffline
-    ? ' iw-status-chip--offline'
-    : isPaidStripe
-      ? ' iw-status-chip--paid'
-      : isReadOnly
-        ? ' iw-status-chip--outstanding'
-        : ' iw-status-chip--draft';
+  const invoiceStatusChip = (() => {
+    if (isPaidOffline) {
+      return { label: 'Paid offline', className: ' iw-status-chip--offline' };
+    }
+    if (isPaidStripe) {
+      return { label: 'Paid via Stripe', className: ' iw-status-chip--paid' };
+    }
+    if (isReadOnly) {
+      return {
+        label: invoiceProp.stripe_payment_link_id ? 'Sent via Stripe' : 'Sent',
+        className: ' iw-status-chip--outstanding',
+      };
+    }
+    if (invoiceProp.downloaded_at) {
+      return { label: 'Downloaded', className: ' iw-status-chip--draft' };
+    }
+    return null;
+  })();
+  const invoiceStatusPlainLabel = invoiceStatusChip ? null : 'Draft';
 
   const flashPaymentLinkCopied = () => {
     if (paymentLinkCopiedTimeoutRef.current !== null) {
@@ -340,17 +345,18 @@ export function InvoiceFinalPage({
         getInvoicePdfFilename(invoiceProp.invoice_number, job.customer_name)
       );
 
-      // Mark invoice as issued after successful download (if not already issued)
-      if (!invoiceProp.issued_at) {
-        const { data: issued, error: issueErr } = await markInvoiceIssued(invoiceProp.id);
-        if (issueErr) {
+      if (!invoiceProp.downloaded_at) {
+        const { data: downloaded, error: downloadMarkErr } = await markInvoiceDownloaded(
+          invoiceProp.id
+        );
+        if (downloadMarkErr) {
           setDownloadError(
-            `Invoice downloaded, but could not update status: ${issueErr.message}. Try sending the invoice to sync status.`
+            `Invoice downloaded, but could not update status: ${downloadMarkErr.message}.`
           );
           return;
         }
-        if (issued) {
-          onInvoiceUpdated(issued);
+        if (downloaded) {
+          onInvoiceUpdated(downloaded);
         }
       }
     } catch (e) {
@@ -661,9 +667,15 @@ export function InvoiceFinalPage({
         <div className="invoice-final-preview-meta">
           <div className="invoice-final-preview-status-row">
             <p className="invoice-final-preview-invoice-number">{invoiceSubline}</p>
-            <span className={`iw-status-chip${invoiceStatusClass}`}>
-              {invoiceStatusLabel}
-            </span>
+            {invoiceStatusChip ? (
+              <span className={`iw-status-chip${invoiceStatusChip.className}`}>
+                {invoiceStatusChip.label}
+              </span>
+            ) : (
+              <span className="invoice-final-preview-status-text">
+                {invoiceStatusPlainLabel}
+              </span>
+            )}
           </div>
           {isPaid && invoiceProp.paid_at ? (
             <span className="invoice-final-status-date">

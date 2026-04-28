@@ -104,6 +104,8 @@ export interface Job {
   esign_declined_at: string | null;
   esign_decline_reason: string | null;
   esign_signed_document_url: string | null;
+  /** First successful work-order PDF download. */
+  last_downloaded_at?: string | null;
   /** Manual paper signature tracking (null = not offline-signed). */
   offline_signed_at: string | null;
 }
@@ -137,6 +139,7 @@ export interface WorkOrderListJob {
   created_at: string;
   price: number;
   esign_status: EsignJobStatus;
+  last_downloaded_at?: string | null;
   offline_signed_at: string | null;
   changeOrders: WorkOrderListChangeOrderPreview[];
 }
@@ -151,6 +154,7 @@ export interface WorkOrderDashboardJob {
   created_at: string;
   price: number;
   esign_status: EsignJobStatus;
+  last_downloaded_at?: string | null;
   offline_signed_at: string | null;
   changeOrderCount: number;
   changeOrderPreview: WorkOrderListChangeOrderPreview[];
@@ -183,6 +187,7 @@ export interface WorkOrderInvoiceStatus {
   id: string;
   job_id: string;
   issued_at: string | null;
+  downloaded_at?: string | null;
   invoice_number: number;
   created_at: string;
   payment_status: 'unpaid' | 'paid' | 'offline';
@@ -228,6 +233,7 @@ export interface Invoice {
   /** Legacy compatibility field; business lifecycle now derives from `issued_at`. */
   status: 'draft' | 'downloaded';
   issued_at: string | null;
+  downloaded_at?: string | null;
   line_items: InvoiceLineItem[];
   subtotal: number;
   tax_rate: number;
