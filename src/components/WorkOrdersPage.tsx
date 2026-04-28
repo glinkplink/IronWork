@@ -171,10 +171,10 @@ function matchesWorkOrderSearch(job: WorkOrderDashboardJob, searchTerm: string):
 type WorkOrderRowProps = {
   job: WorkOrderDashboardJob;
   onOpenDetail: (job: WorkOrderDashboardJob) => void;
-  onOpenChangeOrdersSection: (job: WorkOrderDashboardJob) => void;
+  onStartInvoice: (job: WorkOrderDashboardJob) => void;
 };
 
-const WorkOrderRow = memo(function WorkOrderRow({ job, onOpenDetail, onOpenChangeOrdersSection }: WorkOrderRowProps) {
+const WorkOrderRow = memo(function WorkOrderRow({ job, onOpenDetail, onStartInvoice }: WorkOrderRowProps) {
   const woLabel = formatWorkOrderDashboardWoLabel(job);
   const jobMetaLabel = formatWorkOrderDashboardRowDate(job);
   const statusChip = getWorkOrderRowStatusChip(job);
@@ -208,10 +208,13 @@ const WorkOrderRow = memo(function WorkOrderRow({ job, onOpenDetail, onOpenChang
         <div className="work-orders-row-footer">
           <button
             type="button"
-            className="work-orders-change-orders-link"
-            onClick={() => onOpenChangeOrdersSection(job)}
+            className="work-orders-create-invoice-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartInvoice(job);
+            }}
           >
-            View & Create Change Orders
+            Create Invoice
           </button>
         </div>
       </div>
@@ -227,6 +230,7 @@ interface WorkOrdersPageProps {
   onCreateWorkOrder: () => void;
   onCompleteProfileClick: () => void;
   onOpenWorkOrderDetail: (jobId: string, targetSection?: 'top' | 'change-orders') => void;
+  onStartInvoice: (jobId: string) => void;
 }
 
 export function WorkOrdersPage({
@@ -237,6 +241,7 @@ export function WorkOrdersPage({
   onCreateWorkOrder,
   onCompleteProfileClick,
   onOpenWorkOrderDetail,
+  onStartInvoice,
 }: WorkOrdersPageProps) {
   const [jobs, setJobs] = useState<WorkOrderDashboardJob[]>([]);
   const [jobsLoading, setJobsLoading] = useState(true);
@@ -254,6 +259,13 @@ export function WorkOrdersPage({
       onOpenWorkOrderDetail(listJob.id);
     },
     [onOpenWorkOrderDetail]
+  );
+
+  const handleStartInvoice = useCallback(
+    (listJob: WorkOrderDashboardJob) => {
+      onStartInvoice(listJob.id);
+    },
+    [onStartInvoice]
   );
 
   const hideCtaKey = `${HIDE_COMPLETE_PROFILE_CTA_PREFIX}${userId}`;
@@ -323,13 +335,6 @@ export function WorkOrdersPage({
     }
     setProfileNudgeDismissedActive(true);
   };
-
-  const handleOpenChangeOrdersSection = useCallback(
-    (job: WorkOrderDashboardJob) => {
-      onOpenWorkOrderDetail(job.id, 'change-orders');
-    },
-    [onOpenWorkOrderDetail]
-  );
 
   const handleLoadMore = useCallback(() => {
     if (loadMoreLoading || !hasMore || !nextCursor) return;
@@ -515,7 +520,7 @@ export function WorkOrdersPage({
                     key={job.id}
                     job={job}
                     onOpenDetail={handleOpenDetail}
-                    onOpenChangeOrdersSection={handleOpenChangeOrdersSection}
+                    onStartInvoice={handleStartInvoice}
                   />
                 ))}
               </ul>

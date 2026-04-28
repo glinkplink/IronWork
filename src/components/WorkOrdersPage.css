@@ -541,43 +541,45 @@
 
 .work-orders-page .work-orders-row-footer {
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 
-.work-orders-page .work-orders-change-orders-link {
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
+.work-orders-page .work-orders-create-invoice-btn {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px var(--space-md);
+  border: 1px solid rgba(255, 140, 0, 0.35);
+  border-radius: var(--shell-radius-sm);
+  background: rgba(255, 140, 0, 0.1);
   font: inherit;
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--spark);
   text-align: center;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.15em;
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.work-orders-page .work-orders-change-orders-link:hover:not(:disabled) {
-  color: var(--spark);
-  filter: brightness(1.1);
+.work-orders-page .work-orders-create-invoice-btn:hover:not(:disabled) {
+  background: rgba(255, 140, 0, 0.18);
+  border-color: rgba(255, 140, 0, 0.55);
 }
 
-.work-orders-page .work-orders-change-orders-link:focus {
+.work-orders-page .work-orders-create-invoice-btn:focus {
   outline: none;
 }
 
-.work-orders-page .work-orders-change-orders-link:focus-visible {
+.work-orders-page .work-orders-create-invoice-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring-spark);
-  border-radius: 2px;
 }
 
-.work-orders-page .work-orders-change-orders-link:disabled {
+.work-orders-page .work-orders-create-invoice-btn:disabled {
   opacity: 0.65;
   cursor: wait;
 }
