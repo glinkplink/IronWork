@@ -20,6 +20,16 @@ import {
 } from '../lib/agreement-pdf';
 import './InvoiceFinalPage.css';
 
+function formatTimestampDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 interface InvoiceFinalPageProps {
   invoice: Invoice;
   job: Job;
@@ -510,19 +520,19 @@ export function InvoiceFinalPage({
             {isPaidOffline && invoiceProp.paid_at ? (
               <div className="wo-esign-meta-row">
                 <dt>Paid offline</dt>
-                <dd>{new Date(invoiceProp.paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</dd>
+                <dd>{formatTimestampDate(invoiceProp.paid_at)}</dd>
               </div>
             ) : null}
             {invoiceProp.issued_at ? (
               <div className="wo-esign-meta-row">
                 <dt>Sent</dt>
-                <dd>{new Date(invoiceProp.issued_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</dd>
+                <dd>{formatTimestampDate(invoiceProp.issued_at)}</dd>
               </div>
             ) : null}
             {isPaidStripe && invoiceProp.paid_at ? (
               <div className="wo-esign-meta-row">
                 <dt>Paid</dt>
-                <dd>{new Date(invoiceProp.paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</dd>
+                <dd>{formatTimestampDate(invoiceProp.paid_at)}</dd>
               </div>
             ) : null}
           </dl>
@@ -676,12 +686,7 @@ export function InvoiceFinalPage({
           </div>
           {isPaid && invoiceProp.paid_at ? (
             <span className="invoice-final-status-date">
-              Paid{' '}
-              {new Date(invoiceProp.paid_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
+              Paid {formatTimestampDate(invoiceProp.paid_at)}
             </span>
           ) : null}
 
