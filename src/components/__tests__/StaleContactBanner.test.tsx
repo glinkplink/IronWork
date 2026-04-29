@@ -128,6 +128,63 @@ describe('StaleContactBanner', () => {
     expect(screen.getByText(/no customer email on file/i)).toBeInTheDocument();
   });
 
+  it('does not render empty-state while a linked client lookup is pending', () => {
+    const job = makeJob({ customer_email: null, customer_phone: null, client_id: 'client-1' });
+    const { container } = render(
+      <StaleContactBanner
+        job={job}
+        client={null}
+        clientLoading
+        onJobBackfilled={vi.fn()}
+        onEditClient={vi.fn()}
+      />
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText(/no customer email on file/i)).not.toBeInTheDocument();
+  });
+
+  it('offers backfill once linked client contact info is available after loading', () => {
+    const job = makeJob({ customer_email: null, customer_phone: null, client_id: 'client-1' });
+    const { rerender } = render(
+      <StaleContactBanner
+        job={job}
+        client={null}
+        clientLoading
+        onJobBackfilled={vi.fn()}
+        onEditClient={vi.fn()}
+      />
+    );
+
+    rerender(
+      <StaleContactBanner
+        job={job}
+        client={makeClient({ email: 'jane@example.com', phone: '555-1234' })}
+        clientLoading={false}
+        onJobBackfilled={vi.fn()}
+        onEditClient={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/email \(jane@example\.com\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/phone \(555-1234\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no customer email on file/i)).not.toBeInTheDocument();
+  });
+
+  it('renders empty-state after linked client lookup completes with no email', () => {
+    render(
+      <StaleContactBanner
+        job={makeJob({ customer_email: null, client_id: 'client-1' })}
+        client={makeClient({ email: null })}
+        clientLoading={false}
+        onJobBackfilled={vi.fn()}
+        onEditClient={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/no customer email on file/i)).toBeInTheDocument();
+  });
+
   it('offers to backfill email when job email is empty and client has one', () => {
     const job = makeJob({ customer_email: null, customer_phone: '555' });
     render(

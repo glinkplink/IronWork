@@ -141,6 +141,7 @@ export function WorkOrderDetailPage({
   const [jobLoading, setJobLoading] = useState(() => initialJob === null);
   const [jobLoadError, setJobLoadError] = useState('');
   const [linkedClient, setLinkedClient] = useState<Client | null>(null);
+  const [linkedClientLoading, setLinkedClientLoading] = useState(false);
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([]);
   const [coLoading, setCoLoading] = useState(true);
   const [coError, setCoError] = useState('');
@@ -194,12 +195,18 @@ export function WorkOrderDetailPage({
     const clientId = job?.client_id;
     if (!clientId) {
       setLinkedClient(null);
+      setLinkedClientLoading(false);
       return;
     }
     let cancelled = false;
+    setLinkedClient(null);
+    setLinkedClientLoading(true);
     void (async () => {
       const c = await getClientById(clientId);
-      if (!cancelled) setLinkedClient(c);
+      if (!cancelled) {
+        setLinkedClient(c);
+        setLinkedClientLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -672,6 +679,7 @@ export function WorkOrderDetailPage({
         <StaleContactBanner
           job={job}
           client={linkedClient}
+          clientLoading={linkedClientLoading}
           onJobBackfilled={handleJobBackfilled}
           onEditClient={onEditClient}
         />

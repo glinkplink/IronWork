@@ -728,7 +728,7 @@ describe('WorkOrdersPage', () => {
 
     const list = latestWorkOrdersListUl();
     const rows = Array.from(list.querySelectorAll('li')) as HTMLElement[];
-    
+
     expect(within(rows[0]).queryByRole('button', { name: /create invoice/i })).not.toBeInTheDocument();
     expect(within(rows[1]).queryByRole('button', { name: /create invoice/i })).not.toBeInTheDocument();
   });
@@ -751,7 +751,7 @@ describe('WorkOrdersPage', () => {
     const list = latestWorkOrdersListUl();
     const row = list.querySelector('li') as HTMLElement;
     const button = within(row).getByRole('button', { name: /create invoice/i });
-    
+
     expect(button).toBeDisabled();
     expect(within(row).getByText('Signature required before invoicing.')).toBeInTheDocument();
   });
@@ -774,7 +774,7 @@ describe('WorkOrdersPage', () => {
     const list = latestWorkOrdersListUl();
     const row = list.querySelector('li') as HTMLElement;
     const button = within(row).getByRole('button', { name: /create invoice/i });
-    
+
     expect(button).not.toBeDisabled();
     expect(within(row).queryByText('Signature required before invoicing.')).not.toBeInTheDocument();
   });
@@ -797,7 +797,7 @@ describe('WorkOrdersPage', () => {
     const list = latestWorkOrdersListUl();
     const row = list.querySelector('li') as HTMLElement;
     const button = within(row).getByRole('button', { name: /create invoice/i });
-    
+
     expect(button).not.toBeDisabled();
   });
 
@@ -812,7 +812,7 @@ describe('WorkOrdersPage', () => {
 
     const list = latestWorkOrdersListUl();
     const row = list.querySelector('li') as HTMLElement;
-    
+
     expect(row.querySelector('.work-orders-row-date-inline')).toBeInTheDocument();
   });
 });

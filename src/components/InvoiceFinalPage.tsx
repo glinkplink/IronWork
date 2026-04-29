@@ -95,6 +95,7 @@ export function InvoiceFinalPage({
   const [paymentLinkCopied, setPaymentLinkCopied] = useState(false);
   const [pendingCOCount, setPendingCOCount] = useState(0);
   const [linkedClient, setLinkedClient] = useState<Client | null>(null);
+  const [linkedClientLoading, setLinkedClientLoading] = useState(false);
 
   const documentRef = useRef<HTMLDivElement | null>(null);
   const paymentLinkCopiedTimeoutRef = useRef<number | null>(null);
@@ -111,12 +112,18 @@ export function InvoiceFinalPage({
     const clientId = job.client_id;
     if (!clientId) {
       setLinkedClient(null);
+      setLinkedClientLoading(false);
       return;
     }
     let cancelled = false;
+    setLinkedClient(null);
+    setLinkedClientLoading(true);
     void (async () => {
       const c = await getClientById(clientId);
-      if (!cancelled) setLinkedClient(c);
+      if (!cancelled) {
+        setLinkedClient(c);
+        setLinkedClientLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -474,6 +481,7 @@ export function InvoiceFinalPage({
       <StaleContactBanner
         job={job}
         client={linkedClient}
+        clientLoading={linkedClientLoading}
         onJobBackfilled={handleJobBackfilled}
         onEditClient={onEditClient}
       />

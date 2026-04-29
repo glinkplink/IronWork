@@ -6,6 +6,7 @@ import './StaleContactBanner.css';
 interface StaleContactBannerProps {
   job: Job;
   client: Client | null;
+  clientLoading?: boolean;
   onJobBackfilled: (job: Job) => void;
   onEditClient: () => void;
 }
@@ -17,6 +18,7 @@ interface StaleContactBannerProps {
 export function StaleContactBanner({
   job,
   client,
+  clientLoading = false,
   onJobBackfilled,
   onEditClient,
 }: StaleContactBannerProps) {
@@ -35,7 +37,7 @@ export function StaleContactBanner({
 
   // Banner only shows when there is something to act on
   const hasBackfill = clientHasNewerEmail || clientHasNewerPhone;
-  const hasNothingOnFile = emailMissingFromJob && !clientEmail;
+  const hasNothingOnFile = emailMissingFromJob && !clientEmail && !clientLoading;
 
   if (!hasBackfill && !hasNothingOnFile) return null;
 
