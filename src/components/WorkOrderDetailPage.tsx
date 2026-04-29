@@ -245,7 +245,7 @@ export function WorkOrderDetailPage({
     spacerHeight: woPreviewSpacerHeight,
     spacerWidth: woPreviewSpacerWidth,
     letterWidthPx: woLetterWidthPx,
-  } = useScaledPreview({ fitPageHeightPx: 280 }, sections);
+  } = useScaledPreview({ fitPageHeightPx: 280, maxVisiblePageCount: 1 }, sections);
 
   const woPreviewHtml = useMemo(
     () =>
