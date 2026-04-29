@@ -1,6 +1,24 @@
 # IronWork
 
-Work agreement generator for contractors (initially welders). Contractors fill out a job form and get a professional PDF agreement to send to clients.
+Mobile-first work orders, e-signatures, and invoices for welders.
+
+IronWork turns a jobsite conversation into a signed work order, clean PDF, change-order trail, and invoice with a payment link. It is built for welding work that changes in the field: repair scope, fabrication details, site conditions, hidden damage, exclusions, deposits, late fees, and workmanship warranty terms are all captured before sparks fly.
+
+## Built For Welding Jobs
+
+- **Lock the scope before the first bead.** Capture the customer, job site, item or structure, requested welding work, materials, exclusions, customer obligations, and payment terms in one mobile form.
+- **Protect against scope creep.** Create signed change orders when a repair exposes more damage or the customer asks for extra fabrication.
+- **Keep the paperwork tied to the work.** Work orders, change orders, signed PDFs, invoices, payment status, and customer records stay organized by job.
+- **Send professional documents from the truck.** Preview the agreement, send for e-signature, download PDFs, and issue invoices without rebuilding the same paperwork by hand.
+- **Get paid with less chasing.** Invoices can include Stripe payment links, saved payment terms, deposits, taxes, late fees, and signed change-order line items.
+
+## Workflow
+
+1. **Create the work order:** customer, job site, welding scope, exclusions, price, deposit, schedule, and warranty.
+2. **Preview the agreement:** numbered, plain-language sections built for welding jobs.
+3. **Send for signature:** DocuSeal e-signature flow, resend support, offline-signed fallback, and signed PDF tracking.
+4. **Manage changes:** add change orders from the work-order detail page and require signature before billing them.
+5. **Invoice the job:** generate a PDF invoice, include approved change orders, send a payment link, and track payment status.
 
 **Important:** This is not a static single-page app you can drop on pure CDN hosting. **Every PDF** (work order, invoice, change order, and combined work order + change orders) is produced by a **Node process** that runs **Puppeteer** against a **local Chrome/Chromium** binary. The UI and `/api/pdf` are intended to run **on the same origin** so the browser can `POST` HTML + metadata to the server without cross-origin configuration.
 
@@ -127,17 +145,16 @@ Session persistence is standard Supabase client behavior (refresh survives page 
 
 ## Features
 
-- Mobile-first responsive design
-- **Open product:** full agreement flow before sign-in; **account + profile stub on first Download & Save**
+- Mobile-first welding work-order form designed for use from the shop, truck, or jobsite
+- Full agreement preview before sign-in; account creation happens on first save, download, or signature send
 - Email/password auth via Supabase
-- Business profile and defaults (exclusions, assumptions, warranty, payment methods, tax, WO/invoice counters, etc.) in the database
-- **Work Orders** list, detail, agreement PDF re-download
-- **Change orders:** wizard from detail, statuses, standalone and combined PDFs, offline-sign support, optional inclusion on the work-order invoice when signature-satisfied (`line_items.source` for stable edit behavior)
-- **Invoices:** wizard from a work order → PDF download; persisted rows
-- **Work Orders dashboard:** contract-value rollups use saved work-order totals (`job.price`), and partial invoice-status parse issues show a warning banner instead of disabling all invoice actions
-- Job site autocomplete (optional Geoapify key)
-- US phone formatting on job form and edit profile
-- Work agreement generator (numbered sections), preview, **server PDF** parity, print support
+- Business profile defaults for exclusions, assumptions, warranty, payment methods, sales tax, and numbering
+- Work order list, detail page, signed status, PDF re-download, and job value rollups
+- Change-order wizard with statuses, offline-sign support, standalone/combined PDFs, and invoice inclusion only after signature satisfaction
+- Invoice wizard from a work order, PDF download, persisted invoice rows, Stripe payment links, and payment status tracking
+- Job site autocomplete with an optional Geoapify key
+- US phone formatting on the job form and edit profile
+- Numbered welding agreement generator with server-rendered PDF parity and print support
 
 ---
 
