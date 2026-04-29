@@ -775,7 +775,7 @@
 
   .work-orders-dashboard-page .work-orders-row--with-invoice-action .work-orders-row-body {
     flex-wrap: wrap;
-    padding-bottom: 14px;
+    padding-bottom: 0;
   }
 
   .work-orders-dashboard-page .work-orders-row--with-invoice-action .work-orders-create-invoice-slot {
@@ -783,8 +783,10 @@
     transform: none;
     width: 100%;
     max-width: none;
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px solid var(--iron-700);
+    margin-top: 15px;
+    margin-bottom: 15px;
+    padding-top: 15px;
+    padding-bottom: 0;
+    border-top: 1.5px solid var(--iron-600);
   }
 }
