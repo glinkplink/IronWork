@@ -590,6 +590,26 @@ function App() {
         />
       );
     }
+    if (view === 'work-order-detail' && user && !profile) {
+      return renderLazyPage(
+        <WorkOrdersPage
+          key={`${user.id}-inv-${invoice.refreshKey}`}
+          userId={user.id}
+          profile={null}
+          successBanner={workOrdersSuccessBanner}
+          onClearSuccessBanner={() => setWorkOrdersSuccessBanner(null)}
+          onCreateWorkOrder={draftFlow.createNewAgreement}
+          onCompleteProfileClick={() => {
+            setProfileEntrySource('work-orders');
+            navigateTo('profile');
+          }}
+          onOpenWorkOrderDetail={handleOpenWorkOrderDetail}
+          onStartInvoice={(jobId: string) => {
+            navigateTo('invoice-wizard', { jobId });
+          }}
+        />
+      );
+    }
     if (view === 'work-order-detail' && user && profile && effectiveWorkOrderDetailJobId) {
       return renderLazyPage(
         <WorkOrderDetailPage

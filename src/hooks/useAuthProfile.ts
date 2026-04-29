@@ -15,6 +15,7 @@ type PostCapturePayloadV2 = {
   ts: number;
   captureKind: 'pdf' | 'esign';
   ok: boolean;
+  jobId: string;
 };
 
 /** Legacy sessionStorage shape (treated as PDF outcome). */
@@ -40,7 +41,7 @@ export function useAuthProfile({
   const [stripeConnectNotice, setStripeConnectNotice] = useState<StripeConnectNotice | null>(null);
 
   const runPostCaptureRedirect = useCallback(
-    ({ captureKind, ok }: CaptureFlowFinishedPayload) => {
+    ({ captureKind, ok, jobId }: CaptureFlowFinishedPayload) => {
       if (captureKind === 'esign') {
         setWorkOrdersSuccessBanner(
           ok
@@ -54,7 +55,7 @@ export function useAuthProfile({
             : 'Work order saved. PDF could not be generated — open the work order to try again.'
         );
       }
-      replaceView('work-orders');
+      replaceView('work-order-detail', { jobId });
     },
     [replaceView, setWorkOrdersSuccessBanner]
   );
@@ -72,6 +73,7 @@ export function useAuthProfile({
         ts: Date.now(),
         captureKind: opts.captureKind,
         ok: opts.ok,
+        jobId: opts.jobId,
       };
 
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
@@ -129,15 +131,17 @@ export function useAuthProfile({
       }
 
       let normalized: CaptureFlowFinishedPayload | null = null;
-      if ('captureKind' in parsed && 'ok' in parsed) {
+      if ('captureKind' in parsed && 'ok' in parsed && 'jobId' in parsed) {
         if (
           (parsed.captureKind === 'pdf' || parsed.captureKind === 'esign') &&
-          typeof parsed.ok === 'boolean'
+          typeof parsed.ok === 'boolean' &&
+          typeof parsed.jobId === 'string' &&
+          parsed.jobId.trim().length > 0
         ) {
-          normalized = { captureKind: parsed.captureKind, ok: parsed.ok };
+          normalized = { captureKind: parsed.captureKind, ok: parsed.ok, jobId: parsed.jobId };
         }
       } else if ('pdfOk' in parsed && typeof parsed.pdfOk === 'boolean') {
-        normalized = { captureKind: 'pdf', ok: parsed.pdfOk };
+        normalized = null;
       }
 
       if (!normalized) {

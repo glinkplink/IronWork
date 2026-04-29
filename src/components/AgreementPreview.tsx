@@ -268,14 +268,14 @@ export function AgreementPreview({
           setConfirmationMessage(
             `Account created! WO #${String(job.wo_number).padStart(4, '0')} saved. Signature request emailed to the customer.`
           );
-          onCaptureFlowFinished?.({ captureKind: 'esign', ok: true });
+          onCaptureFlowFinished?.({ captureKind: 'esign', ok: true, jobId: data.id });
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Send for signature failed.';
           setSaveError(`Work order saved, but ${msg}`);
           setConfirmationMessage(
             `Account created! WO #${String(job.wo_number).padStart(4, '0')} saved.`
           );
-          onCaptureFlowFinished?.({ captureKind: 'esign', ok: false });
+          onCaptureFlowFinished?.({ captureKind: 'esign', ok: false, jobId: data.id });
         }
         setShowCaptureModal(false);
         setCaptureSubmitting(false);
@@ -301,7 +301,7 @@ export function AgreementPreview({
         }
       }
 
-      onCaptureFlowFinished?.({ captureKind: 'pdf', ok: pdfOk });
+      onCaptureFlowFinished?.({ captureKind: 'pdf', ok: pdfOk, jobId: data.id });
 
       setShowCaptureModal(false);
       setCaptureSubmitting(false);
