@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
@@ -77,6 +78,19 @@ async function clickAgreementPreview(
   if (!btn) throw new Error('Preview button not found');
   await user.click(btn);
 }
+
+describe('JobForm select styling', () => {
+  const css = readFileSync('src/components/JobForm.css', 'utf8');
+
+  it('keeps the custom dropdown arrow from repeating in mobile browsers', () => {
+    const selectRule = css.match(/\.job-form select\s*\{(?<body>[^}]+)\}/);
+
+    expect(selectRule?.groups?.body).toContain('background-repeat: no-repeat');
+    expect(selectRule?.groups?.body).toContain('background-position: right 0.75rem center');
+    expect(selectRule?.groups?.body).toContain('background-size: 1rem');
+    expect(selectRule?.groups?.body).toContain('padding-right: 2.5rem');
+  });
+});
 
 describe('JobForm payment terms', () => {
   it('uses text currency fields so wheel scrolling cannot step the work-order price down a penny', async () => {
