@@ -791,7 +791,7 @@ export function WorkOrderDetailPage({
               {signedDocBusy ? 'Loading…' : 'Download signed PDF'}
             </button>
           ) : null}
-          {!coNewCoBlockedByInvoice && (isOfflineMarked ? (
+          {!coNewCoBlockLoading && !coNewCoBlockedByInvoice && (isOfflineMarked ? (
             <button
               type="button"
               className="btn-secondary btn-action"

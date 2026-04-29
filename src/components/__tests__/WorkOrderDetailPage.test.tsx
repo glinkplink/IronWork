@@ -683,7 +683,7 @@ it('renders change-order rows with date, amount, description, and shared e-sign 
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /mark signed offline/i }));
+    await user.click(await screen.findByRole('button', { name: /mark signed offline/i }));
 
     await waitFor(() => {
       expect(mockFns.updateJob).toHaveBeenCalledWith(
