@@ -23,6 +23,10 @@
   -webkit-appearance: none;
   height: 3rem;
   padding: 0 1rem;
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding-right: 2.5rem;
   font-size: 1rem;
   line-height: 1;
 }
