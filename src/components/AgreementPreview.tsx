@@ -121,6 +121,8 @@ interface AgreementPreviewProps {
   }) => Promise<CaptureAndSaveResult>;
   /** Called after PDF or e-sign attempt (account + save already done). Parent may redirect. */
   onCaptureFlowFinished?: (opts: CaptureFlowFinishedPayload) => void;
+  /** Called after a successful download or send-for-signature so the parent can redirect away from the editable preview. */
+  onReleased?: (jobId: string, kind: 'download' | 'esign') => void;
   noticeMessage?: string | null;
 }
 
@@ -135,6 +137,7 @@ export function AgreementPreview({
   onSaveSuccess,
   onCaptureAndSave,
   onCaptureFlowFinished,
+  onReleased,
   noticeMessage,
 }: AgreementPreviewProps) {
   const [saving, setSaving] = useState(false);
@@ -355,6 +358,7 @@ export function AgreementPreview({
     }
 
     let wroteToDb = false;
+    let savedJobId: string | null = existingJobId ?? null;
 
     if (!hasPersistedRef.current) {
       hasPersistedRef.current = true;
@@ -369,6 +373,7 @@ export function AgreementPreview({
 
       setHasPersistedViaDownloadOnce(true);
       wroteToDb = true;
+      savedJobId = data.id;
       const isNewInsert = !existingJobId;
       await Promise.resolve(onSaveSuccess(data.id, isNewInsert));
     }
@@ -381,6 +386,9 @@ export function AgreementPreview({
           ? `WO #${String(job.wo_number).padStart(4, '0')} saved. PDF downloaded.`
           : `WO #${String(job.wo_number).padStart(4, '0')} downloaded.`
       );
+      if (savedJobId && onReleased) {
+        window.setTimeout(() => onReleased(savedJobId, 'download'), 1500);
+      }
     } catch (pdfErr) {
       if (wroteToDb) {
         setSaveError(
@@ -461,6 +469,10 @@ export function AgreementPreview({
       setConfirmationMessage(
         `Signature request sent. WO #${String(job.wo_number).padStart(4, '0')} — customer will receive an email.`
       );
+      if (jobId && onReleased) {
+        const releasedJobId = jobId;
+        window.setTimeout(() => onReleased(releasedJobId, 'esign'), 1500);
+      }
     } catch (e) {
       setEsignError(e instanceof Error ? e.message : 'Send for signature failed.');
     } finally {

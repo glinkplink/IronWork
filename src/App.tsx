@@ -732,6 +732,14 @@ function App() {
         onSaveSuccess={draftFlow.handleSaveSuccess}
         onCaptureAndSave={!user ? handleCaptureAndSave : undefined}
         onCaptureFlowFinished={handleCaptureFlowFinished}
+        onReleased={(jobId, kind) => {
+          setWorkOrdersSuccessBanner(
+            kind === 'esign'
+              ? 'Signature request sent. The customer will receive an email.'
+              : 'Work order saved and PDF downloaded.'
+          );
+          handleOpenWorkOrderDetail(jobId);
+        }}
         noticeMessage={pendingCaptureNotice}
       />
     );
