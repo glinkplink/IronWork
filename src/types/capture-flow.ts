@@ -2,4 +2,5 @@
 export type CaptureFlowFinishedPayload = {
   captureKind: 'pdf' | 'esign';
   ok: boolean;
+  jobId: string;
 };
