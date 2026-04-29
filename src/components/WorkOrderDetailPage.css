@@ -110,12 +110,6 @@
   outline-offset: 2px;
 }
 
-.work-order-detail-document.agreement-document {
-  max-width: 100%;
-  border-radius: calc(var(--radius-lg) + 2px);
-  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.2);
-}
-
 .work-order-detail-change-orders {
   padding: clamp(1rem, 2vw, 1.25rem);
   border-radius: var(--shell-radius-lg);

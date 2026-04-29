@@ -49,6 +49,7 @@ import { useScaledPreview } from '../hooks/useScaledPreview';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { StaleContactBanner } from './StaleContactBanner';
 import './EsignTimeline.css';
+import './ScaledPreview.css';
 import './WorkOrderDetailPage.css';
 
 const ROW_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
@@ -238,12 +239,12 @@ export function WorkOrderDetailPage({
     spacerHeight: woPreviewSpacerHeight,
     spacerWidth: woPreviewSpacerWidth,
     letterWidthPx: woLetterWidthPx,
-  } = useScaledPreview(sections);
+  } = useScaledPreview({ fitPageHeightPx: 320 }, sections);
 
   const woPreviewHtml = useMemo(
     () =>
       sections
-        ? `<div class="agreement-document work-order-detail-document">${agreementSectionsToHtml(sections)}</div>`
+        ? `<div class="agreement-document">${agreementSectionsToHtml(sections)}</div>`
         : '',
     [sections]
   );

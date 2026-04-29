@@ -3,8 +3,24 @@ import { useLayoutEffect, useRef, useState } from 'react';
 /** Letter width at 96dpi — preview layout matches PDF viewport. */
 export const PREVIEW_LETTER_WIDTH_PX = 816;
 
+/** Letter height at 96dpi — used when a thumbnail should show one full page. */
+export const PREVIEW_LETTER_HEIGHT_PX = 1056;
+
 /** Preview upscale only applies at this breakpoint and when measure width > 816px. */
 export const PREVIEW_DESKTOP_UPSCALE_MQ = '(min-width: 1024px)';
+
+type UseScaledPreviewOptions = {
+  fitPageHeightPx?: number;
+};
+
+function isUseScaledPreviewOptions(value: unknown): value is UseScaledPreviewOptions {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'fitPageHeightPx' in value
+  );
+}
 
 /**
  * Shared scaled “mini sheet” preview: viewport + sheet refs, scale, and spacer dimensions
@@ -14,6 +30,11 @@ export const PREVIEW_DESKTOP_UPSCALE_MQ = '(min-width: 1024px)';
  * layout effect that remeasures sheet height when caller content changes.
  */
 export function useScaledPreview(...heightRefreshDeps: unknown[]) {
+  const options = isUseScaledPreviewOptions(heightRefreshDeps[0])
+    ? heightRefreshDeps[0]
+    : undefined;
+  const refreshDeps = options ? heightRefreshDeps.slice(1) : heightRefreshDeps;
+  const fitPageHeightPx = options?.fitPageHeightPx;
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const [sheetScrollHeight, setSheetScrollHeight] = useState(0);
@@ -28,7 +49,11 @@ export function useScaledPreview(...heightRefreshDeps: unknown[]) {
       if (w <= 0) return 1;
 
       const maxScale = window.matchMedia(PREVIEW_DESKTOP_UPSCALE_MQ).matches ? 1.5 : 1;
-      return Math.min(w / PREVIEW_LETTER_WIDTH_PX, maxScale);
+      const widthScale = w / PREVIEW_LETTER_WIDTH_PX;
+      const pageHeightScale = fitPageHeightPx
+        ? fitPageHeightPx / PREVIEW_LETTER_HEIGHT_PX
+        : Number.POSITIVE_INFINITY;
+      return Math.min(widthScale, pageHeightScale, maxScale);
     };
 
     const updateScale = () => {
@@ -46,7 +71,7 @@ export function useScaledPreview(...heightRefreshDeps: unknown[]) {
       mq.removeEventListener('change', updateScale);
       window.removeEventListener('resize', updateScale);
     };
-  }, []);
+  }, [fitPageHeightPx]);
 
   /* Spacer height: sheet content only — ResizeObserver here does not track scroll container size. */
   useLayoutEffect(() => {
@@ -62,7 +87,7 @@ export function useScaledPreview(...heightRefreshDeps: unknown[]) {
     ro.observe(sheet);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- caller passes refresh triggers (e.g. job, profile)
-  }, heightRefreshDeps);
+  }, refreshDeps);
 
   const spacerHeight = sheetScrollHeight * scale;
   const spacerWidth = PREVIEW_LETTER_WIDTH_PX * scale;

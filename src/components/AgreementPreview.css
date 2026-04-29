@@ -54,27 +54,6 @@
   box-sizing: border-box;
 }
 
-.agreement-preview-scale-viewport {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  overflow-y: visible;
-  padding: clamp(0.25rem, 1vw, 0.5rem);
-}
-
-.agreement-preview-scale-spacer {
-  position: relative;
-  margin: 0 auto;
-}
-
-.agreement-preview-scale-sheet {
-  position: absolute;
-  top: 0;
-  left: 0;
-  box-sizing: border-box;
-}
-
 .preview-esign-hint {
   margin: 0;
   font-size: 0.8125rem;
@@ -109,20 +88,4 @@
     background: transparent;
   }
 
-  .agreement-preview-scale-viewport {
-    overflow: visible;
-    padding: 0;
-  }
-
-  .agreement-preview-scale-sheet {
-    position: static;
-    transform: none !important;
-    width: 100% !important;
-    will-change: auto !important;
-  }
-
-  .agreement-preview-scale-spacer {
-    width: 100% !important;
-    height: auto !important;
-  }
 }

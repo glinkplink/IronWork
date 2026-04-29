@@ -19,6 +19,7 @@ import {
   getInvoicePdfFilename,
 } from '../lib/agreement-pdf';
 import './EsignTimeline.css';
+import './ScaledPreview.css';
 import './InvoiceFinalPage.css';
 
 function formatTimestampDate(iso: string): string {

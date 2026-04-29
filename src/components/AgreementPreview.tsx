@@ -26,6 +26,7 @@ import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { CaptureModal } from './CaptureModal';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import { supabase } from '../lib/supabase';
+import './ScaledPreview.css';
 import './AgreementPreview.css';
 
 const VALID_PRICE_TYPES: readonly PriceType[] = ['fixed', 'estimate', 'time_and_materials'];
