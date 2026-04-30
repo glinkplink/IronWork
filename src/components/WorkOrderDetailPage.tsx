@@ -156,6 +156,7 @@ export function WorkOrderDetailPage({
   const [coNewCoBlockLoading, setCoNewCoBlockLoading] = useState(true);
   const [coNewCoBlockError, setCoNewCoBlockError] = useState<string | null>(null);
   const [coNewCoBlockedByInvoice, setCoNewCoBlockedByInvoice] = useState(false);
+  const [invoicePaid, setInvoicePaid] = useState(false);
 
   const [woPreviewModalOpen, setWoPreviewModalOpen] = useState(false);
 
@@ -245,7 +246,7 @@ export function WorkOrderDetailPage({
     spacerHeight: woPreviewSpacerHeight,
     spacerWidth: woPreviewSpacerWidth,
     letterWidthPx: woLetterWidthPx,
-  } = useScaledPreview({ fitPageHeightPx: 280, maxVisiblePageCount: 1 }, sections);
+  } = useScaledPreview({ maxVisiblePageCount: 1 }, sections);
 
   const woPreviewHtml = useMemo(
     () =>
@@ -333,6 +334,7 @@ export function WorkOrderDetailPage({
     setCoNewCoBlockLoading(true);
     setCoNewCoBlockError(null);
     setCoNewCoBlockedByInvoice(false);
+    setInvoicePaid(false);
 
     void (async () => {
       const result = await getBlocksNewChangeOrdersForJob(userId, job.id);
@@ -346,6 +348,7 @@ export function WorkOrderDetailPage({
       } else {
         setCoNewCoBlockError(null);
         setCoNewCoBlockedByInvoice(result.blocks);
+        setInvoicePaid(result.invoicePaid);
       }
     })();
 
@@ -947,7 +950,7 @@ export function WorkOrderDetailPage({
         ) : null}
       </section>
 
-      <div className="work-order-detail-footer">
+      {!invoicePaid && <div className="work-order-detail-footer">
         <button
           type="button"
           className="btn-secondary btn-large work-order-detail-download"
@@ -985,7 +988,7 @@ export function WorkOrderDetailPage({
         >
           Download WO + Changes
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
