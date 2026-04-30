@@ -2,7 +2,6 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
-import React from 'react';
 import {
   useScaledPreview,
   PREVIEW_LETTER_HEIGHT_PX,
@@ -274,6 +273,66 @@ describe('useScaledPreview', () => {
     expect(getScale()).toBeCloseTo(500 / 816, 5);
     // spacerHeight = min(sheetScrollHeight, 1 page) * scale = 1056 * scale
     expect(getSpacerHeight()).toBeCloseTo(PREVIEW_LETTER_HEIGHT_PX * getScale(), 2);
+  });
+
+  // Regression: WorkOrderDetailPage gates its preview JSX behind `if (!sections) return <error>`,
+  // so the viewport ref attaches AFTER the initial render. With a plain useRef, the scale effect's
+  // deps never changed so it didn't re-run on attach — scale stayed at the initial useState(1) and
+  // the sheet rendered at full 816px, overflowing the mobile viewport. The callback-ref pattern
+  // (viewportRef-as-state) makes the effect re-run when the node mounts.
+  it('measures scale when viewport mounts after initial render (gated JSX)', async () => {
+    viewportWidth.current = 360;
+    sheetScrollHeight.current = 1500;
+    vi.stubGlobal('ResizeObserver', MockRO);
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockReturnValue(makeMatchMedia(false)),
+    });
+
+    function GatedHarness({ ready }: { ready: boolean }) {
+      const { viewportRef, sheetRef, scale } = useScaledPreview({ maxVisiblePageCount: 1 }, ready);
+      if (!ready) return <div data-testid="gate-closed" data-scale={scale} />;
+      return (
+        <div
+          ref={(el) => {
+            if (el) {
+              vi.spyOn(el, 'getBoundingClientRect').mockImplementation(
+                () => ({ width: viewportWidth.current }) as DOMRect
+              );
+            }
+            (viewportRef as (node: HTMLDivElement | null) => void)(el);
+          }}
+        >
+          <div
+            ref={(el) => {
+              if (el) {
+                Object.defineProperty(el, 'scrollHeight', {
+                  configurable: true,
+                  get: () => sheetScrollHeight.current,
+                });
+              }
+              (sheetRef as (node: HTMLDivElement | null) => void)(el);
+            }}
+          />
+          <div data-testid="probe" data-scale={scale} />
+        </div>
+      );
+    }
+
+    const { rerender, getByTestId } = render(<GatedHarness ready={false} />);
+    // Gate closed: scale is still the initial 1 (no viewport to measure).
+    expect(parseFloat(getByTestId('gate-closed').getAttribute('data-scale')!)).toBe(1);
+
+    // Open the gate — viewport mounts. Scale must re-measure to widthScale = 360/816, not stay at 1.
+    act(() => {
+      rerender(<GatedHarness ready={true} />);
+    });
+    await flushAnimationFrame();
+
+    const measuredScale = parseFloat(getByTestId('probe').getAttribute('data-scale')!);
+    expect(measuredScale).toBeCloseTo(360 / 816, 5);
+    expect(measuredScale).not.toBe(1);
   });
 
   it('deps change causes height effect to re-run and spacerHeight updates', () => {
