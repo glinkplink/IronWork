@@ -2,37 +2,54 @@
 
 Mobile-first work orders, e-signatures, and invoices for welders.
 
-IronWork turns a jobsite conversation into a signed work order, clean PDF, change-order trail, and invoice with a payment link. It is built for welding work that changes in the field: repair scope, fabrication details, site conditions, hidden damage, exclusions, deposits, late fees, and workmanship warranty terms are all captured before sparks fly.
+**Live app:** [ironwork.app](https://ironwork.app) — create a work order, preview the agreement, and walk the full flow without cloning anything.
 
-## Built For Welding Jobs
+IronWork turns a jobsite conversation into a signed work order, clean PDF, change-order trail, and invoice with an optional payment link. Scope, exclusions, hidden damage, deposits, late fees, and workmanship warranty terms are captured in plain language before work starts.
 
-- **Lock the scope before the first bead.** Capture the customer, job site, item or structure, requested welding work, materials, exclusions, customer obligations, and payment terms in one mobile form.
-- **Protect against scope creep.** Create signed change orders when a repair exposes more damage or the customer asks for extra fabrication.
-- **Keep the paperwork tied to the work.** Work orders, change orders, signed PDFs, invoices, payment status, and customer records stay organized by job.
-- **Send professional documents from the truck.** Preview the agreement, send for e-signature, download PDFs, and issue invoices without rebuilding the same paperwork by hand.
-- **Get paid with less chasing.** Invoices can include Stripe payment links, saved payment terms, deposits, taxes, late fees, and signed change-order line items.
-
-## Workflow
-
-1. **Create the work order:** customer, job site, welding scope, exclusions, price, deposit, schedule, and warranty.
-2. **Preview the agreement:** numbered, plain-language sections built for welding jobs.
-3. **Send for signature:** DocuSeal e-signature flow, resend support, offline-signed fallback, and signed PDF tracking.
-4. **Manage changes:** add change orders from the work-order detail page and require signature before billing them.
-5. **Invoice the job:** generate a PDF invoice, include approved change orders, send a payment link, and track payment status.
-
-**Important:** This is not a static single-page app you can drop on pure CDN hosting. **Every PDF** (work order, invoice, change order, and combined work order + change orders) is produced by a **Node process** that runs **Puppeteer** against a **local Chrome/Chromium** binary. The UI and `/api/pdf` are intended to run **on the same origin** so the browser can `POST` HTML + metadata to the server without cross-origin configuration.
+**Stack:** TypeScript · React · Vite · Node · Supabase · Puppeteer · DocuSeal · Stripe Connect · Resend
 
 ---
 
-## What you need to run it
+## Built for welding jobs
 
-- **Node.js** (recent LTS is fine)
-- **Chrome or Chromium** installed on the same machine (or container) that runs `server/app-server.mjs`
-- A **Supabase** project with migrations applied (`business_profiles`, `clients`, `jobs`, `change_orders`, `invoices`, RPCs such as `next_invoice_number` and `create_change_order`)
+- **Lock scope before the first bead** — customer, job site, welding work, materials, exclusions, and payment terms in one mobile form
+- **Protect against scope creep** — signed change orders when repairs expose more damage or the customer adds fabrication
+- **Keep paperwork tied to the job** — work orders, change orders, signed PDFs, invoices, and clients organized in one place
+- **Send documents from the truck** — preview, e-sign, download PDFs, and issue invoices without rebuilding paperwork by hand
+- **Get paid with less chasing** — Stripe payment links, deposits, taxes, late fees, and signed change-order line items on one invoice per job
+
+## Workflow
+
+1. **Create the work order** — customer, job site, scope, exclusions, price, deposit, schedule, warranty
+2. **Preview the agreement** — numbered, plain-language sections built for welding jobs
+3. **Send for signature** — DocuSeal e-sign, resend, offline-signed fallback, signed PDF tracking
+4. **Manage changes** — change orders from work-order detail; signature required before billing
+5. **Invoice the job** — PDF invoice, signed change orders as line items, email send, optional payment link, payment tracking
+
+---
+
+## Features
+
+- Mobile-first work-order form for shop, truck, or jobsite
+- Agreement preview before sign-in; account creation on first save, download, or signature send
+- Email/password auth via Supabase
+- Business profile defaults (exclusions, warranty, payment methods, tax, numbering)
+- Bottom nav: **Home · Work Orders · Invoices · Clients** (+ profile settings)
+- Work order list and detail with signature progress, PDF re-download, and job value rollups
+- **Clients** page — search, inline edit contact fields; edits propagate to unsigned work orders
+- Change-order wizard with offline-sign support, standalone/combined PDFs; billable only after signature
+- Invoice wizard, list, and detail; one standard invoice per work order
+- Invoice email with PDF attachment (Resend); Stripe Connect onboarding and payment links
+- Invoice lifecycle: Draft → Downloaded → Invoiced → Paid (see below)
+- Job site autocomplete (optional Geoapify key); US phone formatting
+- Installable PWA shell (not offline-first — PDF, auth, Stripe, and DocuSeal need network)
+- CI: lint, test, and build on every push/PR
 
 ---
 
 ## Quick start
+
+**Requirements:** Node.js **≥ 20**, Chrome/Chromium on the same machine as the app server, Supabase project with migrations applied.
 
 ```bash
 npm install
@@ -40,13 +57,11 @@ npm install
 # Copy env vars and fill in from Supabase (Project Settings → API)
 cp .env.example .env.local
 
-# Dev: one process serves Vite (HMR) + POST /api/pdf + e-sign + DocuSeal webhook routes
+# Dev: Vite (HMR) + /api/pdf + e-sign + Stripe + webhooks
 npm run dev
 ```
 
-By default the app listens on **`http://127.0.0.1:3000`**. On startup the server logs which Chrome path it uses for PDF rendering.
-
-Check that PDF infrastructure is reachable:
+Default URL: **`http://127.0.0.1:3000`**. Startup logs show which Chrome binary Puppeteer uses.
 
 ```bash
 curl -s http://127.0.0.1:3000/api/pdf/health
@@ -59,112 +74,142 @@ curl -s http://127.0.0.1:3000/api/pdf/health
 
 | Command | What runs |
 |--------|-----------|
-| `npm run dev` | **`node server/app-server.mjs`** with `NODE_ENV` ≠ `production`: Vite in **middleware mode** (hot reload) + **`POST /api/pdf`** + work-order/change-order e-sign routes + Stripe Connect/payment routes + **`POST /api/webhooks/docuseal`** + **`POST /api/stripe/webhook`** |
-| `npm run build` | TypeScript project references + Vite production bundle → `dist/` |
-| `npm run preview` | **`NODE_ENV=production node server/app-server.mjs`**: serves **`dist/`** as static files + **`POST /api/pdf`** and the same e-sign/Stripe/webhook routes. **Run `npm run build` first** or the app shell will be missing/outdated. |
-| `npm run lint` | ESLint |
+| `npm run dev` | `node server/app-server.mjs` — Vite middleware (HMR) + all API routes |
+| `npm run build` | TypeScript + Vite production bundle → `dist/` |
+| `npm run preview` | Production server over `dist/` + API routes (**run `build` first**) |
+| `npm start` | Same as preview — `NODE_ENV=production node server/app-server.mjs` |
+| `npm run test` | Vitest unit/route tests |
+| `npm run lint` | ESLint + Vite public env check |
 
-There is **no** `vite preview` workflow as the primary way to run the product: the supported path is **always** the custom app server so PDFs work.
+There is **no** standalone `vite preview` workflow. The supported path is always the custom app server so PDFs and API routes work on one origin.
 
-The client also ships install metadata for **iOS home-screen**, **Android install prompts**, and a minimal **service worker** for app-shell caching. This is an installable PWA setup, not an offline-first business workflow: PDF, auth, Stripe, and DocuSeal routes still require network access.
+GitHub Actions (`.github/workflows/ci.yml`) runs **`lint` → `test` → `build`** on `main` pushes and pull requests.
+
+---
+
+## Architecture note
+
+This is **not** a static SPA you can drop on pure CDN hosting.
+
+Every PDF (work order, invoice, change order, combined WO + COs) is rendered by a **Node process** using **Puppeteer** and a local **Chrome/Chromium** binary. The browser builds HTML and `POST`s it to **`/api/pdf`** on the **same origin** as the UI.
+
+`POST /api/pdf` requires **`Authorization: Bearer <Supabase access_token>`**. Only **`GET /api/pdf/health`** is unauthenticated (for uptime probes).
 
 ---
 
 ## Environment variables
 
-**Client (Vite — must be prefixed with `VITE_`, read at build time):**
+**Client (Vite — `VITE_*`, read at build time):**
 
 ```
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
-VITE_GEOAPIFY_API_KEY=...   # optional — job site street autocomplete
+VITE_GEOAPIFY_API_KEY=...        # optional — job site autocomplete
+VITE_UMAMI_WEBSITE_ID=...        # optional — analytics
 ```
 
-Put these in **`.env.local`** (see `.env.example`).
+**Server (runtime — not `VITE_`):**
 
-**Server (read at runtime by `server/app-server.mjs` — not `VITE_`):**
-
-The server loads **`.env`** then **`.env.local`** (override) via `dotenv` so DocuSeal and Supabase service keys match local and hosted setups without manual `export`.
+The server loads **`.env`** then **`.env.local`** via `dotenv`.
 
 | Variable | Purpose |
 |----------|---------|
-| `PUPPETEER_EXECUTABLE_PATH` or `CHROME_PATH` | Absolute path to Chrome/Chromium. If unset, defaults to **`/usr/bin/google-chrome-stable`** (typical on Debian/Ubuntu; adjust on macOS/Windows or in Docker). |
-| `PORT` | HTTP port (default **3000**) |
-| `HOST` | Bind address (default **127.0.0.1** — set to `0.0.0.0` in containers/cloud if you need external access) |
-| `NODE_ENV` | When set to **`production`**, the server serves **`dist/`** instead of Vite dev middleware. `npm run preview` sets this for you. |
-| `DOCUSEAL_API_KEY` | Server → DocuSeal REST API (`POST /submissions/html`, `PUT /submitters/{id}`, `GET /submissions/{id}`). |
-| `DOCUSEAL_BASE_URL` | DocuSeal API origin (default **`https://api.docuseal.com`**). |
-| `DOCUSEAL_WEBHOOK_HEADER_NAME` | **Exact** header name configured in DocuSeal for inbound webhooks (copy from their UI). |
-| `DOCUSEAL_WEBHOOK_HEADER_VALUE` | Secret value paired with that header. |
-| `SUPABASE_URL` | Same project URL as `VITE_SUPABASE_URL`; used by the server with the service role. |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Server only.** Used to update work-order and change-order `esign_*` fields after send/resend and on webhooks. Send/resend still require a valid user **JWT**; each update checks the owned row before writing (webhooks use DocuSeal submission correlation, not Supabase JWT). |
-| `APP_BASE_URL` | Optional absolute app origin used for Stripe Connect return/refresh links. If unset, the server derives it from forwarded headers and `Host`. |
-| `STRIPE_SECRET_KEY` | **Server only.** Used for Stripe Connect account creation, onboarding links, payment links, and webhook verification. |
-| `STRIPE_WEBHOOK_SECRET` | **Server only.** Used to verify `POST /api/stripe/webhook` events. |
+| `PUPPETEER_EXECUTABLE_PATH` / `CHROME_PATH` | Chrome/Chromium path (default `/usr/bin/google-chrome-stable`) |
+| `PORT` / `HOST` | HTTP bind (default `3000` / `127.0.0.1`; use `0.0.0.0` in containers) |
+| `NODE_ENV` | `production` serves `dist/` instead of Vite dev middleware |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Server-side JWT verification and RLS-bypass updates |
+| `DOCUSEAL_API_KEY` / `DOCUSEAL_BASE_URL` | E-sign send/resend/status |
+| `DOCUSEAL_WEBHOOK_HEADER_NAME` / `DOCUSEAL_WEBHOOK_HEADER_VALUE` | Inbound DocuSeal webhook auth |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Connect, payment links, payment reconciliation |
+| `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | Invoice email with PDF attachment |
+| `APP_BASE_URL` | Optional public origin for Stripe Connect return/refresh URLs |
+| `SENTRY_DSN` | Optional server error tracking |
+
+See **`.env.example`** for the full list and comments.
 
 ---
 
-## PDFs and `/api/pdf`
+## API routes (same app server)
 
-- The **browser** builds HTML strings (agreement, invoice, change order, or combined body) and sends them in the **JSON body** of **`POST /api/pdf`**.
-- The **server** loads fonts, sets viewport, runs Puppeteer, returns a PDF blob. Work order / invoice headers (e.g. WO #, Invoice #, CO #) come from fields in that JSON (e.g. `marginHeaderLeft`, `workOrderNumber`), matching `server/app-server.mjs` + `agreement-pdf.ts`.
-- **Same origin:** the frontend posts to a relative URL (`/api/pdf`), so production deployments should put the SPA and this API behind **one** host (or a reverse proxy that makes them look like one host).
+**PDF**
 
-## Stripe routes
+- `GET /api/pdf/health` — readiness probe
+- `POST /api/pdf` — authenticated; HTML → PDF via Puppeteer
 
-- `POST /api/stripe/connect/start`: authenticated; creates or reuses the user’s connected Stripe account and returns an onboarding link.
-- `GET /api/stripe/connect/status`: authenticated; inspects the connected account, reconciles `business_profiles.stripe_onboarding_complete`, and returns the current connect status used by Edit Profile.
-- `POST /api/stripe/invoices/:invoiceId/payment-link`: authenticated; creates or reuses an invoice payment link for the connected account.
-- `POST /api/stripe/webhook`: unauthenticated Stripe webhook endpoint for invoice payment reconciliation; requires `STRIPE_WEBHOOK_SECRET`.
+**E-sign (DocuSeal)**
+
+- `POST /api/esign/work-orders/:jobId/send|resend`
+- `GET /api/esign/work-orders/:jobId/status`
+- `POST /api/esign/change-orders/:coId/send|resend`
+- `GET /api/esign/change-orders/:coId/status`
+- `POST /api/webhooks/docuseal` — webhook (header secret, not JWT)
+
+**Invoices**
+
+- `POST /api/invoices/:id/send` — email PDF; optional payment link; sets `issued_at` on first successful send
+- `POST /api/invoices/:id/mark-downloaded` — sets `downloaded_at` after PDF download (does not issue)
+- `POST /api/invoices/:id/mark-paid-offline` / `unmark-paid-offline`
+
+**Stripe**
+
+- `POST /api/stripe/connect/start` / `GET /api/stripe/connect/status`
+- `POST /api/stripe/invoices/:invoiceId/payment-link` — does **not** set `issued_at` alone
+- `POST /api/stripe/webhook`
+
+Send/resend, payment-link, and invoice email routes require a valid user **JWT**. Invoice send and payment-link creation are blocked until the parent work order is signature-satisfied (DocuSeal completed or offline-signed).
 
 ---
 
 ## Auth and product flow
 
-**Anonymous (no Supabase session)**
+**Anonymous**
 
-- **Home → Create Work Order → JobForm → Preview.** Header shows **Sign In** only (no Work Orders, no profile gear).
-- **Download & Save** opens **CaptureModal**: business name, email, password, and an optional **Save defaults?** checkbox → **`signUp`**. With Supabase email confirmation enabled, signup returns no session, so IronWork stores the pending capture locally, asks the user to confirm email, restores the draft after the confirmed session returns, creates `business_profiles`, and then the user clicks save/send again. If confirmation is disabled and signup returns a session immediately, the same-screen path runs **`upsertProfile`**, **`saveWorkOrder`**, then PDF download. Anonymous **Save & Send for Signature** uses the same capture path before the e-sign request. Unchecked means “do not seed my profile defaults from this work order”; stored empty defaults arrays are treated as intentionally empty on future drafts.
-- **Save & Send for Signature** (preview, when DocuSeal is configured) uses the same capture/save path when anonymous, then **`POST /api/esign/work-orders/:jobId/send`** with a Bearer token. Work order detail has a 3-step e-sign progress timeline, **Send / Resend**, signing link, and signed PDF when DocuSeal reports completion; detail and list auto-refresh while signature state is in flight so webhook updates appear without reloading. If a resend is attempted after the customer already signed, the server refreshes DocuSeal submission state and updates the work order instead of leaving the UI stale.
+- **Home → Create Work Order → JobForm → Preview.** Header shows **Sign In** only.
+- **Download & Save** opens **CaptureModal** (business name, email, password, optional **Save defaults?**) → `signUp`. With Supabase email confirmation enabled, the pending work order is stored locally until the user confirms email, then the draft restores and the user saves again. With confirmation disabled, profile + job persist immediately.
+- **Save & Send for Signature** uses the same capture path when anonymous, then `POST /api/esign/work-orders/:jobId/send`.
 
 **Returning user**
 
-- **Sign In** → **AuthPage** (email + password). There is no separate “create account” marketing funnel on that screen; new accounts are created through capture on first save (or through any future onboarding you add).
-
-**Signed in but missing `business_profiles` row** (rare)
-
-- Full-screen **BusinessProfileForm** until a profile exists.
+- **Sign In** on **AuthPage** (email + password). New accounts are created through capture on first save, not a separate signup page.
 
 **Signed in with profile**
 
-- **Home**, **Work Orders**, **Edit profile** (gear). **Work order drafts** while editing a new job are **in-memory** until **Download & Save** persists the job (and upserts **clients** by normalized name). **Invoices** and **change orders** are persisted in Postgres; change orders are created from **Work Order detail**, and the single work-order invoice can include signed/offline-signed change orders as line items.
+- Bottom nav: **Home · Work Orders · Invoices · Clients**; profile gear for Edit Profile (Stripe Connect, defaults, business info).
+- New work-order drafts are **in-memory** until **Download & Save** persists the job and upserts **clients** by normalized name.
+- Change orders are created from **Work Order detail**. One invoice per work order; signed/offline-signed change orders appear as line items.
 
-Session persistence is standard Supabase client behavior (refresh survives page reload).
+**E-sign UI sync**
+
+- Work-order and change-order **detail** call DocuSeal/DB status **once** when the screen opens (and again after send/resend). There is **no** client interval polling; webhooks update the database in the background.
+- **InvoiceFinalPage** refetches the invoice once on mount so Stripe webhook payment updates appear without leaving the page.
 
 ---
 
-## Features
+## Invoice lifecycle
 
-- Mobile-first welding work-order form designed for use from the shop, truck, or jobsite
-- Full agreement preview before sign-in; account creation happens on first save, download, or signature send
-- Email/password auth via Supabase
-- Business profile defaults for exclusions, assumptions, warranty, payment methods, sales tax, and numbering
-- Work order list, detail page, signed status, PDF re-download, and job value rollups
-- Change-order wizard with statuses, offline-sign support, standalone/combined PDFs, and invoice inclusion only after signature satisfaction
-- Invoice wizard from a work order, PDF download, persisted invoice rows, Stripe payment links, and payment status tracking
-- Job site autocomplete with an optional Geoapify key
-- US phone formatting on the job form and edit profile
-- Numbered welding agreement generator with server-rendered PDF parity and print support
+| State | Meaning |
+|-------|---------|
+| No row | UI label **Invoice** — not yet created |
+| `issued_at = null` | **Draft** |
+| `downloaded_at` set, still draft | **Downloaded** chip (via `mark-downloaded`; does not issue) |
+| `issued_at` set | **Invoiced** (first successful email send only) |
+| `payment_status = paid/offline` | **Paid** (Stripe webhook or manual offline mark) |
+
+Payment-link creation alone does not issue an invoice. Unsigned change orders may appear in the invoice UI but cannot be selected or persisted as billable line items.
 
 ---
 
 ## Tech stack
 
-- **Vite** + **React** + **TypeScript**
-- **Supabase** (auth + Postgres + RLS)
-- **Node `http` server** + **Vite middleware** (dev) or **static `dist/`** (production)
-- **Puppeteer Core** + **system Chrome/Chromium**
-- Plain CSS — no Tailwind
+- **Vite** + **React 19** + **TypeScript**
+- **Supabase** — auth, Postgres, RLS
+- **Node `http` server** — Vite middleware (dev) or static `dist/` (prod)
+- **Puppeteer Core** + system Chrome/Chromium
+- **DocuSeal** — work order and change order e-sign
+- **Stripe Connect Express** — onboarding and invoice payment links
+- **Resend** — invoice email delivery
+- **Sentry** (optional) — server error tracking
+- Plain CSS — co-located per component; no Tailwind
 
 ---
 
@@ -172,87 +217,71 @@ Session persistence is standard Supabase client behavior (refresh survives page 
 
 ```
 src/
-  App.tsx                    # View state machine; anonymous + authenticated flows
-  App.css                    # Global tokens, shell/layout, shared utilities, print/PDF globals
-  index.css                  # Base reset + font stack
-  components/
-    AuthPage.tsx             # Sign-in (returning users)
-    AuthPage.css             # AuthPage-only styles
-    BusinessProfileForm.tsx  # Signed-in user missing profile row (edge case)
-    BusinessProfileForm.css  # BusinessProfileForm-only styles
-    CaptureModal.tsx         # Account creation on first Download & Save
-    CaptureModal.css         # CaptureModal-only styles
-    HomePage.tsx
-    HomePage.css
-    JobForm.tsx
-    JobForm.css
-    AgreementPreview.tsx
-    AgreementDocumentSections.tsx
-    EditProfilePage.tsx
-    EditProfilePage.css
-    WorkOrdersPage.tsx, WorkOrdersPage.css
-    WorkOrderDetailPage.tsx, WorkOrderDetailPage.css
-    ChangeOrderDetailPage.tsx, ChangeOrderDetailPage.css
-    ChangeOrderWizard.tsx, ChangeOrderWizard.css
-    InvoiceWizard.tsx, InvoiceWizard.css
-    InvoiceFinalPage.tsx, InvoiceFinalPage.css
-    InvoicePreviewModal.tsx, InvoicePreviewModal.css
+  App.tsx, App.css           # View routing + global shell tokens
+  components/                # Pages and UI (each major surface has a paired .css)
+    HomePage, JobForm, AgreementPreview, CaptureModal
+    WorkOrdersPage, WorkOrderDetailPage
+    ChangeOrderWizard, ChangeOrderDetailPage
+    InvoiceWizard, InvoiceFinalPage, InvoicesPage
+    ClientsPage, EditProfilePage, AuthPage, …
+  hooks/                     # useAppNavigation, useAuthProfile, useWorkOrderDraft, …
   lib/
-    supabase.ts, auth.ts
-    agreement-generator.ts, agreement-sections-html.ts, change-order-generator.ts
-    agreement-pdf.ts, invoice-generator.ts, html-escape.ts
-    stripe-connect.ts          # Authenticated Stripe Connect/payment-link helpers
-    job-site-address.ts, us-phone-input.ts, geoapify-autocomplete.ts
-    job-to-welder-job.ts
-    db/                      # profile, clients, jobs, invoices, change-orders
-  hooks/useAuth.ts
-  types/                     # WelderJob, DB row types
-  data/sample-job.json
+    agreement-*, change-order-*, invoice-*, docuseal-*
+    agreement-pdf.ts, esign-api.ts, stripe-connect.ts, invoice-send.ts
+    db/                        # profile, clients, jobs, change-orders, invoices
+  types/
 server/
-  app-server.mjs             # HTTP server: Vite (dev) or dist (prod) + PDF + e-sign + Stripe routes
-  stripe-routes.mjs          # Stripe Connect, payment-link, and webhook routes
-supabase/migrations/       # Apply via CLI or dashboard SQL editor
+  app-server.mjs             # HTTP entry: static/Vite + route dispatch
+  esign-routes.mjs           # DocuSeal send/resend/status + webhook
+  invoice-routes.mjs         # Invoice send, mark-downloaded, offline paid
+  stripe-routes.mjs          # Connect + payment links + webhook
+  jobs-routes.mjs            # Job-level server actions
+  lib/                       # auth, PDF, rate-limit, stripe, sentry, …
+supabase/migrations/
 ```
 
-Styling convention: keep page/component styles co-located with the page/component that owns them. `src/App.css` is reserved for global tokens, shell/layout, shared utilities, and print/PDF-global rules.
+Styling: co-locate with the owning component. `App.css` is for design tokens, shell layout, shared utilities, and print/PDF globals only.
 
 ---
 
 ## Database
 
-Tables include: `business_profiles`, `clients`, `jobs`, `change_orders`, `invoices` — all with RLS.
+Tables: `business_profiles`, `clients`, `jobs`, `change_orders`, `invoices` — all with RLS.
 
 ```bash
 npx supabase db push
 ```
 
-Or paste each migration into Supabase Dashboard → SQL Editor.
+Or paste migrations in Supabase Dashboard → SQL Editor.
 
 ---
 
 ## Deployment
 
-IronWork **must** run as a **long-lived Node process** with **Chrome available** on that same environment. Typical shape:
+IronWork runs as a **long-lived Node process** with **Chrome available** on the same host.
 
-1. **`npm ci`** (or `npm install`)
-2. Set **`VITE_*`** vars for the build environment and run **`npm run build`**
-3. Run **`NODE_ENV=production node server/app-server.mjs`** (or **`npm run preview`**) with:
-   - **`PUPPETEER_EXECUTABLE_PATH`** or **`CHROME_PATH`** pointing at a real binary (in Docker, install `chromium` or Google Chrome and set the path explicitly)
-   - **`HOST=0.0.0.0`** and **`PORT`** if the platform assigns a port
-4. Put a **reverse proxy** (nginx, Caddy, load balancer) in front if needed; keep **one public origin** for both HTML/JS and **`/api/pdf`**
-5. Optional: probe **`GET /api/pdf/health`** for readiness (returns `{"ok":true}`)
+1. `npm ci` (or `npm install`)
+2. Set **`VITE_*`** for the build environment → **`npm run build`**
+3. Run **`npm start`** (or `NODE_ENV=production node server/app-server.mjs`) with:
+   - **`PUPPETEER_EXECUTABLE_PATH`** or **`CHROME_PATH`** set explicitly in Docker/containers
+   - **`HOST=0.0.0.0`** and platform **`PORT`**
+   - All server env vars on the **running process** (not only build-time `VITE_*`)
+4. One public origin for SPA + `/api/*` (reverse proxy if needed)
+5. Probe **`GET /api/pdf/health`** for readiness
 
-**What does not work alone:** uploading only the contents of `dist/` to static hosting with no server-side `POST /api/pdf` handler — PDF download buttons will fail.
+**What does not work:** uploading only `dist/` to static hosting with no `POST /api/pdf` handler.
 
-For more detail (preview vs PDF parity, fonts, viewport), see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
+Production runbook and observability notes: **[PRODUCTION.md](./PRODUCTION.md)**. Deep system reference: **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
 
 ---
 
 ## Roadmap
 
-**Current priorities:** change orders, client e-sign, Stripe / ACH payments.
+**Current focus:** production hardening, custom branding (logo), ACH / bank payments.
 
-Full backlog and completed work: **[ARCHITECTURE.md — Roadmap](./ARCHITECTURE.md#roadmap)**.
+Shipped: work orders, change orders, DocuSeal e-sign, Stripe Connect + payment links, client management, invoice email, PWA install shell.
+
+Full backlog: **[ARCHITECTURE.md — Roadmap](./ARCHITECTURE.md#roadmap)**.
 
 ---
 
