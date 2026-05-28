@@ -798,13 +798,16 @@ it('renders change-order rows with date, amount, description, and shared e-sign 
     );
 
     await waitFor(() => {
-      const btns = screen.getAllByTestId('wo-detail-create-change-order');
-      expect(btns.length).toBeGreaterThan(0);
-      expect(btns.at(-1) as HTMLButtonElement).toBeDisabled();
+      expect(mockFns.getBlocksNewChangeOrdersForJob).toHaveBeenCalledWith('u1', 'job-1');
     });
+
     expect(
-      screen.getByText(/Could not verify whether new change orders are allowed \(network\)/i)
+      await screen.findByText(/Could not verify whether new change orders are allowed \(network\)/i)
     ).toBeInTheDocument();
+
+    const btns = screen.getAllByTestId('wo-detail-create-change-order');
+    expect(btns.length).toBeGreaterThan(0);
+    expect(btns.at(-1) as HTMLButtonElement).toBeDisabled();
   });
 
   it('hides Mark signed offline and Undo offline mark when an invoice has been issued', async () => {
