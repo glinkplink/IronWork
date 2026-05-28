@@ -12,6 +12,7 @@ const updateInvoice = vi.fn();
 const getInvoice = vi.fn();
 const sendInvoiceMock = vi.fn();
 const fetchWithSupabaseAuthMock = vi.fn();
+const listChangeOrdersMock = vi.fn();
 
 vi.mock('../../lib/agreement-pdf', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/agreement-pdf')>();
@@ -38,6 +39,14 @@ vi.mock('../../lib/invoice-send', () => ({
 vi.mock('../../lib/fetch-with-supabase-auth', () => ({
   fetchWithSupabaseAuth: (...args: unknown[]) => fetchWithSupabaseAuthMock(...args),
 }));
+
+vi.mock('../../lib/db/change-orders', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/db/change-orders')>();
+  return {
+    ...actual,
+    listChangeOrders: (...args: unknown[]) => listChangeOrdersMock(...args),
+  };
+});
 
 vi.mock('../../hooks/useScaledPreview', () => ({
   useScaledPreview: () => ({
@@ -200,6 +209,7 @@ describe('InvoiceFinalPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    listChangeOrdersMock.mockResolvedValue([]);
     fetchInvoicePdfBlob.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }));
     downloadPdfBlobToFile.mockResolvedValue(undefined);
     updateInvoice.mockResolvedValue({ data: baseInvoice(), error: null });
