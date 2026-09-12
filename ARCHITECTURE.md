@@ -512,6 +512,10 @@ The checkbox sections below track shipped work and the longer backlog; the three
 - Shared utility logic belongs in `src/lib/`; avoid duplicated helper functions across generators when one utility can keep behavior consistent.
 - HTML escaping for generated strings lives in `src/lib/html-escape.ts` (`esc`); agreement, change-order, and invoice generators import it—do not reintroduce parallel `escapeHtml` / local `esc` copies.
 
+## Outreach automation (operator scripts)
+
+One-way **Manyreach → Google Sheet** sync lives in **`scripts/outreach/`** (CLI only; not part of the web app). IronWork reads Manyreach campaign state (`GET` only) and updates the Welder Outreach Tracker sheet. Operator setup, env vars, and runbook: **[docs/OUTREACH_AUTOMATION.md](./docs/OUTREACH_AUTOMATION.md)**.
+
 ## Environment Variables
 
 ```
