@@ -293,6 +293,7 @@ export function AgreementPreview({
         try {
           const blob = await fetchAgreementPdfBlob(job, capturedProfile, documentRef.current);
           downloadAgreementPdfBlob(blob, job);
+          await markJobDownloaded(data.id).catch(() => {});
           pdfOk = true;
         } catch (pdfErr) {
           setSaveError(
