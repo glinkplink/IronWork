@@ -31,9 +31,10 @@ function resultToSuggestion(r: GeoapifyJsonResult, index: number): JobSiteAddres
   const st = (r.street ?? '').trim();
   const fromParts = [house, st].filter(Boolean).join(' ').trim();
 
+  // Prefer housenumber+street so amenity names (e.g. "White House") are not stored as the street.
   let street =
-    line1 ||
     fromParts ||
+    line1 ||
     (formatted.includes(',') ? formatted.split(',')[0]?.trim() ?? '' : formatted) ||
     '';
   if (!street) return null;

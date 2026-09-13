@@ -25,6 +25,7 @@ import { buildGuestPreviewProfile } from '../lib/guest-agreement-profile';
 import { buildDocusealProviderSignatureImage } from '../lib/docuseal-signature-image';
 import { AgreementDocumentSections } from './AgreementDocumentSections';
 import { CaptureModal } from './CaptureModal';
+import { toUserFacingError } from '../lib/user-facing-error';
 import { useScaledPreview } from '../hooks/useScaledPreview';
 import { supabase } from '../lib/supabase';
 import './ScaledPreview.css';
@@ -313,7 +314,9 @@ export function AgreementPreview({
       );
     } catch (err) {
       setCaptureSubmitting(false);
-      setCaptureError(err instanceof Error ? err.message : 'Something went wrong.');
+      setCaptureError(
+        err instanceof Error ? toUserFacingError(err.message) : 'Something went wrong.'
+      );
     }
   };
 
