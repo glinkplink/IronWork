@@ -1,0 +1,12 @@
+{
+  "name": "IronWork",
+  "install": "npm ci",
+  "ports": [{ "name": "app", "port": 3000 }],
+  "terminals": [
+    {
+      "name": "dev-server",
+      "command": "VITE_SUPABASE_URL=\"${VITE_SUPABASE_URL:-https://placeholder.supabase.co}\" VITE_SUPABASE_ANON_KEY=\"${VITE_SUPABASE_ANON_KEY:-placeholder-anon-key}\" HOST=0.0.0.0 npm run dev",
+      "description": "IronWork app server on http://localhost:3000 (Vite HMR + /api/pdf + API routes). Chrome for the PDF route is auto-detected at /usr/bin/google-chrome-stable. Placeholder Supabase client vars let the SPA boot the anonymous work-order/preview flow; add real VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY secrets for auth/DB, and SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY for the authenticated PDF route."
+    }
+  ]
+}
