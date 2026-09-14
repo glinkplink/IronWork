@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { signIn } from '../lib/auth';
+import { toUserFacingError } from '../lib/user-facing-error';
 import './AuthPage.css';
 
 interface AuthPageProps {
@@ -21,7 +22,7 @@ export function AuthPage({ onSignInSuccess }: AuthPageProps) {
     const result = await signIn(email, password);
 
     if (result.error) {
-      setError(result.error.message);
+      setError(toUserFacingError(result.error.message, 'Could not sign in.'));
       setLoading(false);
     } else {
       setLoading(false);

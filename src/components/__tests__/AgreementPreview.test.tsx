@@ -11,6 +11,9 @@ import { buildWorkOrderEsignNotificationMessage } from '../../lib/docuseal-agree
 
 const saveWorkOrder = vi.fn();
 const sendWorkOrderForSignature = vi.fn();
+const markJobDownloaded = vi.fn();
+const fetchAgreementPdfBlob = vi.fn();
+const downloadAgreementPdfBlob = vi.fn();
 
 vi.mock('../../lib/db/jobs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/db/jobs')>();
@@ -19,6 +22,30 @@ vi.mock('../../lib/db/jobs', async (importOriginal) => {
     saveWorkOrder: (...args: unknown[]) => saveWorkOrder(...args),
   };
 });
+
+vi.mock('../../lib/job-mark-downloaded', () => ({
+  markJobDownloaded: (...args: unknown[]) => markJobDownloaded(...args),
+}));
+
+vi.mock('../../lib/agreement-pdf', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/agreement-pdf')>();
+  return {
+    ...actual,
+    fetchAgreementPdfBlob: (...args: unknown[]) => fetchAgreementPdfBlob(...args),
+    downloadAgreementPdfBlob: (...args: unknown[]) => downloadAgreementPdfBlob(...args),
+  };
+});
+
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { access_token: 'test-token' } },
+        error: null,
+      }),
+    },
+  },
+}));
 
 vi.mock('../../lib/esign-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/esign-api')>();
@@ -196,5 +223,47 @@ describe('AgreementPreview', () => {
       intent: 'pdf',
     });
     expect(saveWorkOrder).not.toHaveBeenCalled();
+  });
+
+  it('marks the work order downloaded after first-time capture PDF save', async () => {
+    const job = baseJob();
+    const user = userEvent.setup();
+    markJobDownloaded.mockResolvedValue({ data: { id: 'job-new' }, error: null });
+    fetchAgreementPdfBlob.mockResolvedValue(new Blob(['%PDF']));
+    downloadAgreementPdfBlob.mockReturnValue(undefined);
+    saveWorkOrder.mockResolvedValue({ data: { id: 'job-new' }, error: null });
+
+    const onCaptureAndSave = vi.fn().mockResolvedValue({
+      status: 'ready',
+      userId: 'user-new',
+      businessName: 'Acme Welding',
+      email: 'tester@example.com',
+      phone: null,
+      ownerName: 'Alex Rivera',
+    });
+
+    render(
+      <AgreementPreview
+        job={job}
+        profile={null}
+        hasSession={false}
+        onSaveSuccess={vi.fn()}
+        onCaptureAndSave={onCaptureAndSave}
+      />
+    );
+
+    await user.click(screen.getAllByRole('button', { name: 'Download & Save' })[0]);
+    await user.type(screen.getByLabelText(/business name/i), 'Acme Welding');
+    await user.type(screen.getByLabelText(/^email$/i), 'tester@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'hunter2');
+    await user.click(screen.getByRole('button', { name: /create account & download/i }));
+
+    await waitFor(() => {
+      expect(saveWorkOrder).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(markJobDownloaded).toHaveBeenCalledWith('job-new');
+    });
+    expect(downloadAgreementPdfBlob).toHaveBeenCalled();
   });
 });

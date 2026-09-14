@@ -19,6 +19,7 @@ import {
   isWorkOrderDashboardJobComplete,
 } from '../lib/work-order-dashboard-display';
 import { supabase } from '../lib/supabase';
+import { toUserFacingError } from '../lib/user-facing-error';
 import { LandingPreviewModal } from './LandingPreviewModal';
 import './HomePage.css';
 import './WorkOrdersPage.css';
@@ -472,12 +473,20 @@ export function HomePage({
       if (error) {
         setUpdatesFeedback({
           tone: 'err',
-          text: error.message || 'Something went wrong. Try again in a moment.',
+          text: toUserFacingError(error.message || '', 'Something went wrong. Try again in a moment.'),
         });
         return;
       }
       setUpdatesEmail('');
       setUpdatesFeedback({ tone: 'ok', text: "Thanks, we'll keep you posted." });
+    } catch (err) {
+      setUpdatesFeedback({
+        tone: 'err',
+        text: toUserFacingError(
+          err instanceof Error ? err.message : '',
+          'Could not reach IronWork. Check your connection and try again.'
+        ),
+      });
     } finally {
       setUpdatesSubmitting(false);
     }

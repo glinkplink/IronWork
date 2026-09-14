@@ -9,6 +9,13 @@ import { HomePage } from '../HomePage';
 const listWorkOrdersDashboardPage = vi.fn();
 const getWorkOrdersDashboardSummary = vi.fn();
 const getInvoiceDashboardSummary = vi.fn();
+const landingInsert = vi.fn();
+
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    from: () => ({ insert: (...args: unknown[]) => landingInsert(...args) }),
+  },
+}));
 
 vi.mock('../../lib/db/jobs', () => ({
   listWorkOrdersDashboardPage: (...args: unknown[]) => listWorkOrdersDashboardPage(...args),
@@ -105,6 +112,7 @@ function signedInProps() {
 describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    landingInsert.mockReset();
     getInvoiceDashboardSummary.mockResolvedValue({ data: invoiceSummaryOk, error: null });
   });
 
@@ -129,6 +137,17 @@ describe('HomePage', () => {
     expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms.html');
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy.html');
     expect(screen.queryByText(/Cover your ass/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a connection message when checklist signup cannot reach the server', async () => {
+    landingInsert.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const user = userEvent.setup();
+    render(<HomePage {...guestProps()} />);
+    await user.type(screen.getByLabelText(/^Email$/i), 'test@example.com');
+    await user.click(screen.getByRole('button', { name: 'Send me the checklist' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not reach IronWork. Check your connection and try again.'
+    );
   });
 
   it('clears dashboard data when userId becomes null after signed-in load', async () => {
